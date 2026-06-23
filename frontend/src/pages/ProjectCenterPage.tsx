@@ -57,6 +57,12 @@ export default function ProjectCenterPage() {
 
   const cur = useMemo(() => projects.find((p) => p.id === curId) ?? null, [projects, curId])
 
+  // C1 结构壳：里程碑 / 风险 / 可复用资产 的 HTML 真实标记已就位，数据待 Codex 端点接入
+  // （见 docs/CODEX_后端任务_项目中心.md：milestones / risks / reusable-assets）。当前为空态，不伪造。
+  const milestones: { title: string; owner: string; due: string; urgent?: boolean }[] = []
+  const risks: { level: 'high' | 'medium'; text: string }[] = []
+  const reuseTags: { kind: string; name: string }[] = []
+
   return (
     <>
       <div className="ptitle">
@@ -152,15 +158,50 @@ export default function ProjectCenterPage() {
       <div className="grid2 mt">
         <div className="card">
           <div className="ct">下一步 · 里程碑</div>
-          <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
-            待接入项目任务接口后展示。
+          <div id="pj-steps">
+            {milestones.length === 0 ? (
+              <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
+                暂无里程碑。接入项目任务后在此显示（负责人 · 截止）。
+              </div>
+            ) : (
+              milestones.map((m, i) => (
+                <div className="li" key={i}>
+                  <span className="b" style={{ background: m.urgent ? 'var(--red)' : 'var(--terra)' }}></span>
+                  {m.title}
+                  <span className="who">{m.owner} · {m.due}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
         <div className="card">
           <div className="ct">风险看板 · 可复用资产</div>
-          <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
-            待接入项目风险 / 资产接口后展示。
+          <div id="pj-riskboard">
+            {risks.length === 0 ? (
+              <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
+                暂无风险项。接入 AI 研判风险后在此显示。
+              </div>
+            ) : (
+              risks.map((r, i) => (
+                <div className="li" key={i}>
+                  <span className={'pill ' + (r.level === 'high' ? 'h' : 'm')}>
+                    {r.level === 'high' ? '高' : '中'}
+                  </span>
+                  {r.text}
+                </div>
+              ))
+            )}
           </div>
+          {reuseTags.length > 0 && (
+            <div className="tags" style={{ marginTop: 10 }}>
+              {reuseTags.map((t, i) => (
+                <span className="tg" key={i}>
+                  <span className="k">{t.kind}</span>
+                  {t.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
