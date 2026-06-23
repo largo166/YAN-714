@@ -11,6 +11,7 @@ from .routers import project_files, project_analysis
 from .routers import meetings
 from .routers import settings as settings_router
 from .routers import workspace
+from .routers import skills
 
 
 @asynccontextmanager
@@ -38,6 +39,7 @@ app.include_router(workspace.router)
 app.include_router(project_files.router)
 app.include_router(project_analysis.router)
 app.include_router(meetings.router)
+app.include_router(skills.router)
 
 
 @app.get("/")

@@ -44,6 +44,21 @@ class ProjectOverviewOut(BaseModel):
     minutes: int = 0
 
 
+# ── 共创营地：内置技能目录（运行时独立，仅展示，执行链路后续接入）──
+class SkillOut(BaseModel):
+    id: str
+    title: str
+    icon: str = ""
+    source: str = ""
+    example: str = ""
+    status: str = "待命"
+
+
+class SkillListOut(BaseModel):
+    items: List[SkillOut]
+    total: int
+
+
 # ── 设置 ──
 class SettingsOut(BaseModel):
     deepseek_api_key_set: bool
