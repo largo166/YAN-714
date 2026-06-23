@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import type { KnowledgeDoc, KnowledgeDocListItem, KnowledgeHit } from '@/types/schemas'
+import type { KnowledgeDoc, KnowledgeDocListItem, KnowledgeHit, KnowledgeStats } from '@/types/schemas'
 
 /** 数据基地（知识库）：接入真实 knowledge API。保留原 ROM-AI 检索/分区视觉。
  *  C2.1：去 mock — 数据源/库存/可复用资产一律取真实数据或空态，不伪造（原则 9/13）。
@@ -17,6 +17,7 @@ export default function KnowledgePage() {
   const [detail, setDetail] = useState<KnowledgeDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<KnowledgeStats | null>(null)
   // 真实数据源（单一已配置工作区根；未配置 → 空态）
   const [ws, setWs] = useState<{ workspace_path: string; accessible: boolean } | null>(null)
 
@@ -63,6 +64,7 @@ export default function KnowledgePage() {
   useEffect(() => {
     loadDocs()
     api.workspaceStatus().then(setWs).catch(() => setWs(null))
+    api.getKnowledgeStats().then(setStats).catch(() => setStats(null))
   }, [loadDocs])
 
   const doSearch = async () => {
@@ -234,15 +236,15 @@ export default function KnowledgePage() {
         </button>
         <div className="secbody">
           <div className="grid3">
-            <div className="metric"><div className="l">受管文件</div><div className="v">{docs.length}</div></div>
-            <div className="metric"><div className="l">已索引</div><div className="v t">{docs.length}</div></div>
+            <div className="metric"><div className="l">受管文件</div><div className="v">{stats ? stats.documents : docs.length}</div></div>
+            <div className="metric"><div className="l">已索引</div><div className="v t">{stats ? stats.indexed : docs.length}</div></div>
             <div className="metric">
               <div className="l">索引块 · CJK</div>
-              <div className="v" style={{ fontSize: 15, color: 'var(--mut)' }} title="真实分块统计待后端 /api/knowledge/stats 接入">待接入</div>
+              <div className="v">{stats ? stats.cjk_chunks : '…'}</div>
             </div>
           </div>
           <div className="health">
-            <div className="hrow"><span className="hb" style={{ background: 'var(--ok)' }}></span>索引状态 正常 · FTS5 / BM25<span className="r">当前本地库</span></div>
+            <div className="hrow"><span className="hb" style={{ background: 'var(--ok)' }}></span>索引状态 正常 · {stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}<span className="r">当前本地库</span></div>
             <div className="hrow"><span className="hb" style={{ background: 'var(--mut)' }}></span>二进制图纸与图片暂不入全文检索<span className="r">资产登记</span></div>
           </div>
         </div>

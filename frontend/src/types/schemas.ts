@@ -62,6 +62,74 @@ export const SkillListSchema = z.object({
 })
 export type SkillList = z.infer<typeof SkillListSchema>
 
+// ── 协作平台 / 驾驶舱（C4/C5）──
+export const AgentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.string(),
+  duty: z.string(),
+  output: z.string(),
+  status: z.string(),
+})
+export type Agent = z.infer<typeof AgentSchema>
+export const AgentListSchema = z.object({ items: z.array(AgentSchema) })
+
+export const TeamMemberSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  role: z.string(),
+  duty: z.string(),
+  birthday: z.string(),
+})
+export type TeamMember = z.infer<typeof TeamMemberSchema>
+export const TeamMemberListSchema = z.object({ items: z.array(TeamMemberSchema) })
+
+export const TickerItemSchema = z.object({ kind: z.string(), text: z.string() })
+export type TickerItem = z.infer<typeof TickerItemSchema>
+export const TickerListSchema = z.object({ items: z.array(TickerItemSchema) })
+
+export const BroadcastSchema = z.object({
+  id: z.number(),
+  text: z.string(),
+  created_at: z.string(),
+})
+export type Broadcast = z.infer<typeof BroadcastSchema>
+export const BroadcastListSchema = z.object({ items: z.array(BroadcastSchema) })
+
+export const BossDashboardSchema = z.object({
+  active_projects: z.number(),
+  near_delivery: z.number(),
+  high_risks: z.number(),
+  ai_usage_week: z.number(),
+})
+export type BossDashboard = z.infer<typeof BossDashboardSchema>
+
+export const WorkloadItemSchema = z.object({
+  name: z.string(),
+  pct: z.number(),
+  level: z.string(),
+})
+export type WorkloadItem = z.infer<typeof WorkloadItemSchema>
+export const WorkloadListSchema = z.object({ items: z.array(WorkloadItemSchema) })
+
+export const AiUsageItemSchema = z.object({ capability: z.string(), count: z.number() })
+export type AiUsageItem = z.infer<typeof AiUsageItemSchema>
+export const AiUsageListSchema = z.object({ items: z.array(AiUsageItemSchema) })
+
+export const NotConfiguredListSchema = z.object({
+  status: z.string(),
+  items: z.array(z.unknown()),
+})
+
+export const KnowledgeStatsSchema = z.object({
+  documents: z.number(),
+  indexed: z.number(),
+  chunks: z.number(),
+  cjk_chunks: z.number(),
+  engine: z.string(),
+})
+export type KnowledgeStats = z.infer<typeof KnowledgeStatsSchema>
+
 export const PROJECT_STATUSES = ['active', 'planning', 'completed'] as const
 
 export const ProjectInputSchema = z.object({

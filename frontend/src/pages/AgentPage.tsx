@@ -2,22 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import type { ChatMessage, ChatSession, KnowledgeHit } from '@/types/schemas'
+import type { ChatMessage, ChatSession, KnowledgeHit, Skill } from '@/types/schemas'
 
 const EXAMPLES = [
   '帮我做一版方案汇报 PPT',
   '把会议录音转成纪要并排好待办',
   '生成几张退台立面意向图',
   '对这版方案做评审，再对标一个类比项目',
-]
-
-const SKILLS = [
-  { key: 'ppt', icon: '▤', title: 'PPT 大纲生成', src: '读知识库 + 项目数据' },
-  { key: 'img', icon: '🖼', title: 'AI 生图 · 意向图', src: 'Prompt 模板 → 即梦 / MJ' },
-  { key: 'review', icon: '◷', title: '方案评审', src: '案例策略 + 方法模板比对' },
-  { key: 'task', icon: '✓', title: '任务安排生成', src: '→ 写回项目中心 下一步' },
-  { key: 'meeting', icon: '🔊', title: '会议纪要', src: '转写 + 甲方诉求转译' },
-  { key: 'compete', icon: '◰', title: '竞品分析', src: '读知识库类比项目' },
 ]
 
 /** 共创营地（AI 工作台）：接入真实 chat API。保留原 ROM-AI composer/bubble 视觉。
@@ -36,6 +27,7 @@ export default function AgentPage() {
   const [mode, setMode] = useState('Auto')
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [lastHits, setLastHits] = useState<KnowledgeHit[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
   const logRef = useRef<HTMLDivElement>(null)
 
   const loadSessions = useCallback(async () => {
@@ -67,6 +59,7 @@ export default function AgentPage() {
         setModel(s.deepseek_model || 'DeepSeek')
       })
       .catch(() => setAiConfigured(false))
+    api.listSkills().then((d) => setSkills(d.items)).catch(() => setSkills([]))
     loadSessions().then((items) => {
       if (items.length) openSession(items[0].id)
     })
@@ -338,16 +331,26 @@ export default function AgentPage() {
         <button className="anbtn">＋ 全部技能</button>
       </div>
       <div className="grid3">
-        {SKILLS.map((s) => (
-          <div className="skill" key={s.key}>
+        {skills.map((s) => (
+          <button
+            className="skill"
+            key={s.id}
+            type="button"
+            title="点击把示例填入下方输入框（不自动执行）"
+            onClick={() => setText(s.example)}
+            style={{ cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+          >
             <div className="srow">
               <div className="ic">{s.icon}</div>
-              <span className="status">待命</span>
+              <span className="status">{s.status}</span>
             </div>
             <h4>{s.title}</h4>
-            <div className="src">{s.src}</div>
-          </div>
+            <div className="src">{s.source}</div>
+          </button>
         ))}
+        {skills.length === 0 && (
+          <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>技能目录加载中…</div>
+        )}
       </div>
 
       <div className="ct mt" style={{ paddingLeft: 2 }}>

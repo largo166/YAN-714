@@ -20,6 +20,16 @@ import {
   ProjectSchema,
   ReusableAssetListSchema,
   SkillListSchema,
+  AgentListSchema,
+  TeamMemberListSchema,
+  TickerListSchema,
+  BroadcastListSchema,
+  BroadcastSchema,
+  BossDashboardSchema,
+  WorkloadListSchema,
+  AiUsageListSchema,
+  NotConfiguredListSchema,
+  KnowledgeStatsSchema,
   SendMessageOutSchema,
   SettingsSchema,
   TencentSyncSchema,
@@ -36,6 +46,14 @@ import {
   type ProjectRisk,
   type ReusableAsset,
   type SkillList,
+  type Agent,
+  type TeamMember,
+  type TickerItem,
+  type Broadcast,
+  type BossDashboard,
+  type WorkloadItem,
+  type AiUsageItem,
+  type KnowledgeStats,
   type ProjectFileDetail,
   type ProjectInput,
   type ProjectList,
@@ -122,6 +140,47 @@ export const api = {
   // ── 共创营地：内置技能目录（只读） ──
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
+  },
+
+  // ── 协作平台（C4）──
+  async listAgents(): Promise<Agent[]> {
+    return AgentListSchema.parse(await request('/api/agents')).items
+  },
+  async listTeamMembers(): Promise<TeamMember[]> {
+    return TeamMemberListSchema.parse(await request('/api/team/members')).items
+  },
+  async getTicker(): Promise<TickerItem[]> {
+    return TickerListSchema.parse(await request('/api/broadcast/ticker')).items
+  },
+
+  // ── 管理驾驶舱（C5）──
+  async getBossDashboard(): Promise<BossDashboard> {
+    return BossDashboardSchema.parse(await request('/api/boss/dashboard'))
+  },
+  async getWorkload(): Promise<WorkloadItem[]> {
+    return WorkloadListSchema.parse(await request('/api/boss/workload')).items
+  },
+  async getAiUsage(): Promise<AiUsageItem[]> {
+    return AiUsageListSchema.parse(await request('/api/boss/ai-usage')).items
+  },
+  async getFeishuBoard(): Promise<{ status: string }> {
+    return NotConfiguredListSchema.parse(await request('/api/boss/feishu-board'))
+  },
+  async getBossComments(): Promise<{ status: string }> {
+    return NotConfiguredListSchema.parse(await request('/api/boss/comments'))
+  },
+  async listBroadcasts(): Promise<Broadcast[]> {
+    return BroadcastListSchema.parse(await request('/api/broadcast/broadcasts')).items
+  },
+  async createBroadcast(text: string): Promise<Broadcast> {
+    return BroadcastSchema.parse(
+      await request('/api/broadcast/broadcasts', { method: 'POST', body: JSON.stringify({ text }) }),
+    )
+  },
+
+  // ── 数据基地：索引统计 ──
+  async getKnowledgeStats(): Promise<KnowledgeStats> {
+    return KnowledgeStatsSchema.parse(await request('/api/knowledge/stats'))
   },
 
   // ── 设置 ──
