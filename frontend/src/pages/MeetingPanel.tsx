@@ -92,6 +92,25 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
     }
   }
 
+  // 查看已生成纪要：GET 拉取最新一版，不重跑 LLM；无纪要时友好提示而非报错。
+  const viewMinute = async (mid: number) => {
+    if (projectId == null) return
+    setBusy(true)
+    setErr(null)
+    setMsg(null)
+    setCurMeeting(mid)
+    setMinute(null)
+    try {
+      setMinute(await api.getLatestMinute(projectId, mid))
+    } catch (e) {
+      const m = (e as Error).message
+      setMsg(m.includes('404') || m.includes('尚未') ? '该会议尚未生成纪要，点「生成纪要」创建。' : null)
+      if (!m.includes('404') && !m.includes('尚未')) setErr(m)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const confirm = async () => {
     if (projectId == null || curMeeting == null || !minute) return
     try {
@@ -204,7 +223,15 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
       {meetings.length > 0 && (
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {meetings.map((m) => (
-            <div key={m.id} style={{ padding: '8px 10px', border: '1px solid var(--line2)', borderRadius: 8 }}>
+            <div
+              key={m.id}
+              style={{
+                padding: '8px 10px',
+                border: '1px solid ' + (m.id === curMeeting ? 'var(--terra-line)' : 'var(--line2)'),
+                background: m.id === curMeeting ? 'var(--terra-soft)' : undefined,
+                borderRadius: 8,
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontSize: 13 }}>
                   🗓 {m.title}
@@ -213,7 +240,10 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
                     <span className="statpill live" style={{ marginLeft: 6 }}>腾讯 {m.tencent_meeting_code}</span>
                   )}
                 </div>
-                <button className="anbtn" disabled={busy} onClick={() => genMinute(m.id)}>生成纪要</button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="anbtn" disabled={busy} onClick={() => viewMinute(m.id)}>查看纪要</button>
+                  <button className="anbtn" disabled={busy} onClick={() => genMinute(m.id)}>生成纪要</button>
+                </div>
               </div>
             </div>
           ))}

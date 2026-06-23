@@ -34,6 +34,8 @@ import {
   BossDashboardSchema,
   WorkloadListSchema,
   AiUsageListSchema,
+  BatchIngestImportSchema,
+  BatchIngestPreviewSchema,
   NotConfiguredListSchema,
   KnowledgeStatsSchema,
   SendMessageOutSchema,
@@ -64,6 +66,8 @@ import {
   type BossDashboard,
   type WorkloadItem,
   type AiUsageItem,
+  type BatchIngestImport,
+  type BatchIngestPreview,
   type KnowledgeStats,
   type ProjectFileDetail,
   type ProjectInput,
@@ -374,6 +378,22 @@ export const api = {
       await request(`/api/projects/${projectId}/files/${fileId}/index`, { method: 'POST' }),
     )
   },
+  async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
+    return BatchIngestPreviewSchema.parse(
+      await request('/api/projects/batch-ingest/preview', {
+        method: 'POST',
+        body: JSON.stringify({ root_path: rootPath }),
+      }),
+    )
+  },
+  async importBatchIngest(rootPath: string): Promise<BatchIngestImport> {
+    return BatchIngestImportSchema.parse(
+      await request('/api/projects/batch-ingest/import', {
+        method: 'POST',
+        body: JSON.stringify({ root_path: rootPath, index_to_knowledge: true }),
+      }),
+    )
+  },
 
   // ── 4D: AI 研判 ──
   async analyzeProject(projectId: number, task: string, topK = 5): Promise<ProjectAnalysis> {
@@ -452,6 +472,11 @@ export const api = {
   async generateMinute(projectId: number, meetingId: number): Promise<MeetingMinute> {
     return MeetingMinuteSchema.parse(
       await request(`/api/projects/${projectId}/meetings/${meetingId}/minute`, { method: 'POST' }),
+    )
+  },
+  async getLatestMinute(projectId: number, meetingId: number): Promise<MeetingMinute> {
+    return MeetingMinuteSchema.parse(
+      await request(`/api/projects/${projectId}/meetings/${meetingId}/minute`),
     )
   },
   async confirmMinute(
