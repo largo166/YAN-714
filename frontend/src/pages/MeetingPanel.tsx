@@ -100,6 +100,16 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
     }
   }
 
+  const reflow = async () => {
+    if (projectId == null || curMeeting == null || !minute) return
+    try {
+      const r = await api.reflowMinute(projectId, curMeeting, minute.id)
+      if (r.status === 'ok') setMinute({ ...minute, reflowed: true })
+    } catch (e) {
+      setErr((e as Error).message)
+    }
+  }
+
   if (projectId == null) {
     return (
       <div className="card mt">
@@ -179,6 +189,14 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
             {minute.gen_status === 'ok' && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {minute.review_status !== 'confirmed' && <button className="anbtn" onClick={confirm}>人工审定</button>}
+                {minute.review_status === 'confirmed' &&
+                  (minute.reflowed ? (
+                    <span className="statpill live">✓ 已回流下一步</span>
+                  ) : (
+                    <button className="anbtn" onClick={reflow} title="把已审定纪要待办回流为项目中心「下一步·里程碑」">
+                      回流到下一步
+                    </button>
+                  ))}
                 <a className="anbtn" style={{ textDecoration: 'none' }}
                    href={api.minuteDocxUrl(projectId, curMeeting as number, minute.id, 'external')}>导出 Word(对外)</a>
                 <a className="anbtn" style={{ textDecoration: 'none' }}

@@ -62,7 +62,7 @@ export default function AgentPage() {
       })
       .catch(() => setAiConfigured(false))
     api.listSkills().then((d) => setSkills(d.items)).catch(() => setSkills([]))
-    api.getResultChannels().then(setChannels).catch(() => setChannels([]))
+    api.getResultSendChannels().then(setChannels).catch(() => setChannels([]))
     loadSessions().then((items) => {
       if (items.length) openSession(items[0].id)
     })

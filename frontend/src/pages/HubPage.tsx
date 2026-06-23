@@ -165,7 +165,19 @@ export default function HubPage() {
             </div>
             <div className="duty">
               <b>承担任务</b>
-              <span style={{ color: 'var(--mut)' }}>未分派</span>
+              {m.assignments.length === 0 ? (
+                <span style={{ color: 'var(--mut)' }}>未分派</span>
+              ) : (
+                <span className="dv">
+                  {m.assignments.map((a, i) => (
+                    <span key={i}>
+                      {i > 0 && '；'}
+                      {a.task_title}
+                      {a.due ? ` · ${a.due}` : ''}
+                    </span>
+                  ))}
+                </span>
+              )}
               <span className="pdis">项目中心分派</span>
             </div>
           </div>

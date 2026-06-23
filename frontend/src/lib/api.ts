@@ -22,6 +22,8 @@ import {
   ProjectProgressSchema,
   ResultSendChannelsSchema,
   ResultSendPreviewSchema,
+  ReflowSchema,
+  TeamAssignmentSchema,
   SkillListSchema,
   AgentListSchema,
   TeamMemberListSchema,
@@ -52,6 +54,8 @@ import {
   type ProjectProgress,
   type ResultSendChannel,
   type ResultSendPreview,
+  type Reflow,
+  type TeamAssignment,
   type SkillList,
   type Agent,
   type TeamMember,
@@ -172,6 +176,11 @@ export const api = {
   async deleteTeamMember(id: number): Promise<void> {
     await request(`/api/team/members/${id}`, { method: 'DELETE' })
   },
+  async createTeamAssignment(projectId: number, input: { member_id: number; task_title: string; due?: string }): Promise<TeamAssignment> {
+    return TeamAssignmentSchema.parse(
+      await request(`/api/projects/${projectId}/team-assignments`, { method: 'POST', body: JSON.stringify(input) }),
+    )
+  },
   async getTicker(): Promise<TickerItem[]> {
     return TickerListSchema.parse(await request('/api/broadcast/ticker')).items
   },
@@ -207,7 +216,7 @@ export const api = {
   },
 
   // ── 成果发送（D1，preview/not_configured，不真发）──
-  async getResultChannels(): Promise<ResultSendChannel[]> {
+  async getResultSendChannels(): Promise<ResultSendChannel[]> {
     return ResultSendChannelsSchema.parse(await request('/api/result-send/channels')).items
   },
   async previewResultSend(content: string, channel: string): Promise<ResultSendPreview> {
@@ -453,6 +462,18 @@ export const api = {
     return MeetingMinuteSchema.parse(
       await request(
         `/api/projects/${projectId}/meetings/${meetingId}/minute/${minuteId}/confirm`,
+        { method: 'POST' },
+      ),
+    )
+  },
+  async reflowMinute(
+    projectId: number,
+    meetingId: number,
+    minuteId: number,
+  ): Promise<Reflow> {
+    return ReflowSchema.parse(
+      await request(
+        `/api/projects/${projectId}/meetings/${meetingId}/minute/${minuteId}/reflow`,
         { method: 'POST' },
       ),
     )

@@ -98,15 +98,29 @@ export const AgentSchema = z.object({
 export type Agent = z.infer<typeof AgentSchema>
 export const AgentListSchema = z.object({ items: z.array(AgentSchema) })
 
+export const TeamAssignmentSchema = z.object({
+  task_title: z.string(),
+  due: z.string().default(''),
+  project_id: z.number(),
+})
+export type TeamAssignment = z.infer<typeof TeamAssignmentSchema>
+
 export const TeamMemberSchema = z.object({
   id: z.number(),
   name: z.string(),
   role: z.string(),
   duty: z.string(),
   birthday: z.string(),
+  assignments: z.array(TeamAssignmentSchema).default([]),
 })
 export type TeamMember = z.infer<typeof TeamMemberSchema>
 export const TeamMemberListSchema = z.object({ items: z.array(TeamMemberSchema) })
+
+export const ReflowSchema = z.object({
+  status: z.string(),
+  reflowed_count: z.number(),
+})
+export type Reflow = z.infer<typeof ReflowSchema>
 
 export const TickerItemSchema = z.object({ kind: z.string(), text: z.string() })
 export type TickerItem = z.infer<typeof TickerItemSchema>
@@ -403,6 +417,7 @@ export const MeetingMinuteSchema = z.object({
   decisions: z.array(z.string()),
   todos: z.array(TodoItemSchema),
   review_status: z.string(), // draft|confirmed
+  reflowed: z.boolean().default(false),
   model: z.string(),
   error_message: z.string(),
   created_at: z.string(),
