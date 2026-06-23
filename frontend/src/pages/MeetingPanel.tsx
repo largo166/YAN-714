@@ -24,6 +24,7 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [speaking, setSpeaking] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(() => {
@@ -110,6 +111,52 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
     }
   }
 
+  // 语音播报：用 confirmed 纪要的真实五段内容拼播报稿，浏览器 speechSynthesis 朗读（无后端/无 key/离线）。
+  const buildScript = (m: MeetingMinute): string => {
+    const parts: string[] = ['以下是会议纪要要点播报。']
+    if (m.summary.length) parts.push('纪要内容：' + m.summary.join('；') + '。')
+    if (m.core_items.length) parts.push('核心事项：' + m.core_items.join('；') + '。')
+    if (m.decisions.length) parts.push('会议决议：' + m.decisions.join('；') + '。')
+    if (m.todos.length)
+      parts.push(
+        '待办事项：' +
+          m.todos.map((t) => t.text + (t.owner ? '，负责人' + t.owner : '')).join('；') +
+          '。',
+      )
+    parts.push('播报结束。')
+    return parts.join('')
+  }
+
+  const toggleSpeak = () => {
+    if (!minute) return
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setErr('当前浏览器不支持语音播报。')
+      return
+    }
+    if (speaking) {
+      window.speechSynthesis.cancel()
+      setSpeaking(false)
+      return
+    }
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(buildScript(minute))
+    u.lang = 'zh-CN'
+    u.rate = 1
+    u.onend = () => setSpeaking(false)
+    u.onerror = () => setSpeaking(false)
+    setSpeaking(true)
+    window.speechSynthesis.speak(u)
+  }
+
+  // 切换纪要 / 卸载时停止播报，避免串音
+  useEffect(() => {
+    setSpeaking(false)
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    }
+  }, [minute?.id])
+
   if (projectId == null) {
     return (
       <div className="card mt">
@@ -188,6 +235,9 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
             </b>
             {minute.gen_status === 'ok' && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button className="anbtn" onClick={toggleSpeak} title="用浏览器语音朗读纪要要点">
+                  {speaking ? '■ 停止播报' : '🔊 语音播报'}
+                </button>
                 {minute.review_status !== 'confirmed' && <button className="anbtn" onClick={confirm}>人工审定</button>}
                 {minute.review_status === 'confirmed' &&
                   (minute.reflowed ? (
