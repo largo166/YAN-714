@@ -87,7 +87,7 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
 
 @router.post("/search", response_model=schemas.KnowledgeSearchOut)
 def search_documents(payload: schemas.KnowledgeSearchIn, db: Session = Depends(get_db)):
-    hits = retrieval.search(db, payload.query, top_k=payload.top_k)
+    hits = retrieval.search(db, payload.query, top_k=payload.top_k, project_id=payload.project_id)
     engine = hits[0].engine if hits else ("fts5" if retrieval.fts5_available(db) else "like")
     return schemas.KnowledgeSearchOut(
         query=payload.query,

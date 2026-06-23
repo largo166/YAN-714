@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill } from '@/types/schemas'
+import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill, SkillRun } from '@/types/schemas'
 
 const EXAMPLES = [
   '帮我做一版方案汇报 PPT',
@@ -30,6 +30,8 @@ export default function AgentPage() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [channels, setChannels] = useState<ResultSendChannel[]>([])
   const [sendNote, setSendNote] = useState<string | null>(null)
+  const [results, setResults] = useState<SkillRun[]>([])
+  const [runningSkill, setRunningSkill] = useState<string | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
 
   const loadSessions = useCallback(async () => {
@@ -113,8 +115,8 @@ export default function AgentPage() {
       const res = await api.sendMessage(sid, {
         message: content,
         use_knowledge: useKnowledge,
-        // 作用于当前项目：开启知识库时，用项目名为检索加上项目上下文
-        knowledge_query: useKnowledge && cur ? `${cur.name} ${content}` : undefined,
+        // 作用于当前项目：开启知识库时，按当前项目范围检索（E1 项目级检索，避免混读其他项目）
+        project_id: useKnowledge && cur ? cur.id : undefined,
         top_k: 5,
       })
       setAiConfigured(res.ai_configured)
@@ -132,6 +134,25 @@ export default function AgentPage() {
       setMessages((m) => m.filter((x) => x.id > 0))
     } finally {
       setSending(false)
+    }
+  }
+
+  // 执行技能卡 → 成果卡（围绕当前项目 + 项目级 RAG）。需选中项目；不自动串跑。
+  const runSkill = async (skillId: string) => {
+    if (!cur) {
+      setErr('请先选择作用项目，再执行技能。')
+      return
+    }
+    if (runningSkill) return
+    setErr(null)
+    setRunningSkill(skillId)
+    try {
+      const r = await api.runSkill(cur.id, skillId, text.trim())
+      setResults((prev) => [r, ...prev]) // 新成果卡置顶
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setRunningSkill(null)
     }
   }
 
@@ -335,21 +356,37 @@ export default function AgentPage() {
       </div>
       <div className="grid3">
         {skills.map((s) => (
-          <button
+          <div
             className="skill"
             key={s.id}
-            type="button"
-            title="点击把示例填入下方输入框（不自动执行）"
-            onClick={() => setText(s.example)}
-            style={{ cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+            style={{ textAlign: 'left' }}
           >
             <div className="srow">
               <div className="ic">{s.icon}</div>
-              <span className="status">{s.status}</span>
+              <span className="status">{runningSkill === s.id ? '执行中…' : s.status}</span>
             </div>
             <h4>{s.title}</h4>
             <div className="src">{s.source}</div>
-          </button>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button
+                className="anbtn"
+                type="button"
+                disabled={!!runningSkill || !cur}
+                title={cur ? '基于当前项目执行，产出成果卡' : '请先选择作用项目'}
+                onClick={() => runSkill(s.id)}
+              >
+                {runningSkill === s.id ? '执行中…' : '执行'}
+              </button>
+              <button
+                className="anbtn"
+                type="button"
+                title="把示例填入下方输入框（不执行）"
+                onClick={() => setText(s.example)}
+              >
+                填入示例
+              </button>
+            </div>
+          </div>
         ))}
         {skills.length === 0 && (
           <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>技能目录加载中…</div>
@@ -398,7 +435,49 @@ export default function AgentPage() {
         <div style={{ fontSize: 11.5, color: 'var(--mut)', padding: '6px 2px' }}>{sendNote}</div>
       )}
       <div className="results">
-        <div className="empty">发送需求后，生成的成果会出现在这里 →</div>
+        {results.length === 0 ? (
+          <div className="empty">点技能卡「执行」后，生成的成果会出现在这里 →</div>
+        ) : (
+          results.map((r, i) => (
+            <div
+              key={i}
+              className="card"
+              style={{ marginBottom: 10, padding: '12px 14px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <b style={{ fontSize: 14 }}>{r.title}</b>
+                <span className={'statpill ' + (r.status === 'ok' ? 'live' : 'demo')}>
+                  {r.status === 'ok'
+                    ? r.model || '已生成'
+                    : r.status === 'not_configured'
+                      ? '未配置 AI'
+                      : r.status === 'no_material'
+                        ? '无材料'
+                        : '失败'}
+                </span>
+              </div>
+              {r.status === 'ok' ? (
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{r.content}</div>
+              ) : (
+                <div style={{ color: 'var(--mut)', fontSize: 13 }}>
+                  {r.content}
+                  {r.error_message && <div style={{ color: 'var(--red)', marginTop: 4 }}>{r.error_message}</div>}
+                </div>
+              )}
+              {r.sources.length > 0 && (
+                <div style={{ marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--mut)', marginBottom: 3 }}>出处（{r.sources.length}）</div>
+                  {r.sources.map((s, j) => (
+                    <div key={j} style={{ fontSize: 11.5, color: 'var(--mut)' }}>
+                      <span className="score">{s.kind === 'project_file' ? '项目文件' : '知识库'}</span>{' '}
+                      <b>{s.title}</b>：{s.snippet}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </>
   )

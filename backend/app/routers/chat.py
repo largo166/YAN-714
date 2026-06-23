@@ -77,7 +77,7 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
     hits = []
     if payload.use_knowledge:
         q = payload.knowledge_query or payload.message
-        hits = retrieval.search(db, q, top_k=payload.top_k)
+        hits = retrieval.search(db, q, top_k=payload.top_k, project_id=payload.project_id)
 
     # 3) 生成 assistant 消息
     if not configured:

@@ -253,6 +253,28 @@ class SkillListOut(BaseModel):
     total: int
 
 
+class SkillRunIn(BaseModel):
+    input: str = ""  # 可选用户补充指令
+
+
+class SkillSourceOut(BaseModel):
+    kind: str
+    ref_id: int
+    title: str
+    snippet: str
+    engine: str = ""
+
+
+class SkillRunOut(BaseModel):
+    skill_id: str
+    status: str  # ok|not_configured|no_material|error
+    title: str = ""
+    content: str = ""
+    sources: List[SkillSourceOut] = []
+    model: str = ""
+    error_message: str = ""
+
+
 # ── 设置 ──
 class SettingsOut(BaseModel):
     deepseek_api_key_set: bool
@@ -307,6 +329,7 @@ class SendMessageIn(BaseModel):
     message: str = Field(min_length=1)
     use_knowledge: bool = False
     knowledge_query: Optional[str] = None
+    project_id: Optional[int] = None  # 项目级检索范围（E1）；None=全库
     top_k: int = 5
 
 
@@ -373,6 +396,7 @@ class KnowledgeDocListOut(BaseModel):
 class KnowledgeSearchIn(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = 5
+    project_id: Optional[int] = None  # 项目级检索范围（E1）；None=全库
 
 
 class KnowledgeSearchOut(BaseModel):

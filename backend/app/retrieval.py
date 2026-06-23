@@ -113,12 +113,38 @@ def _snippet(content: str, q: str, width: int = 120) -> str:
     return pre + content[start:end].strip() + suf
 
 
-def search(db: Session, query: str, top_k: int = 5) -> List[SearchHit]:
+def _project_doc_ids(db: Session, project_id: int) -> set[int]:
+    """项目级检索范围：该项目所有已索引文件指向的知识文档 id 集合。
+    复用 ProjectFile.project_id + indexed_doc_id（>0 表示已回流入库）。"""
+    from . import models
+
+    rows = (
+        db.query(models.ProjectFile.indexed_doc_id)
+        .filter(
+            models.ProjectFile.project_id == project_id,
+            models.ProjectFile.status == "active",
+            models.ProjectFile.indexed_doc_id > 0,
+        )
+        .all()
+    )
+    return {r[0] for r in rows}
+
+
+def search(
+    db: Session, query: str, top_k: int = 5, project_id: int | None = None
+) -> List[SearchHit]:
     from . import models
 
     q = (query or "").strip()
     if not q:
         return []
+
+    # 项目级范围：限定到该项目已索引文档；项目无任何已索引文档 → 空结果（不报错）
+    scope: set[int] | None = None
+    if project_id is not None:
+        scope = _project_doc_ids(db, project_id)
+        if not scope:
+            return []
 
     # FTS5 路径
     if fts5_available(db):
@@ -126,16 +152,20 @@ def search(db: Session, query: str, top_k: int = 5) -> List[SearchHit]:
         try:
             # 简单转义:用双引号包裹做短语匹配，避免特殊符号当语法
             safe = '"' + q.replace('"', '""') + '"'
+            # 项目级时多取一些再按 scope 过滤，避免被 LIMIT 截掉范围内命中
+            fetch_k = top_k if scope is None else max(top_k * 5, top_k)
             rows = db.execute(
                 text(
                     "SELECT rowid, bm25(knowledge_documents_fts) AS rank "
                     "FROM knowledge_documents_fts WHERE knowledge_documents_fts MATCH :q "
                     "ORDER BY rank LIMIT :k"
                 ),
-                {"q": safe, "k": top_k},
+                {"q": safe, "k": fetch_k},
             ).fetchall()
             hits: List[SearchHit] = []
             for rid, rank in rows:
+                if scope is not None and rid not in scope:
+                    continue
                 doc = db.get(models.KnowledgeDocument, rid)
                 if not doc:
                     continue
@@ -149,6 +179,8 @@ def search(db: Session, query: str, top_k: int = 5) -> List[SearchHit]:
                         engine="fts5",
                     )
                 )
+                if len(hits) >= top_k:
+                    break
             if hits:
                 return hits
         except Exception:
@@ -156,16 +188,14 @@ def search(db: Session, query: str, top_k: int = 5) -> List[SearchHit]:
 
     # LIKE 兜底
     like = f"%{q}%"
-    docs = (
-        db.query(models.KnowledgeDocument)
-        .filter(
-            (models.KnowledgeDocument.title.ilike(like))
-            | (models.KnowledgeDocument.content_text.ilike(like))
-            | (models.KnowledgeDocument.tags.ilike(like))
-        )
-        .limit(top_k)
-        .all()
+    qy = db.query(models.KnowledgeDocument).filter(
+        (models.KnowledgeDocument.title.ilike(like))
+        | (models.KnowledgeDocument.content_text.ilike(like))
+        | (models.KnowledgeDocument.tags.ilike(like))
     )
+    if scope is not None:
+        qy = qy.filter(models.KnowledgeDocument.id.in_(scope))
+    docs = qy.limit(top_k).all()
     return [
         SearchHit(
             document_id=d.id,

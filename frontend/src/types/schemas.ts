@@ -86,6 +86,24 @@ export const SkillListSchema = z.object({
 })
 export type SkillList = z.infer<typeof SkillListSchema>
 
+export const SkillSourceSchema = z.object({
+  kind: z.string(),
+  ref_id: z.number(),
+  title: z.string(),
+  snippet: z.string(),
+  engine: z.string().default(''),
+})
+export const SkillRunSchema = z.object({
+  skill_id: z.string(),
+  status: z.string(),
+  title: z.string().default(''),
+  content: z.string().default(''),
+  sources: z.array(SkillSourceSchema).default([]),
+  model: z.string().default(''),
+  error_message: z.string().default(''),
+})
+export type SkillRun = z.infer<typeof SkillRunSchema>
+
 // ── 协作平台 / 驾驶舱（C4/C5）──
 export const AgentSchema = z.object({
   id: z.string(),

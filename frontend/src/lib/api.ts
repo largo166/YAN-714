@@ -25,6 +25,7 @@ import {
   ReflowSchema,
   TeamAssignmentSchema,
   SkillListSchema,
+  SkillRunSchema,
   AgentListSchema,
   TeamMemberListSchema,
   TeamMemberSchema,
@@ -59,6 +60,7 @@ import {
   type Reflow,
   type TeamAssignment,
   type SkillList,
+  type SkillRun,
   type Agent,
   type TeamMember,
   type TickerItem,
@@ -109,6 +111,7 @@ export interface SendMessageInput {
   message: string
   use_knowledge?: boolean
   knowledge_query?: string
+  project_id?: number
   top_k?: number
 }
 
@@ -158,6 +161,14 @@ export const api = {
   // ── 共创营地：内置技能目录（只读） ──
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
+  },
+  async runSkill(projectId: number, skillId: string, input = ''): Promise<SkillRun> {
+    return SkillRunSchema.parse(
+      await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
+        method: 'POST',
+        body: JSON.stringify({ input }),
+      }),
+    )
   },
 
   // ── 协作平台（C4）──
