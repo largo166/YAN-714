@@ -124,3 +124,45 @@ def test_soft_delete_and_restore(client):
         assert any(f["id"] == fid for f in lst2.json()["items"])
     finally:
         _cleanup_project_dir(pid)
+
+
+def test_batch_ingest_preview_and_import(client, tmp_path):
+    root = tmp_path / "YAN-项目数据"
+    p1 = root / "石家庄市庄项目" / "项目笔记"
+    p2 = root / "石家庄振三街项目" / "原始资料"
+    p1.mkdir(parents=True)
+    p2.mkdir(parents=True)
+    (p1 / "项目复盘.md").write_text("# 复盘\n退台立面策略", encoding="utf-8")
+    (p1 / "效果图.png").write_bytes(b"png")
+    (p2 / "会议纪要.txt").write_text("甲方要求：展示区节点", encoding="utf-8")
+
+    preview = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(root)})
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["total_projects"] == 2
+    assert body["total_supported"] == 3
+    assert body["total_unsupported"] == 0
+
+    imported = client.post("/api/projects/batch-ingest/import", json={"root_path": str(root)})
+    assert imported.status_code == 200, imported.text
+    result = imported.json()
+    project_ids = [p["project_id"] for p in result["projects"]]
+    try:
+        assert result["copied"] == 3
+        assert result["indexed"] == 3
+        assert result["failed"] == 0
+
+        projects = client.get("/api/projects").json()["items"]
+        assert any(p["name"] == "石家庄市庄项目" for p in projects)
+        assert any(p["name"] == "石家庄振三街项目" for p in projects)
+
+        search = client.post("/api/knowledge/search", json={"query": "退台立面", "top_k": 5})
+        assert any("项目复盘" in hit["title"] for hit in search.json()["hits"])
+
+        again = client.post("/api/projects/batch-ingest/import", json={"root_path": str(root)})
+        assert again.status_code == 200
+        assert again.json()["copied"] == 0
+        assert again.json()["skipped_existing"] == 3
+    finally:
+        for pid in project_ids:
+            _cleanup_project_dir(pid)

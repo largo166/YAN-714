@@ -467,6 +467,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 .ptbadge.low b{color:var(--red)}
 .composer2 .dropmask{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#c2703a14;border:2px dashed var(--terra);border-radius:14px;color:var(--terra);font-size:14px;font-weight:600;pointer-events:none}
 .composer2.drag .dropmask{display:flex}
+.agent-chat-card{display:flex;flex-direction:column;gap:12px}
+.agent-chat-card .chatlog{flex:1;min-height:260px;max-height:clamp(320px,52vh,620px);margin-bottom:0;scroll-padding-bottom:12px}
+.agent-chat-card .composer2{flex:none}
+.agent-chat-card .composer2 textarea{resize:vertical;max-height:240px}
 /* + 菜单 / @引用 / /命令 面板 */
 .plusmenu,.refpanel,.cmdpanel{position:absolute;bottom:calc(100% - 44px);left:6px;min-width:230px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 12px 34px #1b1a1720;padding:6px;display:none;z-index:25}
 .plusmenu.show,.refpanel.show,.cmdpanel.show{display:block}

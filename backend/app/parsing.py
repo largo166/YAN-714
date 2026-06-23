@@ -6,17 +6,20 @@
 - unsupported 非 5 类支持格式
 - failed      解析过程异常（捕获，不阻塞其它文件）
 
-支持格式：.txt .md（内建）/ .pdf（pypdf）/ .docx（python-docx）/ .pptx（python-pptx）。
-单文件大小上限防 OOM。
+支持格式：.txt .md（内建）/ .pdf（pypdf）/ .docx（python-docx）/ .pptx（python-pptx）/
+.xlsx（轻量 XML 抽取）/ 图片资产元数据（png/jpg/jpeg，不做 OCR）。
+不按文件体积预先拒绝；解析异常会分级返回 failed，不阻断其它文件。
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 import unicodedata
+import zipfile
+import xml.etree.ElementTree as ET
 
-MAX_FILE_BYTES = 25 * 1024 * 1024  # 25MB（与上传上限一致）
-SUPPORTED_EXTS = {".txt", ".md", ".pdf", ".docx", ".pptx"}
+SUPPORTED_EXTS = {".txt", ".md", ".pdf", ".docx", ".pptx", ".xlsx", ".png", ".jpg", ".jpeg"}
 
 # 抽取后截断上限（防超大文本撑爆 DB / 上下文）
 MAX_TEXT_CHARS = 200_000
@@ -40,8 +43,6 @@ def parse_file(path: str | Path) -> ParseResult:
     if ext not in SUPPORTED_EXTS:
         return ParseResult(status="unsupported")
     try:
-        if p.stat().st_size > MAX_FILE_BYTES:
-            return ParseResult(status="failed", error="文件超过 25MB 上限")
         if ext in (".txt", ".md"):
             text = _read_text(p)
         elif ext == ".pdf":
@@ -50,6 +51,10 @@ def parse_file(path: str | Path) -> ParseResult:
             text = _read_docx(p)
         elif ext == ".pptx":
             text = _read_pptx(p)
+        elif ext == ".xlsx":
+            text = _read_xlsx(p)
+        elif ext in (".png", ".jpg", ".jpeg"):
+            text = _read_image_asset(p)
         else:  # 理论不达
             return ParseResult(status="unsupported")
     except Exception as e:  # noqa: BLE001  抽取失败不崩、不伪造
@@ -107,3 +112,50 @@ def _read_pptx(p: Path) -> str:
                 for para in shape.text_frame.paragraphs:
                     parts.append("".join(run.text for run in para.runs))
     return "\n".join(parts)
+
+
+def _read_xlsx(p: Path) -> str:
+    """轻量读取 xlsx 文本，不引入 openpyxl。公式计算值依赖文件内缓存。"""
+    ns = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    parts: list[str] = []
+    with zipfile.ZipFile(p) as zf:
+        shared: list[str] = []
+        if "xl/sharedStrings.xml" in zf.namelist():
+            root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+            for si in root.findall("a:si", ns):
+                texts = [t.text or "" for t in si.findall(".//a:t", ns)]
+                shared.append("".join(texts))
+
+        sheet_names = sorted(
+            name for name in zf.namelist()
+            if re.match(r"xl/worksheets/sheet\d+\.xml$", name)
+        )
+        for sheet_name in sheet_names:
+            root = ET.fromstring(zf.read(sheet_name))
+            rows: list[str] = []
+            for row in root.findall(".//a:row", ns):
+                cells: list[str] = []
+                for c in row.findall("a:c", ns):
+                    value = ""
+                    cell_type = c.attrib.get("t")
+                    v = c.find("a:v", ns)
+                    inline = c.find("a:is", ns)
+                    if cell_type == "s" and v is not None and v.text:
+                        idx = int(v.text)
+                        value = shared[idx] if 0 <= idx < len(shared) else ""
+                    elif inline is not None:
+                        value = "".join(t.text or "" for t in inline.findall(".//a:t", ns))
+                    elif v is not None and v.text:
+                        value = v.text
+                    if value:
+                        cells.append(value)
+                if cells:
+                    rows.append("\t".join(cells))
+            if rows:
+                parts.append(f"【{Path(sheet_name).stem}】\n" + "\n".join(rows))
+    return "\n\n".join(parts)
+
+
+def _read_image_asset(p: Path) -> str:
+    st = p.stat()
+    return f"图片资产：{p.name}\n格式：{p.suffix.lower().lstrip('.')}\n大小：{st.st_size} bytes\n说明：该文件已登记为项目图片资产；当前未做 OCR 或图像内容识别。"

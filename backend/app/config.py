@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # skill 脚本所在目录（含 tencent_meeting.py）；空则按默认 ~/.claude/skills/... 探测
     tencent_meeting_skill_dir: str = ""
 
+    # ── 成果发送渠道（本批只做 preview，不真实外发）──
+    result_send_email_configured: bool = False
+    result_send_wecom_configured: bool = False
+    result_send_wx_configured: bool = False
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:

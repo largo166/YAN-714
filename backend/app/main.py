@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import init_db
-from .routers import chat, health, knowledge, projects
+from .routers import agents, boss, broadcast, chat, health, knowledge, projects
 from .routers import project_files, project_analysis
 from .routers import meetings
+from .routers import result_send
 from .routers import settings as settings_router
+from .routers import team
 from .routers import workspace
 from .routers import skills
 
@@ -40,6 +42,11 @@ app.include_router(project_files.router)
 app.include_router(project_analysis.router)
 app.include_router(meetings.router)
 app.include_router(skills.router)
+app.include_router(team.router)
+app.include_router(agents.router)
+app.include_router(broadcast.router)
+app.include_router(boss.router)
+app.include_router(result_send.router)
 
 
 @app.get("/")

@@ -1,7 +1,7 @@
 """ORM 模型。"""
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -18,10 +18,48 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
+    city: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    client: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
+
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    role: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    duty: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    birthday: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class TeamAssignment(Base):
+    __tablename__ = "team_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_title: Mapped[str] = mapped_column(String(300), nullable=False)
+    due: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class Broadcast(Base):
+    __tablename__ = "broadcasts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
 
 class AppSetting(Base):
@@ -189,6 +227,7 @@ class MeetingMinute(Base):
     todos_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # 待办
     # draft（AI 草案）/ confirmed（人工审定）
     review_status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    reflowed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)

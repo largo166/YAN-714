@@ -38,7 +38,15 @@ def test_overview_counts(client):
         # 初始：全 0（0 是真实值，非占位）
         base = client.get(f"/api/projects/{pid}/overview")
         assert base.status_code == 200
-        assert base.json() == {"files": 0, "meetings": 0, "todos": 0, "minutes": 0}
+        assert base.json() == {
+            "files": 0,
+            "meetings": 0,
+            "todos": 0,
+            "minutes": 0,
+            "risks": 0,
+            "assets": 0,
+            "gaps": 0,
+        }
 
         # 文件 +1
         files = {"file": ("需求.txt", "甲方要求：退台立面".encode("utf-8"), "text/plain")}
@@ -74,5 +82,8 @@ def test_overview_counts(client):
         assert ov["meetings"] == 1
         assert ov["minutes"] == 2  # 两版纪要都计入“纪要份数”
         assert ov["todos"] == 2  # 待办只取最新版
+        assert ov["risks"] == 0
+        assert ov["assets"] == 0
+        assert ov["gaps"] == 0
     finally:
         _cleanup_project_dir(pid)

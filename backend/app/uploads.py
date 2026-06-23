@@ -60,6 +60,29 @@ def save_upload(project_id: int, original_name: str, data: bytes) -> StoredFile:
     )
 
 
+def copy_into_uploads(project_id: int, source_path: str | Path, original_name: str = "") -> StoredFile:
+    """把本地文件复制到 {pid}/{净化名}，不移动原文件。适合批量接入大文件。"""
+    src = Path(source_path)
+    pdir = _project_dir(project_id)
+    safe_name = sanitize_filename(original_name or src.name)
+    target = pdir / safe_name
+    if target.exists():
+        stem = target.stem
+        suffix = target.suffix
+        ts = datetime.now().strftime("%H%M%S")
+        safe_name = f"{stem}_{ts}{suffix}"
+        target = pdir / safe_name
+
+    validate_path(UPLOADS_ROOT, target)
+    shutil.copy2(str(src), str(target))
+    return StoredFile(
+        filename=safe_name,
+        stored_path=str(target.relative_to(UPLOADS_ROOT)).replace("\\", "/"),
+        abs_path=str(target),
+        size=target.stat().st_size,
+    )
+
+
 def abs_of(stored_path: str) -> Path:
     """把相对 stored_path 还原为校验过的绝对路径。"""
     return validate_path(UPLOADS_ROOT, stored_path)

@@ -197,7 +197,7 @@ export default function AgentPage() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card agent-chat-card">
         <div className="chatlog" ref={logRef} style={messages.length ? undefined : { display: 'none' }}>
           {messages.map((m) => (
             <div key={m.id} className={'bubble ' + (m.role === 'user' ? 'u' : 'a')}>

@@ -10,6 +10,8 @@ class ProjectBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
     status: str = "active"
+    city: str = ""
+    client: str = ""
 
 
 class ProjectCreate(ProjectBase):
@@ -20,6 +22,8 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
     status: Optional[str] = None
+    city: Optional[str] = None
+    client: Optional[str] = None
 
 
 class ProjectOut(ProjectBase):
@@ -42,6 +46,196 @@ class ProjectOverviewOut(BaseModel):
     meetings: int = 0
     todos: int = 0
     minutes: int = 0
+    risks: int = 0
+    assets: int = 0
+    gaps: int = 0
+
+
+class ProjectMilestoneOut(BaseModel):
+    title: str
+    owner: str = ""
+    due: str = ""
+    urgent: bool = False
+
+
+class ProjectMilestoneListOut(BaseModel):
+    items: List[ProjectMilestoneOut] = []
+
+
+class ProjectProgressOut(BaseModel):
+    pct: int = 0
+    next_node: str = ""
+    next_due: str = ""
+
+
+class ProjectRiskOut(BaseModel):
+    level: str
+    text: str
+
+
+class ProjectRiskListOut(BaseModel):
+    items: List[ProjectRiskOut] = []
+
+
+class ReusableAssetOut(BaseModel):
+    kind: str
+    name: str
+
+
+class ReusableAssetListOut(BaseModel):
+    items: List[ReusableAssetOut] = []
+
+
+class TeamMemberCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    role: str = ""
+    duty: str = ""
+    birthday: str = ""
+    status: str = "active"
+
+
+class TeamMemberUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    role: Optional[str] = None
+    duty: Optional[str] = None
+    birthday: Optional[str] = None
+    status: Optional[str] = None
+
+
+class TeamAssignmentOut(BaseModel):
+    task_title: str
+    due: str = ""
+    project_id: int
+
+
+class TeamMemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    role: str = ""
+    duty: str = ""
+    birthday: str = ""
+    assignments: List[TeamAssignmentOut] = []
+
+
+class TeamMemberListOut(BaseModel):
+    items: List[TeamMemberOut] = []
+
+
+class TeamAssignmentCreate(BaseModel):
+    member_id: int
+    task_title: str = Field(min_length=1, max_length=300)
+    due: str = ""
+
+
+class TeamAssignmentCreateOut(TeamAssignmentOut):
+    id: int
+    member_id: int
+    created_at: datetime
+
+
+class AgentOut(BaseModel):
+    id: str
+    name: str
+    role: str = ""
+    duty: str = ""
+    output: str = ""
+    status: str = "plan"
+
+
+class AgentListOut(BaseModel):
+    items: List[AgentOut] = []
+
+
+class BroadcastCreate(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class BroadcastOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    text: str
+    created_at: datetime
+
+
+class BroadcastListOut(BaseModel):
+    items: List[BroadcastOut] = []
+
+
+class TickerItemOut(BaseModel):
+    kind: str
+    text: str
+
+
+class TickerListOut(BaseModel):
+    items: List[TickerItemOut] = []
+
+
+class BossDashboardOut(BaseModel):
+    active_projects: int = 0
+    near_delivery: int = 0
+    high_risks: int = 0
+    ai_usage_week: int = 0
+
+
+class WorkloadItemOut(BaseModel):
+    name: str
+    pct: int
+    level: str
+
+
+class WorkloadListOut(BaseModel):
+    items: List[WorkloadItemOut] = []
+
+
+class AiUsageItemOut(BaseModel):
+    capability: str
+    count: int
+
+
+class AiUsageListOut(BaseModel):
+    items: List[AiUsageItemOut] = []
+
+
+class NotConfiguredListOut(BaseModel):
+    status: str = "not_configured"
+    items: List[dict] = []
+
+
+class KnowledgeStatsOut(BaseModel):
+    documents: int = 0
+    indexed: int = 0
+    chunks: int = 0
+    cjk_chunks: int = 0
+    engine: str = "like"
+
+
+class ResultSendChannelOut(BaseModel):
+    channel: str
+    configured: bool
+    label: str
+
+
+class ResultSendChannelsOut(BaseModel):
+    items: List[ResultSendChannelOut] = []
+
+
+class ResultSendPreviewIn(BaseModel):
+    content: str = Field(min_length=1)
+    channel: str
+
+
+class ResultSendPreviewOut(BaseModel):
+    status: str
+    rendered: str = ""
+    channel: str = ""
+
+
+class ReflowOut(BaseModel):
+    status: str
+    reflowed_count: int
 
 
 # ── 共创营地：内置技能目录（运行时独立，仅展示，执行链路后续接入）──
@@ -224,6 +418,60 @@ class IndexFileOut(BaseModel):
     title: str
 
 
+class BatchIngestRequest(BaseModel):
+    root_path: str = Field(min_length=1)
+
+
+class BatchIngestFileOut(BaseModel):
+    path: str
+    size: int
+    ext: str
+
+
+class BatchIngestProjectPreviewOut(BaseModel):
+    project_name: str
+    path: str
+    supported_count: int
+    unsupported_count: int
+    files: List[BatchIngestFileOut] = []
+    unsupported: List[BatchIngestFileOut] = []
+
+
+class BatchIngestPreviewOut(BaseModel):
+    accessible: bool
+    root: str = ""
+    error: str = ""
+    total_projects: int = 0
+    total_supported: int = 0
+    total_unsupported: int = 0
+    projects: List[BatchIngestProjectPreviewOut] = []
+
+
+class BatchIngestImportRequest(BatchIngestRequest):
+    project_names: Optional[List[str]] = None
+    index_to_knowledge: bool = True
+
+
+class BatchIngestProjectImportOut(BaseModel):
+    project_id: int
+    project_name: str
+    copied: int = 0
+    indexed: int = 0
+    failed: int = 0
+    skipped_existing: int = 0
+
+
+class BatchIngestImportOut(BaseModel):
+    status: str
+    root: str
+    total_projects: int = 0
+    copied: int = 0
+    indexed: int = 0
+    failed: int = 0
+    skipped_existing: int = 0
+    projects: List[BatchIngestProjectImportOut] = []
+
+
 # ── 4D: AI 研判 ──
 ANALYSIS_TASKS = ("overview", "difficulty", "demand", "plan", "report")
 
@@ -344,6 +592,7 @@ class MeetingMinuteOut(BaseModel):
     decisions: List[str] = []
     todos: List[TodoItem] = []
     review_status: str  # draft|confirmed
+    reflowed: bool = False
     model: str
     error_message: str
     created_at: datetime

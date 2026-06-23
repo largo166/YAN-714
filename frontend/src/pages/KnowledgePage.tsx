@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import type { KnowledgeDoc, KnowledgeDocListItem, KnowledgeHit, KnowledgeStats } from '@/types/schemas'
+import type {
+  BatchIngestImport,
+  BatchIngestPreview,
+  KnowledgeDoc,
+  KnowledgeDocListItem,
+  KnowledgeHit,
+  KnowledgeStats,
+} from '@/types/schemas'
 
 /** 数据基地（知识库）：接入真实 knowledge API。保留原 ROM-AI 检索/分区视觉。
  *  C2.1：去 mock — 数据源/库存/可复用资产一律取真实数据或空态，不伪造（原则 9/13）。
@@ -18,6 +25,9 @@ export default function KnowledgePage() {
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
+  const [ingestPreview, setIngestPreview] = useState<BatchIngestPreview | null>(null)
+  const [ingestResult, setIngestResult] = useState<BatchIngestImport | null>(null)
+  const [ingesting, setIngesting] = useState(false)
   // 真实数据源（单一已配置工作区根；未配置 → 空态）
   const [ws, setWs] = useState<{ workspace_path: string; accessible: boolean } | null>(null)
 
@@ -117,6 +127,37 @@ export default function KnowledgePage() {
       setDetail(await api.getKnowledgeDoc(id))
     } catch (e) {
       setErr((e as Error).message)
+    }
+  }
+
+  const previewBatch = async () => {
+    const root = ws?.workspace_path
+    if (!root) return
+    setErr(null)
+    setIngestResult(null)
+    try {
+      setIngestPreview(await api.previewBatchIngest(root))
+    } catch (e) {
+      setErr((e as Error).message)
+    }
+  }
+
+  const importBatch = async () => {
+    const root = ingestPreview?.root || ws?.workspace_path
+    if (!root) return
+    const ok = window.confirm('确认批量接入可解析文件？原始目录不会被移动，系统会复制文件并写入项目中心与知识库。')
+    if (!ok) return
+    setIngesting(true)
+    setErr(null)
+    try {
+      const r = await api.importBatchIngest(root)
+      setIngestResult(r)
+      await loadDocs()
+      api.getKnowledgeStats().then(setStats).catch(() => {})
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setIngesting(false)
     }
   }
 
@@ -223,7 +264,50 @@ export default function KnowledgePage() {
               ＋ 添加来源
             </button>
             <button className="btn ghost" onClick={() => api.reindexKnowledge().then(loadDocs)}>⟳ 重建索引</button>
+            <button className="btn ghost" onClick={previewBatch} disabled={!ws?.workspace_path}>
+              批量接入预览
+            </button>
           </div>
+          {ingestPreview && (
+            <div className="card" style={{ marginTop: 12, background: 'var(--panel2)' }}>
+              <div className="ct">项目目录批量接入预览</div>
+              <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
+                识别项目 <b>{ingestPreview.total_projects}</b> 个 · 可接入{' '}
+                <b>{ingestPreview.total_supported}</b> 个 · 暂不支持{' '}
+                <b>{ingestPreview.total_unsupported}</b> 个
+              </div>
+              <div style={{ marginTop: 8 }}>
+                {ingestPreview.projects.map((p) => (
+                  <div className="kbrow" key={p.path}>
+                    <span className="pth">{p.project_name}</span>
+                    <span className="meta">{p.supported_count} 可接入 / {p.unsupported_count} 不支持</span>
+                  </div>
+                ))}
+              </div>
+              <div className="btnrow">
+                <button className="btn" onClick={importBatch} disabled={ingesting || ingestPreview.total_supported === 0}>
+                  {ingesting ? '接入中…' : '确认导入项目中心 + 知识库'}
+                </button>
+              </div>
+            </div>
+          )}
+          {ingestResult && (
+            <div className="card" style={{ marginTop: 12, background: 'var(--panel2)' }}>
+              <div className="ct">批量接入结果</div>
+              <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
+                已复制 <b>{ingestResult.copied}</b> 个 · 已入库 <b>{ingestResult.indexed}</b> 个 · 跳过重复{' '}
+                <b>{ingestResult.skipped_existing}</b> 个 · 失败 <b>{ingestResult.failed}</b> 个
+              </div>
+              <div style={{ marginTop: 8 }}>
+                {ingestResult.projects.map((p) => (
+                  <div className="kbrow" key={p.project_id}>
+                    <span className="pth">{p.project_name}</span>
+                    <span className="meta">{p.copied} 复制 / {p.indexed} 入库 / {p.failed} 失败</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

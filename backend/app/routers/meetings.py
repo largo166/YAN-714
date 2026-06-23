@@ -88,8 +88,6 @@ async def create_meeting_from_material(
     if not parsing.is_supported(file.filename or ""):
         raise HTTPException(400, "仅支持 txt/md/docx/pdf 材料")
     data = await file.read()
-    if len(data) > parsing.MAX_FILE_BYTES:
-        raise HTTPException(400, "文件超过 25MB 上限")
     # 写临时文件解析（不落 uploads，材料仅取文本）
     import tempfile, os
     suffix = "." + (file.filename or "x").rsplit(".", 1)[-1]
@@ -204,6 +202,27 @@ def confirm_minute(project_id: int, meeting_id: int, minute_id: int, db: Session
     return _minute_out(row)
 
 
+@router.post(
+    "/{project_id}/meetings/{meeting_id}/minute/{minute_id}/reflow",
+    response_model=schemas.ReflowOut,
+)
+def reflow_minute(project_id: int, meeting_id: int, minute_id: int, db: Session = Depends(get_db)):
+    """把已确认纪要待办标记为已回流项目下一步。幂等，不重复计数。"""
+    _meeting_or_404(db, project_id, meeting_id)
+    row = db.get(models.MeetingMinute, minute_id)
+    if row is None or row.meeting_id != meeting_id:
+        raise HTTPException(404, "纪要不存在")
+    if row.review_status != "confirmed":
+        raise HTTPException(400, "纪要未确认，不能回流")
+    todos = safe_json.loads_or(row.todos_json, [])
+    count = len(todos) if isinstance(todos, list) else 0
+    if row.reflowed:
+        return schemas.ReflowOut(status="ok", reflowed_count=0)
+    row.reflowed = True
+    db.commit()
+    return schemas.ReflowOut(status="ok", reflowed_count=count)
+
+
 def _minute_or_404(db: Session, meeting_id: int, minute_id: int) -> models.MeetingMinute:
     row = db.get(models.MeetingMinute, minute_id)
     if row is None or row.meeting_id != meeting_id:
@@ -280,7 +299,8 @@ def _minute_out(row: models.MeetingMinute) -> schemas.MeetingMinuteOut:
         demand_external=[schemas.DemandItem(**x) for x in d["demand_external"]] if isinstance(d["demand_external"], list) else [],
         decisions=d["decisions"] if isinstance(d["decisions"], list) else [],
         todos=[schemas.TodoItem(**x) for x in d["todos"]] if isinstance(d["todos"], list) else [],
-        review_status=row.review_status, model=row.model, error_message=row.error_message,
+        review_status=row.review_status, reflowed=row.reflowed,
+        model=row.model, error_message=row.error_message,
         created_at=row.created_at,
     )
 

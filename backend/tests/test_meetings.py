@@ -91,6 +91,7 @@ def test_minute_ok_dual_version_and_export(client, monkeypatch):
     b = r.json()
     assert b["gen_status"] == "ok"
     assert b["review_status"] == "draft"
+    assert b["reflowed"] is False
     # 内外双版分离且不同
     assert b["demand_internal"][0]["statement"] != b["demand_external"][0]["statement"]
     # 锚定原话+时间点
