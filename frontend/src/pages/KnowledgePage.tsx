@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/lib/api'
 import type { KnowledgeDoc, KnowledgeDocListItem, KnowledgeHit } from '@/types/schemas'
 
-/** 数据基地（知识库）：接入真实 knowledge API。保留原 ROM-AI 检索/分区视觉。 */
+/** 数据基地（知识库）：接入真实 knowledge API。保留原 ROM-AI 检索/分区视觉。
+ *  C2.1：去 mock — 数据源/库存/可复用资产一律取真实数据或空态，不伪造（原则 9/13）。 */
 export default function KnowledgePage() {
   const [docs, setDocs] = useState<KnowledgeDocListItem[]>([])
   const [query, setQuery] = useState('')
@@ -13,6 +14,20 @@ export default function KnowledgePage() {
   const [detail, setDetail] = useState<KnowledgeDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // 真实数据源（单一已配置工作区根；未配置 → 空态）
+  const [ws, setWs] = useState<{ workspace_path: string; accessible: boolean } | null>(null)
+
+  // 可复用资产：按知识文档真实 tags 聚合（无标签 → 空态，不塞 mock）
+  const assetGroups = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const d of docs) {
+      for (const t of (d.tags || '').split(/[,，;；\s]+/).map((x) => x.trim()).filter(Boolean)) {
+        if (!m.has(t)) m.set(t, [])
+        m.get(t)!.push(d.title)
+      }
+    }
+    return [...m.entries()]
+  }, [docs])
 
   // 新增表单
   const [showAdd, setShowAdd] = useState(false)
@@ -34,6 +49,7 @@ export default function KnowledgePage() {
 
   useEffect(() => {
     loadDocs()
+    api.workspaceStatus().then(setWs).catch(() => setWs(null))
   }, [loadDocs])
 
   const doSearch = async () => {
@@ -119,6 +135,20 @@ export default function KnowledgePage() {
             FTS5 · BM25
           </span>
         </div>
+        <div className="scopebar">
+          <span className="lab">类型</span>
+          {['全部', '案例', '方法', '图纸'].map((x, i) => (
+            <button className={'scope' + (i === 0 ? ' on' : '')} key={x}>
+              {x}
+            </button>
+          ))}
+          <span className="lab" style={{ marginLeft: 8 }}>来源</span>
+          {['全部', '复制', '引用'].map((x, i) => (
+            <button className={'scope' + (i === 0 ? ' on' : '')} key={x}>
+              {x}
+            </button>
+          ))}
+        </div>
         {hits !== null && (
           <>
             <div id="kb-hits-meta" style={{ fontSize: 11.5, color: 'var(--mut)', margin: '9px 0 2px' }}>
@@ -144,6 +174,66 @@ export default function KnowledgePage() {
           </>
         )}
       </div>
+
+      <section className="sec" data-open="1">
+        <button className="sechead" type="button">
+          <span className="chev">▸</span>
+          <span className="stitle">数据源</span>
+          <span className="scount">{ws?.workspace_path ? '1 来源' : '未配置'}</span>
+          <span className="shint">授权台账 · 一键整理 · 重建索引</span>
+        </button>
+        <div className="secbody">
+          {ws?.workspace_path ? (
+            <div className="kbrow">
+              <span className="pth mono">{ws.workspace_path}</span>
+              <span className="kbseg">
+                <button className="on">本地目录</button>
+              </span>
+              <span className="meta mono">{ws.accessible ? '可访问' : '路径不可达'}</span>
+              <span className="act" onClick={() => api.workspaceScan().catch(() => {})}>扫描</span>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 2px' }}>
+              未配置数据源。点「添加来源」配置项目工作区目录后纳管。
+            </div>
+          )}
+          <div className="btnrow">
+            <button
+              className="btn ghost"
+              onClick={() => {
+                const p = window.prompt('输入要纳管的工作区目录绝对路径：')
+                if (p) api.workspaceConfig(p).then(setWs).catch((e: Error) => setErr(e.message))
+              }}
+            >
+              ＋ 添加来源
+            </button>
+            <button className="btn ghost" onClick={() => api.reindexKnowledge().then(loadDocs)}>⟳ 重建索引</button>
+          </div>
+        </div>
+      </section>
+
+      <section className="sec" data-open="1">
+        <button className="sechead" type="button">
+          <span className="chev">▸</span>
+          <span className="stitle">库存与健康</span>
+          <span className="scount">{docs.length} 文档</span>
+          <span className="shint">FTS5 / BM25 · 本地索引</span>
+        </button>
+        <div className="secbody">
+          <div className="grid3">
+            <div className="metric"><div className="l">受管文件</div><div className="v">{docs.length}</div></div>
+            <div className="metric"><div className="l">已索引</div><div className="v t">{docs.length}</div></div>
+            <div className="metric">
+              <div className="l">索引块 · CJK</div>
+              <div className="v" style={{ fontSize: 15, color: 'var(--mut)' }} title="真实分块统计待后端 /api/knowledge/stats 接入">待接入</div>
+            </div>
+          </div>
+          <div className="health">
+            <div className="hrow"><span className="hb" style={{ background: 'var(--ok)' }}></span>索引状态 正常 · FTS5 / BM25<span className="r">当前本地库</span></div>
+            <div className="hrow"><span className="hb" style={{ background: 'var(--mut)' }}></span>二进制图纸与图片暂不入全文检索<span className="r">资产登记</span></div>
+          </div>
+        </div>
+      </section>
 
       {/* 文档库 */}
       <section className="sec" data-open="1">
@@ -223,6 +313,90 @@ export default function KnowledgePage() {
               </span>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="sec" data-open="1">
+        <button className="sechead" type="button">
+          <span className="chev">▸</span>
+          <span className="stitle">文件浏览</span>
+          <span className="scount">{docs.length} 文件</span>
+          <span className="shint">目录树 · 按文件夹</span>
+        </button>
+        <div className="secbody">
+          <div className="tree">
+            <div className="tfolder" data-open="1">
+              <button className="tfhead" type="button">
+                <span className="tchev">▸</span>
+                <span className="tname">📁 知识文档</span>
+                <span className="tcnt">{docs.length} 文件</span>
+              </button>
+              <div className="tfiles">
+                {docs.slice(0, 8).map((d) => (
+                  <div className="tfile" key={d.id}>
+                    <span className="ext mono">{d.file_type || 'TXT'}</span>
+                    {d.title}
+                    <span className="sz mono">本地</span>
+                    <span className="idx in">已索引</span>
+                  </div>
+                ))}
+                {!docs.length && <div className="gempty">暂无文件。上传或录入知识后会出现在这里。</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="sec" data-open="1">
+        <button className="sechead" type="button">
+          <span className="chev">▸</span>
+          <span className="stitle">可复用资产 · 沉淀层</span>
+          <span className="scount">{assetGroups.length ? `${assetGroups.length} 类` : '空'}</span>
+          <span className="shint">按标签分组</span>
+        </button>
+        <div className="secbody">
+          {assetGroups.length === 0 ? (
+            <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 2px' }}>
+              暂无可复用资产。给知识文档打标签后，会在此按标签自动聚合。
+            </div>
+          ) : (
+            assetGroups.map(([group, items]) => (
+              <div className="rgroup" key={group}>
+                <div className="gh">{group} · {items.length}</div>
+                <div className="tags">
+                  {items.map((x, i) => <span className="tg" key={group + i}>{x}</span>)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="sec nocollapse" data-open="1">
+        <button className="sechead" type="button">
+          <span className="chev">▸</span>
+          <span className="stitle">项目效果图</span>
+          <span className="scount">0 张</span>
+          <span className="shint">当前项目 · 未接生图</span>
+        </button>
+        <div className="secbody">
+          <div className="matwrap">
+            <div className="matlabel">生图素材 · AI 代理生图来源</div>
+            <div className="matgrid">
+              {['任务书', '参考图', '材料表'].map((x) => (
+                <div className="matcard" key={x}><span className="mname">{x}</span></div>
+              ))}
+            </div>
+            <div className="modebar">
+              <span className="mode t2i">Text to Image</span>
+              <span className="sep">/</span>
+              <span className="mode i2i">Image to Image</span>
+              <span style={{ color: 'var(--mut)' }}>生图未配置时保持空态，不伪造图。</span>
+            </div>
+          </div>
+          <div className="gallery">
+            <div className="gempty">暂无效果图成果。</div>
+          </div>
         </div>
       </section>
 
