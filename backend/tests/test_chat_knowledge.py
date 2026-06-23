@@ -102,6 +102,31 @@ def test_knowledge_crud_and_search(client):
     assert client.get(f"/api/knowledge/documents/{did}").status_code == 404
 
 
+def test_search_long_natural_query_matches(client):
+    """长自然语言整句应能命中（修发现1：FTS5 整句短语匹配 0 命中 → 分词 OR）。"""
+    created = client.post(
+        "/api/knowledge/documents",
+        json={
+            "title": "市庄项目方案研判",
+            "content_text": "市庄项目的设计要点包括退台立面与户型配比；甲方诉求强调材料质感与展示区品质。",
+            "tags": "市庄,立面,户型",
+        },
+    )
+    assert created.status_code == 201
+    did = created.json()["id"]
+    try:
+        # 整句口语化提问（旧实现整句短语匹配会 0 命中）
+        sr = client.post(
+            "/api/knowledge/search",
+            json={"query": "市庄项目的设计要点和甲方诉求是什么？", "top_k": 5},
+        )
+        assert sr.status_code == 200
+        hits = sr.json()["hits"]
+        assert any(h["document_id"] == did for h in hits), "长自然语言 query 应命中相关文档"
+    finally:
+        client.delete(f"/api/knowledge/documents/{did}")
+
+
 def test_reindex(client):
     r = client.post("/api/knowledge/reindex")
     assert r.status_code == 200
