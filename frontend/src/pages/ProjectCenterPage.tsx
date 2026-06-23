@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
+import { useProject } from '@/contexts/useProject'
 import type {
-  Project,
   ProjectMilestone,
   ProjectOverview,
   ProjectRisk,
@@ -21,27 +21,15 @@ const STAGE_CHIP: Record<string, string> = {
   completed: '已完成',
 }
 
-/** 项目中心：原 ROM-AI 五段布局。项目下拉 / KPI 接新后端真实数据；
- *  文件上传解析、AI 研判、会议纪要等区块保留原视觉，数据接口待接入。 */
+/** 项目中心：原 ROM-AI 五段布局。项目下拉 / KPI 接新后端真实数据。
+ *  当前项目走共享上下文（useProject）→ 共创营地/数据基地随之联动。 */
 export default function ProjectCenterPage() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [curId, setCurId] = useState<number | null>(null)
+  const { projects, curId, setCurId, cur, err } = useProject()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
   const [overview, setOverview] = useState<ProjectOverview | null>(null)
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([])
   const [risks, setRisks] = useState<ProjectRisk[]>([])
   const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
-
-  useEffect(() => {
-    api
-      .listProjects()
-      .then((d) => {
-        setProjects(d.items)
-        if (d.items.length) setCurId(d.items[0].id)
-      })
-      .catch((e: Error) => setErr(e.message))
-  }, [])
 
   // 切项目时拉取 KPI 真实计数（只读聚合）。curId 变化即重取，加载中暂显 —。
   useEffect(() => {
@@ -60,7 +48,7 @@ export default function ProjectCenterPage() {
     api
       .getProjectOverview(curId)
       .then((d) => alive && setOverview(d))
-      .catch((e: Error) => alive && setErr(e.message))
+      .catch(() => {})
     api.getProjectMilestones(curId).then((d) => alive && setMilestones(d)).catch(() => {})
     api.getProjectRisks(curId).then((d) => alive && setRisks(d)).catch(() => {})
     api.getProjectReusableAssets(curId).then((d) => alive && setReuseTags(d)).catch(() => {})
@@ -68,8 +56,6 @@ export default function ProjectCenterPage() {
       alive = false
     }
   }, [curId])
-
-  const cur = useMemo(() => projects.find((p) => p.id === curId) ?? null, [projects, curId])
 
   return (
     <>

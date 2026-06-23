@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
+import { useProject } from '@/contexts/useProject'
 import type { ChatMessage, ChatSession, KnowledgeHit } from '@/types/schemas'
 
 const EXAMPLES = [
@@ -10,9 +11,20 @@ const EXAMPLES = [
   '对这版方案做评审，再对标一个类比项目',
 ]
 
+const SKILLS = [
+  { key: 'ppt', icon: '▤', title: 'PPT 大纲生成', src: '读知识库 + 项目数据' },
+  { key: 'img', icon: '🖼', title: 'AI 生图 · 意向图', src: 'Prompt 模板 → 即梦 / MJ' },
+  { key: 'review', icon: '◷', title: '方案评审', src: '案例策略 + 方法模板比对' },
+  { key: 'task', icon: '✓', title: '任务安排生成', src: '→ 写回项目中心 下一步' },
+  { key: 'meeting', icon: '🔊', title: '会议纪要', src: '转写 + 甲方诉求转译' },
+  { key: 'compete', icon: '◰', title: '竞品分析', src: '读知识库类比项目' },
+]
+
 /** 共创营地（AI 工作台）：接入真实 chat API。保留原 ROM-AI composer/bubble 视觉。
  *  未配 key → assistant 显示 not_configured，绝不伪造 AI 回复。 */
 export default function AgentPage() {
+  const { projects, curId, setCurId, cur } = useProject()
+  const [projMenuOpen, setProjMenuOpen] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [curSid, setCurSid] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -21,6 +33,7 @@ export default function AgentPage() {
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [model, setModel] = useState('DeepSeek')
+  const [mode, setMode] = useState('Auto')
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [lastHits, setLastHits] = useState<KnowledgeHit[]>([])
   const logRef = useRef<HTMLDivElement>(null)
@@ -104,6 +117,8 @@ export default function AgentPage() {
       const res = await api.sendMessage(sid, {
         message: content,
         use_knowledge: useKnowledge,
+        // 作用于当前项目：开启知识库时，用项目名为检索加上项目上下文
+        knowledge_query: useKnowledge && cur ? `${cur.name} ${content}` : undefined,
         top_k: 5,
       })
       setAiConfigured(res.ai_configured)
@@ -129,8 +144,8 @@ export default function AgentPage() {
       <div className="ptitle">
         <h1>共创营地</h1>
         <div className="projsel">
-          <div className="pick">
-            ▾ 引擎 · <b>{model}</b>
+          <div className="pick" onClick={() => setProjMenuOpen((v) => !v)} style={{ cursor: projects.length ? 'pointer' : 'default' }}>
+            ▾ 作用于 · <b>{cur?.name ?? '（未选择项目）'}</b>
             {aiConfigured === false && (
               <span className="statpill demo" style={{ marginLeft: 8 }}>
                 未配置
@@ -140,6 +155,28 @@ export default function AgentPage() {
               <span className="statpill live" style={{ marginLeft: 8 }}>
                 已配置
               </span>
+            )}
+          </div>
+          <div className={'projmenu' + (projMenuOpen ? ' show' : '')}>
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                className={'projitem' + (p.id === curId ? ' on' : '')}
+                onClick={() => {
+                  setCurId(p.id)
+                  setProjMenuOpen(false)
+                }}
+              >
+                <div>
+                  <div className="pi-name">{p.name}</div>
+                  <div className="pi-meta">{p.description || '—'}</div>
+                </div>
+              </button>
+            ))}
+            {projects.length === 0 && (
+              <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--mut)' }}>
+                暂无项目，请先在项目中心创建
+              </div>
             )}
           </div>
         </div>
@@ -212,6 +249,9 @@ export default function AgentPage() {
             }}
           />
           <div className="ctoolbar">
+            <button className="ctool" title="添加文件 / 文件夹 / Skill">
+              +
+            </button>
             <button
               className={'ctool' + (useKnowledge ? '' : '')}
               title="启用知识库上下文"
@@ -220,14 +260,52 @@ export default function AgentPage() {
             >
               📚
             </button>
-            <span style={{ fontSize: 11, color: useKnowledge ? 'var(--terra)' : 'var(--mut)' }}>
-              {useKnowledge ? '知识库上下文 已开' : '知识库上下文 关'}
+            <div className="engpick">
+              ▾ <b>{model}</b>
+              <div className="engmenu">
+                <button className="on">
+                  DeepSeek <span className="ok2">✓</span>
+                </button>
+                <button disabled>
+                  Kimi <span className="soon">暂未接入</span>
+                </button>
+                <button disabled>
+                  ChatGPT <span className="soon">暂未接入</span>
+                </button>
+                <button disabled>
+                  Claude <span className="soon">暂未接入</span>
+                </button>
+              </div>
+            </div>
+            <div className="engpick">
+              ▾ <b>{mode}</b>
+              <div className="engmenu agentmenu">
+                {['Auto', '找图小雷达', '材料小帮手', '审图老法师', '翻模小王子', '专家团'].map((m) => (
+                  <button
+                    key={m}
+                    className={mode === m ? 'on' : ''}
+                    onClick={() => setMode(m)}
+                  >
+                    {m === 'Auto' ? 'Auto · 自动调度' : m}
+                    <span className={'cost' + (m === '专家团' ? ' hot' : '')}>
+                      {m === '专家团' ? '高耗' : '低耗'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <span className={'ptbadge' + (aiConfigured === false ? ' low' : '')} title="Agent 使用积分 · 每次发送按所选扣减">
+              ⊙ <b>{aiConfigured === false ? 0 : 1000}</b> 分
             </span>
             <span className="cspacer"></span>
+            <button className="ctool" title="语音对话（暂未接入）">
+              🎤
+            </button>
             <button className="btn" disabled={sending} onClick={() => send()}>
               {sending ? '发送中…' : '发送 →'}
             </button>
           </div>
+          <div className="dropmask">松开添加文件（任意类型）</div>
         </div>
 
         {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
@@ -253,6 +331,42 @@ export default function AgentPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="ct mt" style={{ paddingLeft: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>可调度技能 · 后台运作</span>
+        <button className="anbtn">＋ 全部技能</button>
+      </div>
+      <div className="grid3">
+        {SKILLS.map((s) => (
+          <div className="skill" key={s.key}>
+            <div className="srow">
+              <div className="ic">{s.icon}</div>
+              <span className="status">待命</span>
+            </div>
+            <h4>{s.title}</h4>
+            <div className="src">{s.src}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="ct mt" style={{ paddingLeft: 2 }}>
+        成果卡 · 回流项目
+      </div>
+      <div className="resbar" style={{ display: 'flex' }}>
+        <label className="resall">
+          <input type="checkbox" disabled />
+          全选
+        </label>
+        <span className="ressel">已选 0 项</span>
+        <span className="cspacer"></span>
+        <span style={{ fontSize: 11, color: 'var(--mut)' }}>发送到</span>
+        <button className="sendto">企业微信</button>
+        <button className="sendto">邮箱</button>
+        <button className="sendto">个人微信</button>
+      </div>
+      <div className="results">
+        <div className="empty">发送需求后，生成的成果会出现在这里 →</div>
       </div>
     </>
   )

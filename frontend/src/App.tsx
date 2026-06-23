@@ -9,6 +9,7 @@ import HubPage from '@/pages/HubPage'
 import KnowledgePage from '@/pages/KnowledgePage'
 import ProjectCenterPage from '@/pages/ProjectCenterPage'
 import { api } from '@/lib/api'
+import { ProjectProvider } from '@/contexts/ProjectContext'
 import type { BoardKey } from '@/types/boards'
 
 export default function App() {
@@ -29,12 +30,13 @@ export default function App() {
   }, [])
 
   return (
-    <>
+    <ProjectProvider>
       <TopBar
         board={board}
         onBoard={setBoard}
         online={!serverDown}
         onOpenSettings={() => setSettingsOpen(true)}
+        adminVisible
       />
       <div className="wrap">
         <div className={'page' + (board === 'proj' ? ' on' : '')}>
@@ -57,6 +59,6 @@ export default function App() {
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {serverDown && <ServerError onRetry={() => location.reload()} />}
-    </>
+    </ProjectProvider>
   )
 }

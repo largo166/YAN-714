@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/lib/api'
+import { useProject } from '@/contexts/useProject'
 import type { KnowledgeDoc, KnowledgeDocListItem, KnowledgeHit } from '@/types/schemas'
 
 /** 数据基地（知识库）：接入真实 knowledge API。保留原 ROM-AI 检索/分区视觉。
- *  C2.1：去 mock — 数据源/库存/可复用资产一律取真实数据或空态，不伪造（原则 9/13）。 */
+ *  C2.1：去 mock — 数据源/库存/可复用资产一律取真实数据或空态，不伪造（原则 9/13）。
+ *  效果图范围随共享当前项目联动（useProject）。 */
 export default function KnowledgePage() {
+  const { cur } = useProject()
   const [docs, setDocs] = useState<KnowledgeDocListItem[]>([])
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<KnowledgeHit[] | null>(null)
@@ -387,7 +390,7 @@ export default function KnowledgePage() {
           <span className="chev">▸</span>
           <span className="stitle">项目效果图</span>
           <span className="scount">0 张</span>
-          <span className="shint">当前项目 · 未接生图</span>
+          <span className="shint">{cur ? `当前项目 · ${cur.name}` : '未选择项目'} · 未接生图</span>
         </button>
         <div className="secbody">
           <div className="matwrap">
