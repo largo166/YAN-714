@@ -7,6 +7,8 @@ export const ProjectSchema = z.object({
   name: z.string(),
   description: z.string(),
   status: z.string(),
+  city: z.string().default(''),
+  client: z.string().default(''),
   created_at: z.string(),
   updated_at: z.string(),
 })

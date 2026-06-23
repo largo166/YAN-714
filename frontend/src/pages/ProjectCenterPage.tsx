@@ -90,7 +90,9 @@ export default function ProjectCenterPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 5, marginLeft: 6 }}>
+          {cur?.city && <span className="chip">{cur.city}</span>}
           {cur && <span className="chip on">{STAGE_CHIP[cur.status] ?? cur.status}</span>}
+          {cur?.client && <span className="chip">甲方 · {cur.client}</span>}
         </div>
       </div>
 

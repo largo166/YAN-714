@@ -22,6 +22,7 @@ import {
   SkillListSchema,
   AgentListSchema,
   TeamMemberListSchema,
+  TeamMemberSchema,
   TickerListSchema,
   BroadcastListSchema,
   BroadcastSchema,
@@ -148,6 +149,16 @@ export const api = {
   },
   async listTeamMembers(): Promise<TeamMember[]> {
     return TeamMemberListSchema.parse(await request('/api/team/members')).items
+  },
+  async createTeamMember(input: { name: string; role?: string; duty?: string; birthday?: string }): Promise<TeamMember> {
+    return TeamMemberSchema.parse(
+      await request('/api/team/members', { method: 'POST', body: JSON.stringify(input) }),
+    )
+  },
+  async updateTeamMember(id: number, input: { name?: string; role?: string; duty?: string; birthday?: string }): Promise<TeamMember> {
+    return TeamMemberSchema.parse(
+      await request(`/api/team/members/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+    )
   },
   async getTicker(): Promise<TickerItem[]> {
     return TickerListSchema.parse(await request('/api/broadcast/ticker')).items
