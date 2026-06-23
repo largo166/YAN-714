@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/lib/api'
-import type { Project, ProjectOverview } from '@/types/schemas'
+import type {
+  Project,
+  ProjectMilestone,
+  ProjectOverview,
+  ProjectRisk,
+  ReusableAsset,
+} from '@/types/schemas'
 
 import ProjectAnalysisPanel from './ProjectAnalysisPanel'
 import ProjectFilesPanel from './ProjectFilesPanel'
@@ -23,6 +29,9 @@ export default function ProjectCenterPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [overview, setOverview] = useState<ProjectOverview | null>(null)
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>([])
+  const [risks, setRisks] = useState<ProjectRisk[]>([])
+  const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
 
   useEffect(() => {
     api
@@ -38,30 +47,29 @@ export default function ProjectCenterPage() {
   useEffect(() => {
     if (curId == null) {
       setOverview(null)
+      setMilestones([])
+      setRisks([])
+      setReuseTags([])
       return
     }
     let alive = true
     setOverview(null)
+    setMilestones([])
+    setRisks([])
+    setReuseTags([])
     api
       .getProjectOverview(curId)
-      .then((d) => {
-        if (alive) setOverview(d)
-      })
-      .catch((e: Error) => {
-        if (alive) setErr(e.message)
-      })
+      .then((d) => alive && setOverview(d))
+      .catch((e: Error) => alive && setErr(e.message))
+    api.getProjectMilestones(curId).then((d) => alive && setMilestones(d)).catch(() => {})
+    api.getProjectRisks(curId).then((d) => alive && setRisks(d)).catch(() => {})
+    api.getProjectReusableAssets(curId).then((d) => alive && setReuseTags(d)).catch(() => {})
     return () => {
       alive = false
     }
   }, [curId])
 
   const cur = useMemo(() => projects.find((p) => p.id === curId) ?? null, [projects, curId])
-
-  // C1 结构壳：里程碑 / 风险 / 可复用资产 的 HTML 真实标记已就位，数据待 Codex 端点接入
-  // （见 docs/CODEX_后端任务_项目中心.md：milestones / risks / reusable-assets）。当前为空态，不伪造。
-  const milestones: { title: string; owner: string; due: string; urgent?: boolean }[] = []
-  const risks: { level: 'high' | 'medium'; text: string }[] = []
-  const reuseTags: { kind: string; name: string }[] = []
 
   return (
     <>
@@ -139,15 +147,15 @@ export default function ProjectCenterPage() {
       <div className="grid3 mt">
         <div className="metric">
           <div className="l">⚠ 风险</div>
-          <div className="v r">—</div>
+          <div className="v r">{overview ? overview.risks : '—'}</div>
         </div>
         <div className="metric">
           <div className="l">◎ 成果缺口</div>
-          <div className="v">—</div>
+          <div className="v">{overview ? overview.gaps : '—'}</div>
         </div>
         <div className="metric">
           <div className="l">⟳ 可复用资产</div>
-          <div className="v">—</div>
+          <div className="v">{overview ? overview.assets : '—'}</div>
         </div>
       </div>
 

@@ -14,8 +14,12 @@ import {
   ProjectFileDetailSchema,
   ProjectFileListSchema,
   ProjectListSchema,
+  ProjectMilestoneListSchema,
   ProjectOverviewSchema,
+  ProjectRiskListSchema,
   ProjectSchema,
+  ReusableAssetListSchema,
+  SkillListSchema,
   SendMessageOutSchema,
   SettingsSchema,
   TencentSyncSchema,
@@ -27,7 +31,11 @@ import {
   type MeetingMinute,
   type Project,
   type ProjectAnalysis,
+  type ProjectMilestone,
   type ProjectOverview,
+  type ProjectRisk,
+  type ReusableAsset,
+  type SkillList,
   type ProjectFileDetail,
   type ProjectInput,
   type ProjectList,
@@ -100,6 +108,20 @@ export const api = {
   },
   async getProjectOverview(id: number): Promise<ProjectOverview> {
     return ProjectOverviewSchema.parse(await request(`/api/projects/${id}/overview`))
+  },
+  async getProjectMilestones(id: number): Promise<ProjectMilestone[]> {
+    return ProjectMilestoneListSchema.parse(await request(`/api/projects/${id}/milestones`)).items
+  },
+  async getProjectRisks(id: number): Promise<ProjectRisk[]> {
+    return ProjectRiskListSchema.parse(await request(`/api/projects/${id}/risks`)).items
+  },
+  async getProjectReusableAssets(id: number): Promise<ReusableAsset[]> {
+    return ReusableAssetListSchema.parse(await request(`/api/projects/${id}/reusable-assets`)).items
+  },
+
+  // ── 共创营地：内置技能目录（只读） ──
+  async listSkills(): Promise<SkillList> {
+    return SkillListSchema.parse(await request('/api/skills'))
   },
 
   // ── 设置 ──

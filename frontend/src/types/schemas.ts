@@ -23,8 +23,44 @@ export const ProjectOverviewSchema = z.object({
   meetings: z.number(),
   todos: z.number(),
   minutes: z.number(),
+  risks: z.number(),
+  assets: z.number(),
+  gaps: z.number(),
 })
 export type ProjectOverview = z.infer<typeof ProjectOverviewSchema>
+
+export const ProjectMilestoneSchema = z.object({
+  title: z.string(),
+  owner: z.string(),
+  due: z.string(),
+  urgent: z.boolean(),
+})
+export type ProjectMilestone = z.infer<typeof ProjectMilestoneSchema>
+export const ProjectMilestoneListSchema = z.object({ items: z.array(ProjectMilestoneSchema) })
+
+export const ProjectRiskSchema = z.object({ level: z.string(), text: z.string() })
+export type ProjectRisk = z.infer<typeof ProjectRiskSchema>
+export const ProjectRiskListSchema = z.object({ items: z.array(ProjectRiskSchema) })
+
+export const ReusableAssetSchema = z.object({ kind: z.string(), name: z.string() })
+export type ReusableAsset = z.infer<typeof ReusableAssetSchema>
+export const ReusableAssetListSchema = z.object({ items: z.array(ReusableAssetSchema) })
+
+export const SkillSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  icon: z.string(),
+  source: z.string(),
+  example: z.string(),
+  status: z.string(),
+})
+export type Skill = z.infer<typeof SkillSchema>
+
+export const SkillListSchema = z.object({
+  items: z.array(SkillSchema),
+  total: z.number(),
+})
+export type SkillList = z.infer<typeof SkillListSchema>
 
 export const PROJECT_STATUSES = ['active', 'planning', 'completed'] as const
 
