@@ -19,6 +19,9 @@ import {
   ProjectRiskListSchema,
   ProjectSchema,
   ReusableAssetListSchema,
+  ProjectProgressSchema,
+  ResultSendChannelsSchema,
+  ResultSendPreviewSchema,
   SkillListSchema,
   AgentListSchema,
   TeamMemberListSchema,
@@ -46,6 +49,9 @@ import {
   type ProjectOverview,
   type ProjectRisk,
   type ReusableAsset,
+  type ProjectProgress,
+  type ResultSendChannel,
+  type ResultSendPreview,
   type SkillList,
   type Agent,
   type TeamMember,
@@ -137,6 +143,9 @@ export const api = {
   async getProjectReusableAssets(id: number): Promise<ReusableAsset[]> {
     return ReusableAssetListSchema.parse(await request(`/api/projects/${id}/reusable-assets`)).items
   },
+  async getProjectProgress(id: number): Promise<ProjectProgress> {
+    return ProjectProgressSchema.parse(await request(`/api/projects/${id}/progress`))
+  },
 
   // ── 共创营地：内置技能目录（只读） ──
   async listSkills(): Promise<SkillList> {
@@ -159,6 +168,9 @@ export const api = {
     return TeamMemberSchema.parse(
       await request(`/api/team/members/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
     )
+  },
+  async deleteTeamMember(id: number): Promise<void> {
+    await request(`/api/team/members/${id}`, { method: 'DELETE' })
   },
   async getTicker(): Promise<TickerItem[]> {
     return TickerListSchema.parse(await request('/api/broadcast/ticker')).items
@@ -192,6 +204,16 @@ export const api = {
   // ── 数据基地：索引统计 ──
   async getKnowledgeStats(): Promise<KnowledgeStats> {
     return KnowledgeStatsSchema.parse(await request('/api/knowledge/stats'))
+  },
+
+  // ── 成果发送（D1，preview/not_configured，不真发）──
+  async getResultChannels(): Promise<ResultSendChannel[]> {
+    return ResultSendChannelsSchema.parse(await request('/api/result-send/channels')).items
+  },
+  async previewResultSend(content: string, channel: string): Promise<ResultSendPreview> {
+    return ResultSendPreviewSchema.parse(
+      await request('/api/result-send/preview', { method: 'POST', body: JSON.stringify({ content, channel }) }),
+    )
   },
 
   // ── 设置 ──

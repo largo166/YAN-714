@@ -48,6 +48,28 @@ export const ReusableAssetSchema = z.object({ kind: z.string(), name: z.string()
 export type ReusableAsset = z.infer<typeof ReusableAssetSchema>
 export const ReusableAssetListSchema = z.object({ items: z.array(ReusableAssetSchema) })
 
+export const ProjectProgressSchema = z.object({
+  pct: z.number(),
+  next_node: z.string(),
+  next_due: z.string(),
+})
+export type ProjectProgress = z.infer<typeof ProjectProgressSchema>
+
+export const ResultSendChannelSchema = z.object({
+  channel: z.string(),
+  configured: z.boolean(),
+  label: z.string(),
+})
+export type ResultSendChannel = z.infer<typeof ResultSendChannelSchema>
+export const ResultSendChannelsSchema = z.object({ items: z.array(ResultSendChannelSchema) })
+
+export const ResultSendPreviewSchema = z.object({
+  status: z.string(),
+  rendered: z.string().default(''),
+  channel: z.string().default(''),
+})
+export type ResultSendPreview = z.infer<typeof ResultSendPreviewSchema>
+
 export const SkillSchema = z.object({
   id: z.string(),
   title: z.string(),

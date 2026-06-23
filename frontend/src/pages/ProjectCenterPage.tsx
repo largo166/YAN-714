@@ -5,6 +5,7 @@ import { useProject } from '@/contexts/useProject'
 import type {
   ProjectMilestone,
   ProjectOverview,
+  ProjectProgress,
   ProjectRisk,
   ReusableAsset,
 } from '@/types/schemas'
@@ -30,6 +31,7 @@ export default function ProjectCenterPage() {
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([])
   const [risks, setRisks] = useState<ProjectRisk[]>([])
   const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
+  const [progress, setProgress] = useState<ProjectProgress | null>(null)
 
   // 切项目时拉取 KPI 真实计数（只读聚合）。curId 变化即重取，加载中暂显 —。
   useEffect(() => {
@@ -38,6 +40,7 @@ export default function ProjectCenterPage() {
       setMilestones([])
       setRisks([])
       setReuseTags([])
+      setProgress(null)
       return
     }
     let alive = true
@@ -45,6 +48,7 @@ export default function ProjectCenterPage() {
     setMilestones([])
     setRisks([])
     setReuseTags([])
+    setProgress(null)
     api
       .getProjectOverview(curId)
       .then((d) => alive && setOverview(d))
@@ -52,6 +56,7 @@ export default function ProjectCenterPage() {
     api.getProjectMilestones(curId).then((d) => alive && setMilestones(d)).catch(() => {})
     api.getProjectRisks(curId).then((d) => alive && setRisks(d)).catch(() => {})
     api.getProjectReusableAssets(curId).then((d) => alive && setReuseTags(d)).catch(() => {})
+    api.getProjectProgress(curId).then((d) => alive && setProgress(d)).catch(() => {})
     return () => {
       alive = false
     }
@@ -106,11 +111,13 @@ export default function ProjectCenterPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: 'var(--mut)' }}>阶段进度</span>
           <span style={{ fontSize: 12, color: 'var(--terra)', fontWeight: 600 }}>
-            下一节点 · 待接入项目里程碑
+            {progress?.next_node
+              ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}`
+              : '下一节点 · 待接入项目里程碑'}
           </span>
         </div>
         <div className="prog">
-          <i style={{ width: '42%' }}></i>
+          <i style={{ width: `${progress?.pct ?? 0}%` }}></i>
         </div>
       </div>
 

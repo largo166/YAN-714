@@ -46,6 +46,16 @@ export default function HubPage() {
     }
   }
 
+  const removeMember = async (id: number, name: string) => {
+    if (!window.confirm(`确认停用成员「${name}」？（软删除，可后续恢复）`)) return
+    try {
+      await api.deleteTeamMember(id)
+      loadMembers()
+    } catch {
+      // 失败不伪造成功
+    }
+  }
+
   // 走马灯需要可循环；为视觉滚动连续，内容复制一份
   const tickerItems = ticker.length ? [...ticker, ...ticker] : []
 
@@ -115,6 +125,13 @@ export default function HubPage() {
                 <div className="rl">{m.role}</div>
               </div>
               <span className="kind human">真实成员</span>
+              <span
+                title="停用成员（软删除）"
+                onClick={() => removeMember(m.id, m.name)}
+                style={{ cursor: 'pointer', color: 'var(--mut)', fontSize: 14, marginLeft: 4 }}
+              >
+                ✕
+              </span>
             </div>
             <div className="duty">
               <b>工作分工</b>

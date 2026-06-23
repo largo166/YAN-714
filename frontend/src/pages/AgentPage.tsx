@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import type { ChatMessage, ChatSession, KnowledgeHit, Skill } from '@/types/schemas'
+import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill } from '@/types/schemas'
 
 const EXAMPLES = [
   '帮我做一版方案汇报 PPT',
@@ -28,6 +28,8 @@ export default function AgentPage() {
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [lastHits, setLastHits] = useState<KnowledgeHit[]>([])
   const [skills, setSkills] = useState<Skill[]>([])
+  const [channels, setChannels] = useState<ResultSendChannel[]>([])
+  const [sendNote, setSendNote] = useState<string | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
 
   const loadSessions = useCallback(async () => {
@@ -60,6 +62,7 @@ export default function AgentPage() {
       })
       .catch(() => setAiConfigured(false))
     api.listSkills().then((d) => setSkills(d.items)).catch(() => setSkills([]))
+    api.getResultChannels().then(setChannels).catch(() => setChannels([]))
     loadSessions().then((items) => {
       if (items.length) openSession(items[0].id)
     })
@@ -364,10 +367,36 @@ export default function AgentPage() {
         <span className="ressel">已选 0 项</span>
         <span className="cspacer"></span>
         <span style={{ fontSize: 11, color: 'var(--mut)' }}>发送到</span>
-        <button className="sendto">企业微信</button>
-        <button className="sendto">邮箱</button>
-        <button className="sendto">个人微信</button>
+        {(channels.length ? channels : [
+          { channel: 'wecom', label: '企业微信', configured: false },
+          { channel: 'email', label: '邮箱', configured: false },
+          { channel: 'wx', label: '个人微信', configured: false },
+        ]).map((c) => (
+          <button
+            key={c.channel}
+            className="sendto"
+            title={c.configured ? `预览发送到${c.label}` : `${c.label}未配置，请到设置页配置`}
+            style={c.configured ? undefined : { opacity: 0.5 }}
+            onClick={async () => {
+              if (!c.configured) {
+                setSendNote(`${c.label}未配置，请到设置页配置后再发送（不会伪造发送）`)
+                return
+              }
+              try {
+                const r = await api.previewResultSend('（请选择要发送的成果卡）', c.channel)
+                setSendNote(r.status === 'preview' ? `${c.label}发送预览已就绪` : `${c.label}未配置`)
+              } catch {
+                setSendNote('预览失败')
+              }
+            }}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
+      {sendNote && (
+        <div style={{ fontSize: 11.5, color: 'var(--mut)', padding: '6px 2px' }}>{sendNote}</div>
+      )}
       <div className="results">
         <div className="empty">发送需求后，生成的成果会出现在这里 →</div>
       </div>
