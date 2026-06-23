@@ -29,6 +29,16 @@ export default function KnowledgePage() {
     return [...m.entries()]
   }, [docs])
 
+  // 可折叠分区开合态（对齐 HTML 默认：数据源/知识文档 展开，库存/文件浏览/可复用资产 收起）
+  const [open, setOpen] = useState<Record<string, boolean>>({
+    src: true,
+    health: false,
+    docs: true,
+    files: false,
+    assets: false,
+  })
+  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
+
   // 新增表单
   const [showAdd, setShowAdd] = useState(false)
   const [title, setTitle] = useState('')
@@ -175,8 +185,8 @@ export default function KnowledgePage() {
         )}
       </div>
 
-      <section className="sec" data-open="1">
-        <button className="sechead" type="button">
+      <section className="sec" data-open={open.src ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => toggle('src')}>
           <span className="chev">▸</span>
           <span className="stitle">数据源</span>
           <span className="scount">{ws?.workspace_path ? '1 来源' : '未配置'}</span>
@@ -212,8 +222,8 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section className="sec" data-open="1">
-        <button className="sechead" type="button">
+      <section className="sec" data-open={open.health ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => toggle('health')}>
           <span className="chev">▸</span>
           <span className="stitle">库存与健康</span>
           <span className="scount">{docs.length} 文档</span>
@@ -236,8 +246,8 @@ export default function KnowledgePage() {
       </section>
 
       {/* 文档库 */}
-      <section className="sec" data-open="1">
-        <button className="sechead" type="button">
+      <section className="sec" data-open={open.docs ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => toggle('docs')}>
           <span className="chev">▸</span>
           <span className="stitle">知识文档</span>
           <span className="scount">{docs.length}</span>
@@ -316,8 +326,8 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section className="sec" data-open="1">
-        <button className="sechead" type="button">
+      <section className="sec" data-open={open.files ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => toggle('files')}>
           <span className="chev">▸</span>
           <span className="stitle">文件浏览</span>
           <span className="scount">{docs.length} 文件</span>
@@ -347,8 +357,8 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      <section className="sec" data-open="1">
-        <button className="sechead" type="button">
+      <section className="sec" data-open={open.assets ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => toggle('assets')}>
           <span className="chev">▸</span>
           <span className="stitle">可复用资产 · 沉淀层</span>
           <span className="scount">{assetGroups.length ? `${assetGroups.length} 类` : '空'}</span>
