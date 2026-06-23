@@ -32,6 +32,8 @@ export default function ProjectCenterPage() {
   const [risks, setRisks] = useState<ProjectRisk[]>([])
   const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
   const [progress, setProgress] = useState<ProjectProgress | null>(null)
+  // 会议纪要回流后 +1，触发下方 KPI/里程碑/进度重新拉取（同页即时刷新）
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // 切项目时拉取 KPI 真实计数（只读聚合）。curId 变化即重取，加载中暂显 —。
   useEffect(() => {
@@ -60,7 +62,7 @@ export default function ProjectCenterPage() {
     return () => {
       alive = false
     }
-  }, [curId])
+  }, [curId, refreshKey])
 
   return (
     <>
@@ -210,7 +212,7 @@ export default function ProjectCenterPage() {
 
       <TencentMeetingCard projectId={curId} />
 
-      <MeetingPanel projectId={curId} />
+      <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
 
       <WorkspacePanel />
     </>

@@ -11,8 +11,15 @@ const GEN_HINT: Record<string, { text: string; cls: string }> = {
 }
 const SEC = ['一、会议背景', '二、关键结论', '三、甲方诉求', '四、风险与分歧', '五、下一步行动']
 
-/** 会议成果交付中心：记录输入(贴文本/上传材料)→五段式→双版→Word/打印导出→可选腾讯会议。 */
-export default function MeetingPanel({ projectId }: { projectId: number | null }) {
+/** 会议成果交付中心：记录输入(贴文本/上传材料)→五段式→双版→Word/打印导出→可选腾讯会议。
+ *  onReflowed：纪要回流后通知父级(项目中心)刷新 progress/milestones/overview。 */
+export default function MeetingPanel({
+  projectId,
+  onReflowed,
+}: {
+  projectId: number | null
+  onReflowed?: () => void
+}) {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [title, setTitle] = useState('')
   const [mDate, setMDate] = useState('')
@@ -82,6 +89,7 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
     if (projectId == null) return
     setBusy(true)
     setErr(null)
+    setMsg(null)
     setCurMeeting(mid)
     try {
       setMinute(await api.generateMinute(projectId, mid))
@@ -124,7 +132,10 @@ export default function MeetingPanel({ projectId }: { projectId: number | null }
     if (projectId == null || curMeeting == null || !minute) return
     try {
       const r = await api.reflowMinute(projectId, curMeeting, minute.id)
-      if (r.status === 'ok') setMinute({ ...minute, reflowed: true })
+      if (r.status === 'ok') {
+        setMinute({ ...minute, reflowed: true })
+        onReflowed?.() // 通知项目中心刷新 progress/milestones/overview
+      }
     } catch (e) {
       setErr((e as Error).message)
     }
