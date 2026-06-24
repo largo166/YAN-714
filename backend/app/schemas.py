@@ -376,6 +376,9 @@ class KnowledgeDocCreate(BaseModel):
     source_path: str = ""
     file_type: str = "text"
     tags: str = ""
+    type: str = ""
+    description: str = ""
+    resource: str = ""
 
 
 class KnowledgeDocOut(BaseModel):
@@ -387,6 +390,9 @@ class KnowledgeDocOut(BaseModel):
     content_text: str
     file_type: str
     tags: str
+    type: str = ""
+    description: str = ""
+    resource: str = ""
     created_at: datetime
     updated_at: datetime
 
@@ -401,8 +407,23 @@ class KnowledgeDocListItem(BaseModel):
     source_path: str
     file_type: str
     tags: str
+    type: str = ""
+    description: str = ""
+    resource: str = ""
     created_at: datetime
     updated_at: datetime
+
+
+class GenerateMetadataOut(BaseModel):
+    """AI 按需生成元数据结果（不伪造：无 key/无正文不写库）。"""
+
+    status: str  # ok|not_configured|no_material|error
+    document_id: int
+    description: str = ""
+    type: str = ""
+    model: str = ""
+    message: str = ""
+    error_message: str = ""
 
 
 class KnowledgeDocListOut(BaseModel):

@@ -90,6 +90,12 @@ def ensure_fts(db: Session) -> None:
     db.commit()
 
 
+def fts_tags(doc) -> str:
+    """把 tags + type + description 拼进 FTS 的 tags 列（软增强：类型名/摘要词可被检索命中）。
+    不改 FTS 表结构，零重建成本。"""
+    return " ".join(filter(None, [doc.tags, doc.type, doc.description]))
+
+
 def reindex_all(db: Session) -> int:
     """重建 FTS 索引；返回索引文档数。FTS 不可用时返回文档总数（LIKE 模式无需索引）。"""
     from . import models
@@ -105,7 +111,7 @@ def reindex_all(db: Session) -> int:
                 "INSERT INTO knowledge_documents_fts(rowid, title, content_text, tags) "
                 "VALUES (:id, :t, :c, :g)"
             ),
-            {"id": d.id, "t": d.title, "c": d.content_text, "g": d.tags},
+            {"id": d.id, "t": d.title, "c": d.content_text, "g": fts_tags(d)},
         )
     db.commit()
     return len(docs)

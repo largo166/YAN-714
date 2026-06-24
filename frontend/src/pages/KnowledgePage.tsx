@@ -24,20 +24,27 @@ export default function KnowledgePage() {
   const [detail, setDetail] = useState<KnowledgeDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  // 类型筛选（按 tags 真过滤）。"全部"=不筛。来源筛选无真实字段，按钮禁用（见下方 TODO）。
+  // 类型筛选：按真实 doc.type 字段（元数据层）。"全部"=不筛。
   const [typeFilter, setTypeFilter] = useState('全部')
-  // 类型名 → 命中的标签关键词（doc.tags 含任一即归为该类型）
-  const TYPE_TAGS: Record<string, string[]> = {
-    案例: ['案例', '类比', '对标'],
-    方法: ['方法', '模板', '方法论', '理论'],
-    图纸: ['图纸', '总图', '总平面', '平面图', '立面图', '户型图', 'dwg', 'cad', 'pdf'],
-  }
-  const docTags = (id: number) => docs.find((d) => d.id === id)?.tags || ''
-  const matchType = (tags: string) => {
-    if (typeFilter === '全部') return true
-    const low = tags.toLowerCase()
-    return (TYPE_TAGS[typeFilter] || []).some((k) => low.includes(k.toLowerCase()))
-  }
+  const TYPE_OPTIONS = ['全部', '任务书', '会议纪要', '方案文本', '图纸', '案例', '方法', '其他']
+  const docType = (id: number) => docs.find((d) => d.id === id)?.type || ''
+  const matchType = (type: string) => typeFilter === '全部' || type === typeFilter
+  // 来源筛选：按 resource 的来源项目名（resource = "项目名 / 路径"）。
+  const [sourceFilter, setSourceFilter] = useState('全部')
+  const sourceProjects = useMemo(() => {
+    const set = new Set<string>()
+    for (const d of docs) {
+      const p = (d.resource || '').split(' / ')[0].trim()
+      if (p) set.add(p)
+    }
+    return [...set]
+  }, [docs])
+  const docResource = (id: number) => docs.find((d) => d.id === id)?.resource || ''
+  const matchSource = (resource: string) =>
+    sourceFilter === '全部' || resource.startsWith(sourceFilter)
+  // AI 生成元数据：行内 loading + 提示
+  const [genningId, setGenningId] = useState<number | null>(null)
+  const [metaNote, setMetaNote] = useState<string | null>(null)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [ingestPreview, setIngestPreview] = useState<BatchIngestPreview | null>(null)
   const [ingestResult, setIngestResult] = useState<BatchIngestImport | null>(null)
@@ -144,6 +151,31 @@ export default function KnowledgePage() {
     }
   }
 
+  // AI 按需生成元数据（description + refine type）。三态：not_configured/no_material/error/ok。
+  const genMeta = async (id: number) => {
+    if (genningId) return
+    setGenningId(id)
+    setMetaNote(null)
+    try {
+      const r = await api.generateDocMetadata(id)
+      if (r.status === 'ok') {
+        setMetaNote(`已生成：${r.type ? `类型「${r.type}」· ` : ''}${r.description}`)
+        loadDocs()
+        if (detail?.id === id) setDetail({ ...detail, type: r.type, description: r.description })
+      } else if (r.status === 'not_configured') {
+        setMetaNote('AI 未配置，请到设置页配置 DeepSeek API Key 后再生成（不会伪造）。')
+      } else if (r.status === 'no_material') {
+        setMetaNote('该文档无正文，无法生成摘要。')
+      } else {
+        setMetaNote(`生成失败：${r.error_message || r.message}`)
+      }
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setGenningId(null)
+    }
+  }
+
   const previewBatch = async () => {
     const root = ws?.workspace_path
     if (!root) return
@@ -207,7 +239,7 @@ export default function KnowledgePage() {
         </div>
         <div className="scopebar">
           <span className="lab">类型</span>
-          {['全部', '案例', '方法', '图纸'].map((x) => (
+          {TYPE_OPTIONS.map((x) => (
             <button
               className={'scope' + (typeFilter === x ? ' on' : '')}
               key={x}
@@ -217,25 +249,27 @@ export default function KnowledgePage() {
             </button>
           ))}
           <span className="lab" style={{ marginLeft: 8 }}>来源</span>
-          {/* TODO(source-filter): 待产品确认文档级来源筛选是否成立。
-              KnowledgeDocument 当前无 source_mode(复制/引用) 字段，不以 tags 伪造来源筛选。
-              落地需后端给文档加 source_mode 并在导入时写入；本 PR 不动数据模型。 */}
-          {['全部', '复制', '引用'].map((x, i) => (
+          {/* 来源筛选：按 resource 的来源项目名（resource = "项目名 / 路径"）。
+              无 source_mode(复制/引用) 字段，故按来源项目筛选——利用 resource 真实数据，不伪造。 */}
+          {['全部', ...sourceProjects].map((x) => (
             <button
-              className={'scope' + (i === 0 ? ' on' : '')}
+              className={'scope' + (sourceFilter === x ? ' on' : '')}
               key={x}
-              disabled
-              title="来源维度需后端 source_mode 字段，暂未接入"
-              style={{ opacity: 0.5, cursor: 'not-allowed' }}
+              onClick={() => setSourceFilter(x)}
             >
               {x}
             </button>
           ))}
+          {sourceProjects.length === 0 && (
+            <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 4 }}>（暂无来源项目）</span>
+          )}
         </div>
         {hits !== null && (
           <>
             {(() => {
-              const shown = hits.filter((h) => matchType(docTags(h.document_id)))
+              const shown = hits.filter(
+                (h) => matchType(docType(h.document_id)) && matchSource(docResource(h.document_id)),
+              )
               return (
                 <>
                   <div id="kb-hits-meta" style={{ fontSize: 11.5, color: 'var(--mut)', margin: '9px 0 2px' }}>
@@ -437,17 +471,35 @@ export default function KnowledgePage() {
             </div>
           )}
           {docs.map((d) => (
-            <div className="kbrow" key={d.id}>
+            <div className="kbrow" key={d.id} style={{ flexWrap: 'wrap' }}>
               <span className="pth" style={{ cursor: 'pointer' }} onClick={() => openDetail(d.id)}>
+                {d.type && (
+                  <span className="chip" style={{ marginRight: 6, fontSize: 10 }}>{d.type}</span>
+                )}
                 <b>{d.title}</b>
                 {d.tags && <span style={{ color: 'var(--mut)', marginLeft: 8 }}>#{d.tags}</span>}
               </span>
               <span className="meta">{d.file_type}</span>
+              <span
+                className="act"
+                onClick={() => genMeta(d.id)}
+                style={{ color: 'var(--terra)', opacity: genningId === d.id ? 0.5 : 1 }}
+              >
+                {genningId === d.id ? '生成中…' : 'AI 生成元数据'}
+              </span>
               <span className="act" onClick={() => del(d.id)} style={{ color: 'var(--red)' }}>
                 删除
               </span>
+              {d.description && (
+                <div style={{ width: '100%', fontSize: 12, color: 'var(--mut)', marginTop: 4 }}>
+                  {d.description}
+                </div>
+              )}
             </div>
           ))}
+          {metaNote && (
+            <div style={{ fontSize: 12, color: 'var(--mut)', padding: '6px 2px' }}>{metaNote}</div>
+          )}
         </div>
       </section>
 
@@ -548,7 +600,26 @@ export default function KnowledgePage() {
                 ×
               </button>
             </div>
-            {detail.tags && <div className="mto">#{detail.tags}</div>}
+            <div className="mto" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {detail.type && <span className="chip">{detail.type}</span>}
+              {detail.tags && <span>#{detail.tags}</span>}
+              <span className="cspacer" style={{ flex: 1 }}></span>
+              <button
+                className="anbtn"
+                disabled={genningId === detail.id}
+                onClick={() => genMeta(detail.id)}
+              >
+                {genningId === detail.id ? '生成中…' : 'AI 生成元数据'}
+              </button>
+            </div>
+            {detail.description && (
+              <div style={{ fontSize: 13, color: 'var(--ink2)', margin: '6px 0', padding: '8px 10px', background: 'var(--panel2)', borderRadius: 8 }}>
+                📝 {detail.description}
+              </div>
+            )}
+            {detail.resource && (
+              <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 6 }}>来源：{detail.resource}</div>
+            )}
             <div className="mbody" style={{ whiteSpace: 'pre-wrap' }}>
               {detail.content_text || '（无正文）'}
             </div>
