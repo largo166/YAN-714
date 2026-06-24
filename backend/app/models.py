@@ -20,6 +20,8 @@ class Project(Base):
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     city: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     client: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    # 方案前期工作流当前阶段（认知系统脊椎；默认起点=任务书）
+    current_stage: Mapped[str] = mapped_column(String(40), default="brief", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
@@ -179,6 +181,31 @@ class ProjectAnalysis(Base):
     model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── 项目结构化认知（P2 脊椎：把项目认知从散文升级为受控 schema 槽位）──
+class ProjectCognition(Base):
+    """一个项目在某个认知模块(任务书/场地/概念…)的结构化认知。
+    fields_json 存受控字段(如任务书16字段)；status=draft 由 AI 抽取、confirmed 经人工审定后才被下游消费。
+    不伪造：字段抽不到留空标"待补"，绝不编造。"""
+
+    __tablename__ = "project_cognitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    module: Mapped[str] = mapped_column(String(40), nullable=False)  # brief/site/program/case/concept...
+    fields_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)  # 受控字段(safe_json)
+    summary_md: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 一句话/段摘要
+    status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)  # draft|confirmed
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    sources_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # 结构化出处
+    model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
 
 
 # ── 会议纪要（五段式 + 内外双版）──

@@ -572,6 +572,50 @@ class ProjectAnalysisListOut(BaseModel):
     total: int
 
 
+# ── 项目结构化认知（P2 脊椎）──
+# 任务书 canonical 16 字段（对齐《建筑方案前期认知系统》任务书解读模板）
+BRIEF_FIELDS = (
+    "建筑类型", "项目阶段", "基地位置", "建筑规模", "用地条件",
+    "容积率/建筑密度/限高", "功能构成", "业主显性目标", "业主隐性目标",
+    "使用者需求", "场地限制", "设计矛盾", "必须解决的问题",
+    "可创造价值的问题", "前期需追问的问题", "方案切入点",
+)
+COGNITION_MODULES = ("brief",)  # 本期只做任务书;后续横向扩 site/program/case/concept
+
+
+class CognitionSourceOut(BaseModel):
+    kind: str
+    ref_id: int
+    title: str
+    snippet: str
+    engine: str = ""
+
+
+class ProjectCognitionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    module: str
+    fields: dict = {}        # fields_json 解析后
+    summary_md: str = ""
+    status: str              # draft|confirmed
+    version: int = 1
+    sources: List[CognitionSourceOut] = []
+    model: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class CognitionExtractOut(BaseModel):
+    """任务书结构化抽取结果（不伪造：无 key/无材料不写库）。"""
+
+    status: str  # ok|not_configured|no_material|error
+    cognition: Optional[ProjectCognitionOut] = None
+    message: str = ""
+    error_message: str = ""
+
+
 # ── 会议纪要 ──
 class TranscriptSegment(BaseModel):
     text: str
