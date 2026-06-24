@@ -9,6 +9,7 @@ from .database import init_db
 from .routers import agents, boss, broadcast, chat, health, knowledge, projects
 from .routers import project_files, project_analysis
 from .routers import cognition
+from .routers import cross_project
 from .routers import meetings
 from .routers import result_send
 from .routers import settings as settings_router
@@ -42,6 +43,7 @@ app.include_router(workspace.router)
 app.include_router(project_files.router)
 app.include_router(project_analysis.router)
 app.include_router(cognition.router)
+app.include_router(cross_project.router)
 app.include_router(meetings.router)
 app.include_router(skills.router)
 app.include_router(team.router)

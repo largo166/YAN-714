@@ -741,11 +741,22 @@ COGNITION_MODULES = {
     "project_review": {"label": "项目复盘", "implemented": True},
 }
 
-# B 类跨项目复用库（规格 B1-B6，落 KnowledgeDocument，本刀不实现，仅登记名）
+# B 类跨项目复用库（规格 B1-B6）。落 KnowledgeDocument（type 字段携带类别），全局可检索复用。
+# 只有【已确认】的项目认知/成果才能沉淀进来（人工审定后，不伪造），并带源项目/源模块出处。
 CROSS_PROJECT_TYPES = (
     "case_study", "spatial_strategy", "massing_operation",
     "representation", "typology", "design_method",
 )
+
+# B1-B6 类别 → 中文标签
+CROSS_PROJECT_LABELS = {
+    "case_study": "案例库",
+    "spatial_strategy": "空间策略",
+    "massing_operation": "体量操作",
+    "representation": "图面表达",
+    "typology": "类型学",
+    "design_method": "设计方法",
+}
 
 # 工作流状态机节点（规格 D，16 节点）。本刀只定义不驱动。
 STAGE_NODES = [
@@ -823,6 +834,37 @@ class CognitionExtractOut(BaseModel):
     cognition: Optional[ProjectCognitionOut] = None
     message: str = ""
     error_message: str = ""
+
+
+# ── B 类跨项目复用库（规格 B1-B6，阶段3）──
+class CrossProjectTypeOut(BaseModel):
+    type: str
+    label: str
+    count: int = 0
+
+
+class PrecipitateIn(BaseModel):
+    """把【已确认】项目认知沉淀进跨项目库（不伪造：只接受 confirmed 字段/已审定内容）。"""
+    project_id: int
+    cog_id: int                      # 源 ProjectCognition 行
+    cross_type: str                  # B1-B6 类别之一
+    title: Optional[str] = None      # 不给则用「项目名·模块标签」
+
+
+class CrossProjectItemOut(BaseModel):
+    document_id: int
+    title: str
+    cross_type: str
+    label: str
+    description: str = ""
+    resource: str = ""               # 出处（源项目/源模块）
+    snippet: str = ""
+
+
+class PrecipitateOut(BaseModel):
+    status: str                      # ok|empty（项目/认知/类别不存在走 HTTP 404，不在此枚举内）
+    item: Optional[CrossProjectItemOut] = None
+    message: str = ""
 
 
 # ── 会议纪要 ──

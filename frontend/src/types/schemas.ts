@@ -367,6 +367,33 @@ export const CognitionExtractOutSchema = z.object({
 })
 export type CognitionExtractOut = z.infer<typeof CognitionExtractOutSchema>
 
+// ── B 类跨项目复用库（阶段3）──
+export const CrossProjectTypeOutSchema = z.object({
+  type: z.string(),
+  label: z.string(),
+  count: z.number().default(0),
+})
+export type CrossProjectTypeOut = z.infer<typeof CrossProjectTypeOutSchema>
+
+export const CrossProjectItemOutSchema = z.object({
+  document_id: z.number(),
+  title: z.string(),
+  cross_type: z.string(),
+  label: z.string(),
+  description: z.string().default(''),
+  resource: z.string().default(''),
+  snippet: z.string().default(''),
+})
+export type CrossProjectItemOut = z.infer<typeof CrossProjectItemOutSchema>
+
+export const PrecipitateOutSchema = z.object({
+  status: z.string(),
+  item: CrossProjectItemOutSchema.nullable().default(null),
+  message: z.string().default(''),
+})
+export type PrecipitateOut = z.infer<typeof PrecipitateOutSchema>
+
+
 export const KnowledgeDocListSchema = z.object({
   items: z.array(KnowledgeDocListItemSchema),
   total: z.number(),

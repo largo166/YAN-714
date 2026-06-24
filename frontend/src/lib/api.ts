@@ -9,6 +9,9 @@ import {
   GenerateMetadataOutSchema,
   ProjectCognitionSchema,
   CognitionExtractOutSchema,
+  CrossProjectTypeOutSchema,
+  CrossProjectItemOutSchema,
+  PrecipitateOutSchema,
   KnowledgeSearchOutSchema,
   MeetingDetailSchema,
   MeetingListSchema,
@@ -353,6 +356,29 @@ export const api = {
       await request(`/api/projects/${projectId}/cognition/${cogId}`, {
         method: 'PUT',
         body: JSON.stringify({ updates }),
+      }),
+    )
+  },
+  // ── B 类跨项目复用库（阶段3）──
+  async listCrossProjectTypes(): Promise<{ type: string; label: string; count: number }[]> {
+    return z.array(CrossProjectTypeOutSchema).parse(await request('/api/cross-project/types'))
+  },
+  async listCrossProjectLibrary(
+    crossType?: string,
+  ): Promise<import('@/types/schemas').CrossProjectItemOut[]> {
+    const qs = crossType ? `?cross_type=${encodeURIComponent(crossType)}` : ''
+    return z.array(CrossProjectItemOutSchema).parse(await request(`/api/cross-project/library${qs}`))
+  },
+  async precipitateToCrossProject(
+    projectId: number,
+    cogId: number,
+    crossType: string,
+    title?: string,
+  ): Promise<import('@/types/schemas').PrecipitateOut> {
+    return PrecipitateOutSchema.parse(
+      await request('/api/cross-project/precipitate', {
+        method: 'POST',
+        body: JSON.stringify({ project_id: projectId, cog_id: cogId, cross_type: crossType, title }),
       }),
     )
   },

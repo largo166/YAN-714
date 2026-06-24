@@ -66,6 +66,28 @@ def _file_snippet(text: str, width: int = 200) -> str:
     return (t[:width] + "…") if len(t) > width else t
 
 
+def is_nonempty(v) -> bool:
+    """递归判定字段值是否有实质内容：剔除 None/空串/空集合,以及 [None]/{"k":None} 这类
+    嵌套空壳——避免占位空值被 str() 成 "[None]" 注入 prompt/沉淀（不伪造，纲要规则3/4）。
+    cross_project 等模块共用此口径。"""
+    if v in (None, "", [], {}):
+        return False
+    if isinstance(v, (list, tuple, set)):
+        return any(is_nonempty(x) for x in v)
+    if isinstance(v, dict):
+        return any(is_nonempty(x) for x in v.values())
+    if isinstance(v, str):
+        return bool(v.strip())
+    return True
+
+
+def value_to_text(v) -> str:
+    """把字段值渲染成展示文本，list 渲染时【逐项过滤空壳】（避免 [None,"x"]→"None、x" 伪造）。"""
+    if isinstance(v, (list, tuple)):
+        return "、".join(str(x) for x in v if is_nonempty(x))
+    return str(v) if v is not None else ""
+
+
 def gather_cognition(db: Session, project_id: int) -> tuple[List[str], List[Source]]:
     """上下文供给协议·路0：取本项目【已确认】结构化认知（规格 1.5：只 status=confirmed 字段）。
 
@@ -74,18 +96,7 @@ def gather_cognition(db: Session, project_id: int) -> tuple[List[str], List[Sour
     """
     import json as _json
 
-    def _nonempty(v) -> bool:
-        """递归判定字段值是否有实质内容：剔除 None/空串/空集合,以及 [None]/{"k":None} 这类
-        嵌套空壳——避免占位空值被 str() 成 "[None]" 注入 prompt（不伪造，纲要规则3/4）。"""
-        if v in (None, "", [], {}):
-            return False
-        if isinstance(v, (list, tuple, set)):
-            return any(_nonempty(x) for x in v)
-        if isinstance(v, dict):
-            return any(_nonempty(x) for x in v.values())
-        if isinstance(v, str):
-            return bool(v.strip())
-        return True
+    _nonempty = is_nonempty
 
     cogs = (
         db.query(models.ProjectCognition)
@@ -111,12 +122,11 @@ def gather_cognition(db: Session, project_id: int) -> tuple[List[str], List[Sour
         label = c.module_label or c.module
         cog_block.append(f"【已确认认知·{label}】" + (f" 摘要：{c.summary_md}" if c.summary_md else ""))
         for f in confirmed:
-            v = f.get("value")
-            vs = "、".join(map(str, v)) if isinstance(v, list) else str(v)
+            vs = value_to_text(f.get("value"))  # list 逐项过滤空壳,不渲染 None/空白
             cog_block.append(f"  - {f.get('label', f.get('key'))}：{vs}")
         sources.append(
             Source(kind="cognition", ref_id=c.id, title=f"{label}结构化认知",
-                   snippet=(c.summary_md or "; ".join(f"{f.get('label')}:{f.get('value')}" for f in confirmed[:3]))[:200],
+                   snippet=(c.summary_md or "; ".join(f"{f.get('label')}:{value_to_text(f.get('value'))}" for f in confirmed[:3]))[:200],
                    engine="cognition")
         )
     return cog_block, sources

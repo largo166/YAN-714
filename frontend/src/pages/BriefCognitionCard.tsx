@@ -40,6 +40,12 @@ export default function BriefCognitionCard({
   const [note, setNote] = useState<string | null>(null)
   const [editKey, setEditKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
+  const [crossType, setCrossType] = useState('')
+  const [crossTypes, setCrossTypes] = useState<{ type: string; label: string }[]>([])
+
+  useEffect(() => {
+    api.listCrossProjectTypes().then((t) => setCrossTypes(t)).catch(() => setCrossTypes([]))
+  }, [])
 
   const load = useCallback(async () => {
     if (projectId == null) {
@@ -110,6 +116,25 @@ export default function BriefCognitionCard({
     }
   }
 
+  const precipitate = async () => {
+    if (projectId == null || !cog || busy || !crossType) return
+    setBusy(true)
+    try {
+      const r = await api.precipitateToCrossProject(projectId, cog.id, crossType)
+      if (r.status === 'ok' && r.item) {
+        setNote(`已沉淀到跨项目库「${r.item.label}」：${r.item.title}（其它项目可检索复用）`)
+      } else if (r.status === 'empty') {
+        setNote('无已确认字段可沉淀。请先确认事实/判断字段再沉淀（不伪造）。')
+      } else {
+        setNote(r.message || '沉淀失败')
+      }
+    } catch (e) {
+      setNote((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (projectId == null) return null
 
   const confirmedCount = cog ? cog.fields.filter((f) => f.status === 'confirmed').length : 0
@@ -136,6 +161,25 @@ export default function BriefCognitionCard({
           )}
         </div>
       </div>
+
+      {cog && confirmedCount > 0 && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'var(--mut)' }}>沉淀到跨项目库：</span>
+          <select
+            value={crossType}
+            onChange={(e) => setCrossType(e.target.value)}
+            style={{ fontSize: 12, padding: '2px 6px', border: '1px solid var(--line2)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--ink)' }}
+          >
+            <option value="">选择类别…</option>
+            {crossTypes.map((t) => (
+              <option key={t.type} value={t.type}>{t.label}</option>
+            ))}
+          </select>
+          <button className="anbtn" disabled={busy || !crossType} onClick={precipitate} title="把已确认认知沉淀为跨项目可复用条目">
+            沉淀
+          </button>
+        </div>
+      )}
 
       {!cog && (
         <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 0' }}>

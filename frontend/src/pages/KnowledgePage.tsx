@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
+import CrossProjectLibrary from './CrossProjectLibrary'
 import type {
   BatchIngestImport,
   BatchIngestPreview,
@@ -626,6 +627,7 @@ export default function KnowledgePage() {
           </div>
         </div>
       )}
+      <CrossProjectLibrary />
     </>
   )
 }

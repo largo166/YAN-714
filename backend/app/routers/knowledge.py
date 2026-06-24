@@ -30,8 +30,10 @@ def _text_chunks(content: str) -> list[str]:
 
 @router.get("/documents", response_model=schemas.KnowledgeDocListOut)
 def list_documents(db: Session = Depends(get_db)):
+    # 排除跨项目库条目(file_type=cross_project)——它们由 /api/cross-project 独立管理,不混入常规库列表
     items = (
         db.query(models.KnowledgeDocument)
+        .filter(models.KnowledgeDocument.file_type != "cross_project")
         .order_by(models.KnowledgeDocument.updated_at.desc())
         .all()
     )
@@ -40,7 +42,12 @@ def list_documents(db: Session = Depends(get_db)):
 
 @router.get("/stats", response_model=schemas.KnowledgeStatsOut)
 def knowledge_stats(db: Session = Depends(get_db)) -> schemas.KnowledgeStatsOut:
-    docs = db.query(models.KnowledgeDocument).all()
+    # 同 list_documents：常规库统计不含跨项目库沉淀条目
+    docs = (
+        db.query(models.KnowledgeDocument)
+        .filter(models.KnowledgeDocument.file_type != "cross_project")
+        .all()
+    )
     engine = "fts5" if retrieval.fts5_available(db) else "like"
     indexed = len(docs)
     if engine == "fts5":
