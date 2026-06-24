@@ -79,10 +79,15 @@ export default function KnowledgePage() {
     api.getKnowledgeStats().then(setStats).catch(() => setStats(null))
   }, [])
 
+  // 当前生效的整理目标根:配置了仓库则显示仓库路径,否则"程序内部目录"。
+  // 让用户在「一键整理」前清楚文件会进哪里(消除"以为进 A 实际进 B")。
+  const [repoRoot, setRepoRoot] = useState('')
+
   useEffect(() => {
     loadDocs()
     // 仅取上次工作区路径作 prompt 默认值(便利),不当作"已选择来源"——状态从「未选择」起步。
     api.workspaceStatus().then((w) => setLastWsPath(w.workspace_path || '')).catch(() => {})
+    api.getSettings().then((s) => setRepoRoot(s.repository_root_path || '')).catch(() => {})
     loadStats()
   }, [loadDocs, loadStats])
 
@@ -267,6 +272,15 @@ export default function KnowledgePage() {
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--mut)', margin: '6px 2px 0' }}>
             「选择来源」只读取并预览本地文件夹或单个文件（不建项目、不入库、不写索引）；确认无误后点「一键整理」才复制接入并建立本地索引。原始目录始终不动。
+          </div>
+          {/* 当前整理目标根:配置仓库则进仓库,否则程序内部目录(在设置→知识库与数据里配置仓库) */}
+          <div style={{ fontSize: 11.5, color: 'var(--mut)', margin: '4px 2px 0' }}>
+            整理目标：
+            {repoRoot ? (
+              <b style={{ color: 'var(--terra)' }}>仓库 {repoRoot}</b>
+            ) : (
+              <>程序内部目录（默认）· <span style={{ color: 'var(--mut)' }}>可在「设置 → 知识库与数据」配置本地仓库文件夹</span></>
+            )}
           </div>
 
           {/* 只读预览(选择来源后) */}

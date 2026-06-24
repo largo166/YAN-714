@@ -78,6 +78,11 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
+  // 受管资料库(仓库)根:真实接后端。空=未配置→一键整理回退程序内部目录。
+  const [repoRoot, setRepoRoot] = useState('')
+  const [repoMsg, setRepoMsg] = useState<string | null>(null)
+  const [repoErr, setRepoErr] = useState<string | null>(null)
+
   // 本地 UI 态（未接后端，仅保真交互）
   const [autoIndex, setAutoIndex] = useState(true)
   const [slangDict, setSlangDict] = useState(true)
@@ -95,9 +100,28 @@ export default function SettingsDrawer({ open, onClose }: Props) {
         setBaseUrl(s.deepseek_base_url)
         setModel(s.deepseek_model)
         setTheme(s.theme === 'dark' ? '深色' : '暖白')
+        setRepoRoot(s.repository_root_path || '')
       })
       .catch((e: Error) => setErr(e.message))
   }, [open])
+
+  /** 配置/解除仓库根:prompt 输入绝对路径 → 保存(后端校验:存在/可写/非嵌套 uploads…)。 */
+  const setRepository = async () => {
+    setRepoMsg(null)
+    setRepoErr(null)
+    const p = window.prompt(
+      '输入「资料仓库」文件夹的绝对路径（先在资源管理器里新建好，如 D:\\ROM-AI-仓库）：\n留空并确定 = 解除配置，整理回退程序内部目录。',
+      repoRoot || '',
+    )
+    if (p === null) return // 取消
+    try {
+      const saved = await api.updateSettings({ repository_root_path: p.trim() })
+      setRepoRoot(saved.repository_root_path || '')
+      setRepoMsg(saved.repository_configured ? '仓库已配置，之后「一键整理」将整理进此文件夹' : '已解除仓库，整理回退程序内部目录')
+    } catch (e) {
+      setRepoErr((e as Error).message) // 后端 400 文案(不存在/不可写/嵌套 uploads…)
+    }
+  }
 
   const save = async () => {
     setSaveMsg(null)
@@ -239,8 +263,27 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           {/* 2 知识库与数据 */}
           <div className="setsec">
             <div className="setsech">知识库与数据</div>
-            <div className="setsecd">资料目录、索引与存储位置（路径选择待接入桌面桥接）</div>
-            <PathRow t="受管资料根目录" placeholder="待配置（接入目录选择器后填写）" />
+            <div className="setsecd">资料目录、索引与存储位置</div>
+            {/* 受管资料库(仓库)根:真实接后端。配置后「一键整理」把文件整理进此文件夹(资源管理器可读) */}
+            <div className="setrow">
+              <div className="lbl">
+                <div className="t">
+                  受管资料库（仓库）
+                  <span
+                    className="chip"
+                    style={{ marginLeft: 8, fontSize: 10, background: repoRoot ? 'var(--ok)' : 'var(--line2)', color: repoRoot ? '#fff' : 'var(--mut)' }}
+                  >
+                    {repoRoot ? '已配置' : '未配置'}
+                  </span>
+                </div>
+                <div className="d" style={{ wordBreak: 'break-all' }}>
+                  {repoRoot || '未配置时整理回退程序内部目录（backend/data/uploads）'}
+                </div>
+                {repoMsg && <div className="d" style={{ color: 'var(--ok)' }}>{repoMsg}</div>}
+                {repoErr && <div className="d" style={{ color: 'var(--red)' }}>{repoErr}</div>}
+              </div>
+              <button className="btn" onClick={setRepository}>{repoRoot ? '更改 / 解除' : '配置仓库'}</button>
+            </div>
             <PathRow t="Obsidian Vault（引用模式）" placeholder="待配置" d="引用模式" />
             <PathRow t="数据库 / 索引" placeholder="后端默认 backend/data/rom_ai.db" d="SQLite" />
             <div className="setrow">

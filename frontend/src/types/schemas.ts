@@ -212,6 +212,8 @@ export const SettingsSchema = z.object({
   deepseek_base_url: z.string(),
   deepseek_model: z.string(),
   theme: z.string(),
+  repository_root_path: z.string().default(''),
+  repository_configured: z.boolean().default(false),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -220,6 +222,7 @@ export const SettingsInputSchema = z.object({
   deepseek_base_url: z.string().url('需为合法 URL').optional(),
   deepseek_model: z.string().optional(),
   theme: z.enum(['light', 'dark']).optional(),
+  repository_root_path: z.string().optional(),
 })
 export type SettingsInput = z.infer<typeof SettingsInputSchema>
 
