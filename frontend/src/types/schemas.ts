@@ -393,6 +393,33 @@ export const PrecipitateOutSchema = z.object({
 })
 export type PrecipitateOut = z.infer<typeof PrecipitateOutSchema>
 
+// ── 工作流状态机驱动（阶段4）──
+export const StageNodeOutSchema = z.object({
+  stage: z.string(),
+  label: z.string(),
+  cognition_module: z.string().default(''),
+  kind: z.string().default('process'),
+  upstream_required: z.array(z.string()).default([]),
+  done: z.boolean().default(false),
+})
+export const StageSuggestionOutSchema = z.object({
+  stage: z.string(),
+  label: z.string(),
+  cognition_module: z.string(),
+  ready: z.boolean(),
+  blocked_by: z.array(z.string()).default([]),
+})
+export const StageProgressOutSchema = z.object({
+  project_id: z.number(),
+  current_stage: z.string(),
+  done_count: z.number(),
+  total_cognition_stages: z.number(),
+  nodes: z.array(StageNodeOutSchema).default([]),
+  suggestions: z.array(StageSuggestionOutSchema).default([]),
+})
+export type StageProgressOut = z.infer<typeof StageProgressOutSchema>
+
+
 
 export const KnowledgeDocListSchema = z.object({
   items: z.array(KnowledgeDocListItemSchema),

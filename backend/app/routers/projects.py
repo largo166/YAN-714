@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import models, safe_json, schemas
+from .. import models, safe_json, schemas, stage_machine
 from ..database import get_db
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -300,6 +300,16 @@ def project_reusable_assets(
 ) -> schemas.ReusableAssetListOut:
     _get_or_404(db, project_id)
     return schemas.ReusableAssetListOut(items=_project_assets(db, project_id))
+
+
+@router.get("/{project_id}/stage-progress", response_model=schemas.StageProgressOut)
+def project_stage_progress(
+    project_id: int, db: Session = Depends(get_db)
+) -> schemas.StageProgressOut:
+    """工作流状态机驱动（阶段4）：据已确认认知算阶段完成度 + 当前阶段 + 下一步建议。
+    只读聚合，建议由用户逐步触发，不自动跑流水线（不伪造进度）。"""
+    _get_or_404(db, project_id)
+    return stage_machine.compute_stage_progress(db, project_id)
 
 
 @router.post("/{project_id}/team-assignments", response_model=schemas.TeamAssignmentCreateOut, status_code=201)

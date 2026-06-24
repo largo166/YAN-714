@@ -12,6 +12,7 @@ import {
   CrossProjectTypeOutSchema,
   CrossProjectItemOutSchema,
   PrecipitateOutSchema,
+  StageProgressOutSchema,
   KnowledgeSearchOutSchema,
   MeetingDetailSchema,
   MeetingListSchema,
@@ -165,6 +166,9 @@ export const api = {
   },
   async getProjectReusableAssets(id: number): Promise<ReusableAsset[]> {
     return ReusableAssetListSchema.parse(await request(`/api/projects/${id}/reusable-assets`)).items
+  },
+  async getStageProgress(id: number): Promise<import('@/types/schemas').StageProgressOut> {
+    return StageProgressOutSchema.parse(await request(`/api/projects/${id}/stage-progress`))
   },
   async getProjectProgress(id: number): Promise<ProjectProgress> {
     return ProjectProgressSchema.parse(await request(`/api/projects/${id}/progress`))

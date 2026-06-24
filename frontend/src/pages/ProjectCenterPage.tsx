@@ -13,6 +13,7 @@ import type {
 import ProjectAnalysisPanel from './ProjectAnalysisPanel'
 import ProjectFilesPanel from './ProjectFilesPanel'
 import CognitionSection from './CognitionSection'
+import StageProgressPanel from './StageProgressPanel'
 import MeetingPanel from './MeetingPanel'
 import TencentMeetingCard from './TencentMeetingCard'
 import WorkspacePanel from './WorkspacePanel'
@@ -157,6 +158,7 @@ export default function ProjectCenterPage() {
         </div>
       </div>
 
+      <StageProgressPanel projectId={curId} />
       <CognitionSection projectId={curId} />
 
       <ProjectFilesPanel projectId={curId} />

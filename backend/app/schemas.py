@@ -765,7 +765,7 @@ STAGE_NODES = [
     {"stage": "site", "label": "场地研究", "cognition_module": "site_research", "upstream_required": ["brief"]},
     {"stage": "user_program", "label": "使用者功能", "cognition_module": "user_program", "upstream_required": ["brief"]},
     {"stage": "cases", "label": "案例研究", "cognition_module": "", "upstream_required": []},
-    {"stage": "core_problem", "label": "核心问题", "cognition_module": "", "upstream_required": ["brief", "site_research"]},
+    {"stage": "core_problem", "label": "核心问题", "cognition_module": "", "upstream_required": ["brief", "site"]},
     {"stage": "concept", "label": "概念生成", "cognition_module": "design_concept", "upstream_required": ["core_problem"]},
     {"stage": "spatial", "label": "空间策略", "cognition_module": "", "upstream_required": ["concept"]},
     {"stage": "massing", "label": "体量推演", "cognition_module": "", "upstream_required": ["concept"]},
@@ -865,6 +865,33 @@ class PrecipitateOut(BaseModel):
     status: str                      # ok|empty（项目/认知/类别不存在走 HTTP 404，不在此枚举内）
     item: Optional[CrossProjectItemOut] = None
     message: str = ""
+
+
+# ── 工作流状态机驱动（规格 D，阶段4）──
+class StageNodeOut(BaseModel):
+    stage: str
+    label: str
+    cognition_module: str = ""       # 背后的 A 类认知 module；纯过程节点为 ""
+    kind: str = "process"            # cognition | process
+    upstream_required: List[str] = []
+    done: bool = False               # cognition 节点:有已确认认知则 True;process 节点恒 False(不靠认知判定)
+
+
+class StageSuggestionOut(BaseModel):
+    stage: str
+    label: str
+    cognition_module: str
+    ready: bool                      # 认知类上游都已完成,可推进
+    blocked_by: List[str] = []       # 卡住它的未完成认知类上游 stage
+
+
+class StageProgressOut(BaseModel):
+    project_id: int
+    current_stage: str
+    done_count: int                  # 已完成的 stage 数(含 process? 否——只数 cognition done)
+    total_cognition_stages: int      # 有 cognition_module 的节点总数
+    nodes: List[StageNodeOut] = []
+    suggestions: List[StageSuggestionOut] = []
 
 
 # ── 会议纪要 ──
