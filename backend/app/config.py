@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     asr_model: str = ""
     asr_language: str = "zh"
 
+    # ── AI 生图（key 只进本机 .env，绝不入库/同步;未配→not_configured 不伪造）──
+    # APImart OpenAI 兼容异步制:提交 /v1/images/generations → 轮询 /v1/tasks/{id}
+    image_api_key: str = ""
+    image_base_url: str = "https://api.apimart.ai"
+    image_model: str = "gpt-image-1-official"  # 默认 OpenAI;可选 gemini-3-pro-image-preview
+
     # ── 腾讯会议 provider（可选；通过本机已装 MCP skill 脚本调用）──
     # token 读 TENCENT_MEETING_TOKEN（本机 settings/env，绝不入库/同步）
     tencent_meeting_token: str = ""

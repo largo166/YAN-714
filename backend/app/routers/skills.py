@@ -9,7 +9,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas, skill_structured, safe_json
+from .. import analysis, llm, models, schemas, skill_structured, safe_json, image_gen, uploads
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -21,7 +21,7 @@ NO_MATERIAL_MSG = "暂无可用材料：本项目无可解析文件且知识库�
 _SKILLS = [
     {"id": "ppt", "title": "PPT 大纲生成", "icon": "▤", "source": "读知识库 + 项目数据",
      "example": "帮我做一版方案汇报 PPT", "status": "待命"},
-    {"id": "img", "title": "AI 生图 · 意向图", "icon": "🖼", "source": "Prompt 模板 → 即梦 / MJ",
+    {"id": "img", "title": "AI 生图 · 意向图", "icon": "🖼", "source": "APImart 真出图 · 存项目",
      "example": "生成几张退台立面意向图", "status": "待命"},
     {"id": "review", "title": "方案评审", "icon": "◷", "source": "案例策略 + 方法模板比对",
      "example": "对这版方案做评审，再对标一个类比项目", "status": "待命"},
@@ -139,6 +139,47 @@ def run_skill(
             content=skill_structured.meeting_to_markdown(result),
             output_json=safe_json.dumps_safe(result),
             sources=sources if latest is None else [], model=cfg.deepseek_model,
+        )
+
+    # ── 生图技能:DeepSeek 据材料生成提示词 → APImart 真出图 → 下载存项目 uploads ──
+    if skill_id == "img":
+        # 未配生图 key:如实提示,绝不伪造图(规则 3/10)。文本 key 单独判过。
+        if not image_gen.is_configured():
+            return schemas.SkillRunOut(skill_id=skill_id, status="not_configured", title="AI 生图",
+                                       content=image_gen.NOT_CONFIGURED_MSG)
+        # 1) DeepSeek 据项目材料生成一条生图提示词(无材料也可,基于项目名)
+        ctx = material.context or f"项目：{project.name}"
+        gen_user = (
+            f"{ctx}\n\n请为本建筑项目生成一条用于 AI 出『方案意向图/效果图』的英文生图提示词,"
+            f"突出建筑风格、立面材质、光线氛围、视角,写实风格;只输出一段提示词文本,不要解释。"
+            + (f"\n用户补充:{payload.input.strip()}" if payload.input.strip() else "")
+        )
+        try:
+            prompt = llm.chat_completion(
+                [{"role": "user", "content": gen_user}],
+                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+            ).strip()
+        except llm.LLMError as e:
+            return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
+                                       content="生成提示词失败。", error_message=str(e))
+        # 2) 真出图(异步制,内部轮询)
+        res = image_gen.generate_image(prompt, model=payload.model)
+        if res.status == "not_configured":
+            return schemas.SkillRunOut(skill_id=skill_id, status="not_configured", title="AI 生图", content=res.message)
+        if res.status != "ok" or not res.image_bytes:
+            return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
+                                       content="生图失败,未出图(不伪造)。", error_message=res.message)
+        # 3) 下载的字节存进项目 uploads(本地,不依赖 24h 过期 URL)
+        ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}.get(res.mime, "png")
+        try:
+            stored = uploads.save_upload(project_id, f"AI生图-{res.model}.{ext}", res.image_bytes)
+        except Exception as exc:  # noqa: BLE001
+            return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
+                                       content="图片存盘失败。", error_message=str(exc))
+        return schemas.SkillRunOut(
+            skill_id=skill_id, status="ok", title="AI 生图 · 意向图",
+            content=f"已生成意向图（{res.model}）。提示词:\n{prompt}",
+            image_url=stored.stored_path, image_model=res.model, model=cfg.deepseek_model,
         )
 
     # 需检索的技能：无材料则不伪造；不需检索的(生图提示词)允许无材料直接生成

@@ -121,3 +121,21 @@ def test_meeting_structured_uses_transcript(client, monkeypatch):
     assert result["overview"] and result["clientNeedsTranslated"]  # 五段式有诉求转译
     assert "甲方诉求转译" in body["content"]
 
+
+def test_img_not_configured_no_network(client, monkeypatch):
+    """生图技能:未配生图 key → not_configured,不调网络、不伪造图(规则 3/10)。"""
+    from app import image_gen, llm
+    monkeypatch.setattr(image_gen, "is_configured", lambda: False)
+    # 即使 deepseek 配着,生图 key 没配也必须 not_configured,且不应触达 generate_image
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: "a building, photorealistic")
+    def _boom(*a, **k):
+        raise AssertionError("未配 key 时不应调用 generate_image")
+    monkeypatch.setattr(image_gen, "generate_image", _boom)
+    pid = _new_project(client, name="生图未配测试")
+    _set_key()
+    r = client.post(f"/api/projects/{pid}/skills/img/run", json={"input": ""})
+    body = r.json()
+    assert body["status"] == "not_configured"
+    assert body["image_url"] == ""  # 不伪造图
+
+
