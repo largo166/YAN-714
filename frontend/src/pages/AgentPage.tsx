@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
@@ -32,7 +33,30 @@ export default function AgentPage() {
   const [sendNote, setSendNote] = useState<string | null>(null)
   const [results, setResults] = useState<SkillRun[]>([])
   const [runningSkill, setRunningSkill] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const logRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // composer「+」添加文件：上传到当前项目（落项目文件，解析后可经知识库被检索/技能调用）
+  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // 允许连续选同一文件
+    if (!file) return
+    if (!cur) {
+      setErr('请先在上方「作用于」选择项目，再添加文件。')
+      return
+    }
+    setErr(null)
+    setUploading(true)
+    try {
+      const f = await api.uploadProjectFile(cur.id, file)
+      setSendNote(`已添加「${f.filename}」到项目「${cur.name}」（解析状态：${f.parse_status}）`)
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const loadSessions = useCallback(async () => {
     try {
@@ -266,9 +290,20 @@ export default function AgentPage() {
             }}
           />
           <div className="ctoolbar">
-            <button className="ctool" title="添加文件 / 文件夹 / Skill">
-              +
+            <button
+              className="ctool"
+              title={cur ? `添加文件到项目「${cur.name}」` : '请先选择作用项目'}
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+            >
+              {uploading ? '…' : '+'}
             </button>
+            <input
+              ref={fileRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={onPickFile}
+            />
             <button
               className={'ctool' + (useKnowledge ? '' : '')}
               title="启用知识库上下文"

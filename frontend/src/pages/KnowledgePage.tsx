@@ -24,6 +24,20 @@ export default function KnowledgePage() {
   const [detail, setDetail] = useState<KnowledgeDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // 类型筛选（按 tags 真过滤）。"全部"=不筛。来源筛选无真实字段，按钮禁用（见下方 TODO）。
+  const [typeFilter, setTypeFilter] = useState('全部')
+  // 类型名 → 命中的标签关键词（doc.tags 含任一即归为该类型）
+  const TYPE_TAGS: Record<string, string[]> = {
+    案例: ['案例', '类比', '对标'],
+    方法: ['方法', '模板', '方法论', '理论'],
+    图纸: ['图纸', '总图', '总平面', '平面图', '立面图', '户型图', 'dwg', 'cad', 'pdf'],
+  }
+  const docTags = (id: number) => docs.find((d) => d.id === id)?.tags || ''
+  const matchType = (tags: string) => {
+    if (typeFilter === '全部') return true
+    const low = tags.toLowerCase()
+    return (TYPE_TAGS[typeFilter] || []).some((k) => low.includes(k.toLowerCase()))
+  }
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [ingestPreview, setIngestPreview] = useState<BatchIngestPreview | null>(null)
   const [ingestResult, setIngestResult] = useState<BatchIngestImport | null>(null)
@@ -193,40 +207,62 @@ export default function KnowledgePage() {
         </div>
         <div className="scopebar">
           <span className="lab">类型</span>
-          {['全部', '案例', '方法', '图纸'].map((x, i) => (
-            <button className={'scope' + (i === 0 ? ' on' : '')} key={x}>
+          {['全部', '案例', '方法', '图纸'].map((x) => (
+            <button
+              className={'scope' + (typeFilter === x ? ' on' : '')}
+              key={x}
+              onClick={() => setTypeFilter(x)}
+            >
               {x}
             </button>
           ))}
           <span className="lab" style={{ marginLeft: 8 }}>来源</span>
+          {/* TODO(source-filter): 待产品确认文档级来源筛选是否成立。
+              KnowledgeDocument 当前无 source_mode(复制/引用) 字段，不以 tags 伪造来源筛选。
+              落地需后端给文档加 source_mode 并在导入时写入；本 PR 不动数据模型。 */}
           {['全部', '复制', '引用'].map((x, i) => (
-            <button className={'scope' + (i === 0 ? ' on' : '')} key={x}>
+            <button
+              className={'scope' + (i === 0 ? ' on' : '')}
+              key={x}
+              disabled
+              title="来源维度需后端 source_mode 字段，暂未接入"
+              style={{ opacity: 0.5, cursor: 'not-allowed' }}
+            >
               {x}
             </button>
           ))}
         </div>
         {hits !== null && (
           <>
-            <div id="kb-hits-meta" style={{ fontSize: 11.5, color: 'var(--mut)', margin: '9px 0 2px' }}>
-              {searching ? '检索中…' : `命中 ${hits.length} 条 · 引擎 ${engine}`}
-            </div>
-            <div style={{ marginTop: 4 }}>
-              {hits.length === 0 && !searching && (
-                <div className="hit">
-                  <span className="tx" style={{ color: 'var(--mut)' }}>
-                    无命中。
-                  </span>
-                </div>
-              )}
-              {hits.map((h) => (
-                <div className="hit" key={h.document_id} style={{ cursor: 'pointer' }} onClick={() => openDetail(h.document_id)}>
-                  <span className="score">{h.score}</span>
-                  <span className="tx">
-                    <b>{h.title}</b>：{h.snippet}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {(() => {
+              const shown = hits.filter((h) => matchType(docTags(h.document_id)))
+              return (
+                <>
+                  <div id="kb-hits-meta" style={{ fontSize: 11.5, color: 'var(--mut)', margin: '9px 0 2px' }}>
+                    {searching
+                      ? '检索中…'
+                      : `命中 ${shown.length} 条${typeFilter !== '全部' ? `（已按类型「${typeFilter}」筛选，共 ${hits.length}）` : ''} · 引擎 ${engine}`}
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    {shown.length === 0 && !searching && (
+                      <div className="hit">
+                        <span className="tx" style={{ color: 'var(--mut)' }}>
+                          {hits.length === 0 ? '无命中。' : `无「${typeFilter}」类型命中。`}
+                        </span>
+                      </div>
+                    )}
+                    {shown.map((h) => (
+                      <div className="hit" key={h.document_id} style={{ cursor: 'pointer' }} onClick={() => openDetail(h.document_id)}>
+                        <span className="score">{h.score}</span>
+                        <span className="tx">
+                          <b>{h.title}</b>：{h.snippet}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </>
         )}
       </div>
