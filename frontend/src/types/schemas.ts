@@ -279,6 +279,9 @@ export const KnowledgeDocSchema = z.object({
   content_text: z.string(),
   file_type: z.string(),
   tags: z.string(),
+  type: z.string().default(''),
+  description: z.string().default(''),
+  resource: z.string().default(''),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -290,6 +293,9 @@ export const KnowledgeDocListItemSchema = z.object({
   source_path: z.string(),
   file_type: z.string(),
   tags: z.string(),
+  type: z.string().default(''),
+  description: z.string().default(''),
+  resource: z.string().default(''),
   created_at: z.string(),
   updated_at: z.string(),
 })

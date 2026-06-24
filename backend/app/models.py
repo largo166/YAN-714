@@ -122,6 +122,10 @@ class KnowledgeDocument(Base):
     content_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     file_type: Mapped[str] = mapped_column(String(40), default="text", nullable=False)
     tags: Mapped[str] = mapped_column(String(300), default="", nullable=False)  # 逗号分隔
+    # ── 知识元数据层（feat/knowledge-metadata，借鉴 OKF 规范）──
+    type: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 规则推断枚举
+    description: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 一句话摘要（AI 按需生成）
+    resource: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 真实出处
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
