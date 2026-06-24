@@ -99,6 +99,27 @@ def test_index_fills_metadata(client):
         _cleanup_project_dir(pid)
 
 
+def test_large_file_metadata_only_indexes_and_searchable(client, monkeypatch):
+    """超大文件降级 metadata_only,仍能入库且靠文件名/类型被检索到(不卡死导入)。"""
+    import app.parsing as parsing
+
+    monkeypatch.setattr(parsing, "MAX_PARSE_BYTES", 50)  # 调小阈值,小文件即触发降级
+    pid = _new_project(client, name="大资料包测试项目")
+    try:
+        files = {"file": ("投标文本汇编.pdf", b"%PDF-1.4" + b"z" * 200, "application/pdf")}
+        up = client.post(f"/api/projects/{pid}/files", files=files).json()
+        assert up["parse_status"] == "metadata_only"  # 降级,未全文解析
+        fid = up["id"]
+        # 仍能入知识库
+        did = client.post(f"/api/projects/{pid}/files/{fid}/index").json()["document_id"]
+        assert did > 0
+        # 靠文件名检索能命中
+        sr = client.post("/api/knowledge/search", json={"query": "投标文本汇编", "top_k": 5})
+        assert any(h["document_id"] == did for h in sr.json()["hits"])
+    finally:
+        _cleanup_project_dir(pid)
+
+
 def test_index_empty_rejected(client):
     """空文本文件不能入库（不伪造来源）。"""
     pid = _new_project(client)

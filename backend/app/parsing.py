@@ -1,14 +1,16 @@
 """文档文本抽取（Phase 4D）。
 
 分级返回 parse_status，绝不伪造内容（纲要规则 3/4）：
-- ok          抽到非空文本
-- empty       支持的格式但抽出空串（加密/损坏/纯扫描件）
-- unsupported 非 5 类支持格式
-- failed      解析过程异常（捕获，不阻塞其它文件）
+- ok            抽到非空文本
+- empty         支持的格式但抽出空串（加密/损坏/纯扫描件）
+- unsupported   非 5 类支持格式
+- failed        解析过程异常（捕获，不阻塞其它文件）
+- metadata_only 文件超大（>MAX_PARSE_BYTES），降级为只登记元数据，不强制全文解析
+                （投标资料包/大 PDF/PPTX 不卡死导入；content_text 写登记说明，靠 title/type/resource 入库可检索）
 
 支持格式：.txt .md（内建）/ .pdf（pypdf）/ .docx（python-docx）/ .pptx（python-pptx）/
 .xlsx（轻量 XML 抽取）/ 图片资产元数据（png/jpg/jpeg，不做 OCR）。
-不按文件体积预先拒绝；解析异常会分级返回 failed，不阻断其它文件。
+超大文件不强制全文解析（降级 metadata_only）；解析异常分级返回 failed，不阻断其它文件。
 """
 from __future__ import annotations
 
@@ -24,10 +26,14 @@ SUPPORTED_EXTS = {".txt", ".md", ".pdf", ".docx", ".pptx", ".xlsx", ".png", ".jp
 # 抽取后截断上限（防超大文本撑爆 DB / 上下文）
 MAX_TEXT_CHARS = 200_000
 
+# 超大文件阈值：超过则降级 metadata_only，不读全文（避免投标资料包/大 PDF 卡死导入）。
+# 图片资产本就只登记元数据、不受此限。
+MAX_PARSE_BYTES = 20 * 1024 * 1024  # 20 MB
+
 
 @dataclass
 class ParseResult:
-    status: str  # ok / empty / unsupported / failed
+    status: str  # ok / empty / unsupported / failed / metadata_only
     text: str = ""
     error: str = ""
 
@@ -37,11 +43,28 @@ def is_supported(filename: str) -> bool:
 
 
 def parse_file(path: str | Path) -> ParseResult:
-    """抽取文本。异常一律捕获为 failed，不抛出（不阻塞批量）。"""
+    """抽取文本。异常一律捕获为 failed，不抛出（不阻塞批量）。
+    超大文件（>MAX_PARSE_BYTES）的全文类格式降级 metadata_only，不读全文。"""
     p = Path(path)
     ext = p.suffix.lower()
     if ext not in SUPPORTED_EXTS:
         return ParseResult(status="unsupported")
+
+    # 大文件降级：图片资产只登记元数据、不受限；其余全文类超阈值 → metadata_only，不读全文
+    if ext not in (".png", ".jpg", ".jpeg"):
+        try:
+            size = p.stat().st_size
+        except OSError:
+            size = 0
+        if size > MAX_PARSE_BYTES:
+            mb = size / (1024 * 1024)
+            note = (
+                f"{p.name}\n类型：{ext.lstrip('.')}\n大小：{mb:.1f} MB\n"
+                f"说明：文件超过 {MAX_PARSE_BYTES // (1024 * 1024)}MB，已登记为受管资料（仅元数据），"
+                f"未做全文解析；可在数据基地按需查看原件或后续补充摘要。"
+            )
+            return ParseResult(status="metadata_only", text=note)
+
     try:
         if ext in (".txt", ".md"):
             text = _read_text(p)

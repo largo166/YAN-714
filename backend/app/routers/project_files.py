@@ -89,7 +89,8 @@ def _doc_from_file(db: Session, f: models.ProjectFile, tags: str) -> models.Know
 
 
 def _index_project_file(db: Session, f: models.ProjectFile) -> int:
-    if f.parse_status != "ok" or not f.content_text.strip():
+    # ok=全文已抽取；metadata_only=超大文件降级登记（content_text 为登记说明，仍可入库靠 title/type 检索）
+    if f.parse_status not in ("ok", "metadata_only") or not f.content_text.strip():
         return 0
     if f.indexed_doc_id:
         existing = db.get(models.KnowledgeDocument, f.indexed_doc_id)
@@ -284,7 +285,7 @@ def restore_file(project_id: int, file_id: int, timestamp: str, db: Session = De
 def index_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     """回流入库：把已解析文件写入 knowledge_documents（人工触发，幂等）。"""
     f = _file_or_404(db, project_id, file_id)
-    if f.parse_status != "ok" or not f.content_text.strip():
+    if f.parse_status not in ("ok", "metadata_only") or not f.content_text.strip():
         raise HTTPException(400, "该文件无可用文本，无法入库（不伪造）")
     # 幂等：已入库则直接返回
     if f.indexed_doc_id:
