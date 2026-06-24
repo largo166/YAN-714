@@ -17,6 +17,7 @@ from .routers import settings as settings_router
 from .routers import team
 from .routers import workspace
 from .routers import skills
+from .routers import filesystem
 
 
 @asynccontextmanager
@@ -41,6 +42,7 @@ app.include_router(settings_router.router)
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(workspace.router)
+app.include_router(filesystem.router)
 app.include_router(project_files.router)
 app.include_router(project_analysis.router)
 app.include_router(cognition.router)

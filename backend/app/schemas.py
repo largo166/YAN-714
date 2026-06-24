@@ -448,6 +448,30 @@ class KnowledgeSearchOut(BaseModel):
     hits: List[KnowledgeHitOut]
 
 
+class BatchIngestRequest(BaseModel):
+    root_path: str = Field(min_length=1)
+
+
+# ── 文件系统:只读列目录(目录选择弹窗) ──
+class DirEntryOut(BaseModel):
+    name: str
+    abs_path: str
+    is_dir: bool
+    ext: str = ""
+    supported: bool = False   # 文件可被整理链路解析(文件夹恒 False)
+    is_symlink: bool = False
+
+
+class DirListOut(BaseModel):
+    accessible: bool
+    level: str = "dir"        # "drives"=盘符层 | "dir"=目录层
+    path: str = ""
+    parent: Optional[str] = None
+    drives: List[str] = []
+    items: List[DirEntryOut] = []
+    error: str = ""
+
+
 # ── 4D: 项目文件 ──
 class ProjectFileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
