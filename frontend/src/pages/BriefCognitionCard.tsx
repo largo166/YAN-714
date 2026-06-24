@@ -168,7 +168,7 @@ export default function BriefCognitionCard({
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="anbtn" disabled={busy} onClick={extract}>
-            {busy ? '处理中…' : cog ? '重新抽取' : `AI 抽取${label}`}
+            {busy ? '处理中…' : cog ? '重新解读' : 'AI 解读'}
           </button>
           {cog && (
             <button className="anbtn" disabled={busy} onClick={confirm} title="确认事实类(high/medium)字段">
@@ -219,7 +219,7 @@ export default function BriefCognitionCard({
 
       {!cog && (
         <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 0' }}>
-          尚未建立{label}结构化认知。上传可解析资料入库后，点「AI 抽取{label}」按字段分档读取（事实带出处、判断给草案、核心留人工）。
+          尚未建立{label}结构化认知。上传可解析资料入库后，点上方「AI 解读」按字段分档读取（事实带出处、判断给草案、核心留人工）。
         </div>
       )}
 
