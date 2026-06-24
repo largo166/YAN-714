@@ -309,7 +309,7 @@ def get_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
 def delete_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     """软删：移到 _trash + manifest，DB 标 trashed。永不硬删。"""
     f = _file_or_404(db, project_id, file_id)
-    res = uploads.soft_delete(project_id, f.stored_path)
+    res = uploads.soft_delete(f.stored_path, f.storage_root)
     if not res.get("ok"):
         raise HTTPException(400, res.get("error", "删除失败"))
     f.status = "trashed"
@@ -321,7 +321,7 @@ def delete_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
 @router.post("/{project_id}/files/{file_id}/restore", response_model=schemas.ProjectFileDetailOut)
 def restore_file(project_id: int, file_id: int, timestamp: str, db: Session = Depends(get_db)):
     f = _file_or_404(db, project_id, file_id)
-    res = uploads.restore(project_id, timestamp)
+    res = uploads.restore(timestamp, f.storage_root, stored_path=f.stored_path)
     if not res.get("ok"):
         raise HTTPException(400, res.get("error", "恢复失败"))
     f.status = "active"
