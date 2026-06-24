@@ -284,6 +284,26 @@ def test_batch_ingest_collection_root_three_projects(client, tmp_path):
             _cleanup_project_dir(pid)
 
 
+def test_project_image_endpoint(client, tmp_path):
+    """生图成果卡用的 /image 端点:能按 stored_path 读项目内图片;非图/不存在拒绝。"""
+    from app import uploads
+    pid = _new_project(client)
+    try:
+        # 存一张真 png 进项目 uploads
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+        stored = uploads.save_upload(pid, "AI生图-test.png", png)
+        r = client.get(f"/api/projects/{pid}/image", params={"path": stored.stored_path})
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/png")
+        assert r.content == png
+        # 不存在 → 404
+        assert client.get(f"/api/projects/{pid}/image", params={"path": f"{pid}/无此图.png"}).status_code == 404
+        # 越界路径 → 404(validate_path 兜底)
+        assert client.get(f"/api/projects/{pid}/image", params={"path": "../../etc/passwd"}).status_code in (400, 404)
+    finally:
+        _cleanup_project_dir(pid)
+
+
 def test_batch_ingest_single_file(client, tmp_path):
     """选择来源支持「单个文件」:把该文件当作 1 个项目单元(名=文件名去扩展),
     复制+解析+入库;重抽按 source_path 去重不重复。"""

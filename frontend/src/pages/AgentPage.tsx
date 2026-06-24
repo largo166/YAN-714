@@ -34,6 +34,8 @@ export default function AgentPage() {
   const [sendNote, setSendNote] = useState<string | null>(null)
   const [results, setResults] = useState<SkillRun[]>([])
   const [runningSkill, setRunningSkill] = useState<string | null>(null)
+  // 生图模型(默认 OpenAI gpt-image;可选 Gemini)
+  const [imgModel, setImgModel] = useState('gpt-image-1-official')
   const [uploading, setUploading] = useState(false)
   const [agents, setAgents] = useState<Agent[]>([])
   const [showAllSkills, setShowAllSkills] = useState(false)
@@ -183,7 +185,9 @@ export default function AgentPage() {
     setErr(null)
     setRunningSkill(skillId)
     try {
-      const r = await api.runSkill(cur.id, skillId, text.trim())
+      // 生图技能带所选模型(默认 OpenAI gpt-image);其它技能 model 忽略
+      const model = skillId === 'img' ? imgModel : ''
+      const r = await api.runSkill(cur.id, skillId, text.trim(), model)
       setResults((prev) => [r, ...prev]) // 新成果卡置顶
     } catch (e) {
       setErr((e as Error).message)
@@ -445,6 +449,17 @@ export default function AgentPage() {
             </div>
             <h4>{s.title}</h4>
             <div className="src">{s.source}</div>
+            {s.id === 'img' && (
+              <select
+                value={imgModel}
+                onChange={(e) => setImgModel(e.target.value)}
+                style={{ marginTop: 6, fontSize: 11.5, padding: '3px 6px', border: '1px solid var(--line2)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--ink)', width: '100%' }}
+                title="生图模型"
+              >
+                <option value="gpt-image-1-official">OpenAI gpt-image（质量 · 慢）</option>
+                <option value="gemini-3-pro-image-preview">Gemini（快 · 便宜）</option>
+              </select>
+            )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <button
                 className="anbtn"
@@ -537,7 +552,24 @@ export default function AgentPage() {
                 </span>
               </div>
               {r.status === 'ok' ? (
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{r.content}</div>
+                <>
+                  {r.image_url && cur && (
+                    <a href={api.projectImageUrl(cur.id, r.image_url)} target="_blank" rel="noreferrer">
+                      <img
+                        src={api.projectImageUrl(cur.id, r.image_url)}
+                        alt={r.title}
+                        style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 8, display: 'block', border: '1px solid var(--line2)' }}
+                      />
+                    </a>
+                  )}
+                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{r.content}</div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button className="anbtn" onClick={() => navigator.clipboard?.writeText(r.content)}>复制 Markdown</button>
+                    {r.output_json && (
+                      <button className="anbtn" onClick={() => navigator.clipboard?.writeText(r.output_json)}>复制 JSON</button>
+                    )}
+                  </div>
+                </>
               ) : (
                 <div style={{ color: 'var(--mut)', fontSize: 13 }}>
                   {r.content}

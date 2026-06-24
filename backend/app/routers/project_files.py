@@ -376,6 +376,24 @@ def get_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     return _file_or_404(db, project_id, file_id)
 
 
+@router.get("/{project_id}/image")
+def get_project_image(project_id: int, path: str, db: Session = Depends(get_db)):
+    """按 stored_path 读项目内图片(供生图成果卡显示)。走 validate_path,只读项目 uploads 内的图。"""
+    _project_or_404(db, project_id)
+    try:
+        abs_path = uploads.abs_of(path)  # validate_path 兜底:越界/不存在抛错
+    except Exception:  # noqa: BLE001
+        raise HTTPException(404, "图片不存在")
+    if not abs_path.is_file():
+        raise HTTPException(404, "图片不存在")
+    ext = abs_path.suffix.lower().lstrip(".")
+    if ext not in {"png", "jpg", "jpeg", "webp", "gif"}:
+        raise HTTPException(400, "非图片文件")
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, f"image/{ext}")
+    from fastapi.responses import FileResponse
+    return FileResponse(str(abs_path), media_type=mime)
+
+
 @router.delete("/{project_id}/files/{file_id}")
 def delete_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     """软删：移到 _trash + manifest，DB 标 trashed。永不硬删。"""

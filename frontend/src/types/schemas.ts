@@ -99,6 +99,9 @@ export const SkillRunSchema = z.object({
   status: z.string(),
   title: z.string().default(''),
   content: z.string().default(''),
+  output_json: z.string().default(''),   // PPT/会议纪要 结构化 JSON 字符串(复制 JSON)
+  image_url: z.string().default(''),      // 生图:项目内 stored_path
+  image_model: z.string().default(''),
   sources: z.array(SkillSourceSchema).default([]),
   model: z.string().default(''),
   error_message: z.string().default(''),
@@ -122,6 +125,9 @@ export const AgentRunSchema = z.object({
   status: z.string(),
   title: z.string().default(''),
   content: z.string().default(''),
+  output_json: z.string().default(''),  // 与 SkillRun 对齐(agent 恒空),便于成果卡统一渲染
+  image_url: z.string().default(''),
+  image_model: z.string().default(''),
   sources: z.array(SkillSourceSchema).default([]),
   model: z.string().default(''),
   error_message: z.string().default(''),

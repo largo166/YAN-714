@@ -192,13 +192,17 @@ export const api = {
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
   },
-  async runSkill(projectId: number, skillId: string, input = ''): Promise<SkillRun> {
+  async runSkill(projectId: number, skillId: string, input = '', model = ''): Promise<SkillRun> {
     return SkillRunSchema.parse(
       await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({ input, model }),
       }),
     )
+  },
+  /** 生图成果卡的图片 URL(按项目 stored_path 取项目内图片)。 */
+  projectImageUrl(projectId: number, storedPath: string): string {
+    return `${BASE_URL}/api/projects/${projectId}/image?path=${encodeURIComponent(storedPath)}`
   },
 
   // ── 协作平台（C4）──
