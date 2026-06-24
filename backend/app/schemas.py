@@ -612,16 +612,133 @@ MANUAL_GUIDE = {
     "design_entry_point": "你打算从哪个角度切入这个方案？（核心设计立场，请人工填写）",
 }
 
-# A 类项目认知 module（规格 A1-A8）。brief 本刀实现，其余只占位 schema、不实现抽取。
+# ── A2-A8 其余项目认知模块字段表（规格 A2-A8，复用 A1 的 extractable 四档分档）──
+# 设计原则：事实(high/medium)可从材料抽并带出处；判断(low)只给草案+推理依据、禁 confirmed；
+# 核心立场(manual_only)不填值、只给引导问题。全部受 SCOPE_CONSTRAINT 约束（仅方案前期）。
+
+# A2 场地研究 site_research
+SITE_RESEARCH_FIELD_SPECS = [
+    {"key": "site_boundary", "label": "用地边界与范围", "type": "string", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "topography", "label": "地形地貌/高差", "type": "string", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "surroundings", "label": "周边环境/界面", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "access_traffic", "label": "出入口与交通条件", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "orientation_climate", "label": "朝向/日照/气候", "type": "string", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "regulatory_limits", "label": "退线/限高/规划控制", "type": "object", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "site_opportunities", "label": "场地机会点", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "site_challenges", "label": "场地挑战/制约", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "site_strategy_stance", "label": "场地策略立场", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# A3 使用者与功能 user_program
+USER_PROGRAM_FIELD_SPECS = [
+    {"key": "user_groups", "label": "使用者人群", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "program_list", "label": "功能/房间构成", "type": "array", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "area_allocation", "label": "面积分配/配比", "type": "object", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "usage_scenarios", "label": "使用场景/行为", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "adjacency_needs", "label": "功能邻接关系", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "latent_needs", "label": "潜在/未言明需求", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "program_priority_stance", "label": "功能取舍立场", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# A4 概念生成 design_concept
+DESIGN_CONCEPT_FIELD_SPECS = [
+    {"key": "core_problem", "label": "核心设计问题", "type": "string", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "concept_keywords", "label": "概念关键词", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "design_intent", "label": "设计意图/主张", "type": "string", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "precedents", "label": "可借鉴的案例/原型", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "concept_stance", "label": "概念立场（一句话主张）", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# A5 动线与体验 circulation_experience
+CIRCULATION_FIELD_SPECS = [
+    {"key": "entry_sequence", "label": "入口与到达序列", "type": "string", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "main_circulation", "label": "主要动线组织", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "flow_separation", "label": "人/车/货流线分离", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "experience_nodes", "label": "体验节点/场所", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "circulation_stance", "label": "动线体验立场", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# A6 平剖立方向 plan_section_facade
+PSF_FIELD_SPECS = [
+    {"key": "plan_strategy", "label": "平面策略", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "section_strategy", "label": "剖面/竖向策略", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "facade_strategy", "label": "立面/形象方向", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "material_intent", "label": "材料/质感倾向", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "psf_stance", "label": "平剖立整体立场", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# A7 方案比选 scheme_comparison
+SCHEME_COMPARISON_FIELD_SPECS = [
+    {"key": "options", "label": "比选方案列表", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "comparison_criteria", "label": "比选维度/标准", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "tradeoffs", "label": "各方案优劣权衡", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "recommendation_stance", "label": "推荐方案与理由", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# A8 项目复盘 project_review
+PROJECT_REVIEW_FIELD_SPECS = [
+    {"key": "outcome_summary", "label": "成果概述", "type": "string", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "what_worked", "label": "做得好的点", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "what_to_improve", "label": "可改进点", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "reusable_assets", "label": "可复用资产线索", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "lesson_stance", "label": "核心经验沉淀", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# 模块 → 字段表 / 引导问题 / 抽取提示 注册表（驱动通用 extract）。
+# brief 复用既有 BRIEF_FIELD_SPECS/MANUAL_GUIDE，保证 A1 行为不变。
+MODULE_FIELD_SPECS = {
+    "brief": BRIEF_FIELD_SPECS,
+    "site_research": SITE_RESEARCH_FIELD_SPECS,
+    "user_program": USER_PROGRAM_FIELD_SPECS,
+    "design_concept": DESIGN_CONCEPT_FIELD_SPECS,
+    "circulation_experience": CIRCULATION_FIELD_SPECS,
+    "plan_section_facade": PSF_FIELD_SPECS,
+    "scheme_comparison": SCHEME_COMPARISON_FIELD_SPECS,
+    "project_review": PROJECT_REVIEW_FIELD_SPECS,
+}
+
+MODULE_GUIDES = {
+    "brief": MANUAL_GUIDE,
+    "site_research": {"site_strategy_stance": "面对这个场地，你的核心策略立场是什么？（如何回应地形/界面/约束，请人工填写）"},
+    "user_program": {"program_priority_stance": "功能发生冲突时，你优先保谁、牺牲谁？（功能取舍立场，请人工填写）"},
+    "design_concept": {"concept_stance": "用一句话说出这个方案的核心主张是什么？（概念立场，请人工填写）"},
+    "circulation_experience": {"circulation_stance": "你希望使用者在这个建筑里经历怎样的空间序列？（动线体验立场，请人工填写）"},
+    "plan_section_facade": {"psf_stance": "平面/剖面/立面三者中，哪个是你这个方案的主导抓手？（整体立场，请人工填写）"},
+    "scheme_comparison": {"recommendation_stance": "综合权衡后你推荐哪个方案，核心理由是什么？（请人工填写）"},
+    "project_review": {"lesson_stance": "这个项目最值得沉淀、下次能复用的一条经验是什么？（请人工填写）"},
+}
+
+# 每模块的抽取查询提示（gather_material 检索用）+ summary 提示词
+MODULE_QUERY_HINT = {
+    "brief": "任务书 设计任务 项目定位",
+    "site_research": "场地 用地 地形 周边 交通 朝向 退线 限高",
+    "user_program": "使用者 人群 功能 房间 面积 配比 使用场景",
+    "design_concept": "概念 核心问题 设计主张 意图 案例 原型",
+    "circulation_experience": "动线 流线 入口 到达 体验 序列 节点",
+    "plan_section_facade": "平面 剖面 立面 竖向 形象 材料 质感",
+    "scheme_comparison": "方案 比选 对比 优劣 权衡 推荐",
+    "project_review": "复盘 成果 总结 经验 改进 可复用",
+}
+
+
+def module_field_specs(module: str) -> list:
+    """取某模块的字段描述表；未知模块返回空表（调用方据此 404）。"""
+    return MODULE_FIELD_SPECS.get(module, [])
+
+
+def module_guides(module: str) -> dict:
+    return MODULE_GUIDES.get(module, {})
+
+# A 类项目认知 module（规格 A1-A8）。A1-A8 均已实现 extractable 分档抽取（阶段2）。
 COGNITION_MODULES = {
     "brief": {"label": "任务书", "implemented": True},
-    "site_research": {"label": "场地研究", "implemented": False},
-    "user_program": {"label": "使用者与功能", "implemented": False},
-    "design_concept": {"label": "概念生成", "implemented": False},
-    "circulation_experience": {"label": "动线与体验", "implemented": False},
-    "plan_section_facade": {"label": "平剖立方向", "implemented": False},
-    "scheme_comparison": {"label": "方案比选", "implemented": False},
-    "project_review": {"label": "项目复盘", "implemented": False},
+    "site_research": {"label": "场地研究", "implemented": True},
+    "user_program": {"label": "使用者与功能", "implemented": True},
+    "design_concept": {"label": "概念生成", "implemented": True},
+    "circulation_experience": {"label": "动线与体验", "implemented": True},
+    "plan_section_facade": {"label": "平剖立方向", "implemented": True},
+    "scheme_comparison": {"label": "方案比选", "implemented": True},
+    "project_review": {"label": "项目复盘", "implemented": True},
 }
 
 # B 类跨项目复用库（规格 B1-B6，落 KnowledgeDocument，本刀不实现，仅登记名）

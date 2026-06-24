@@ -188,8 +188,10 @@ def test_cognition_nested_empty_value_not_injected():
 def test_extract_brief_field_grading_offline():
     """离线验证字段分档装配(_build_field_records)：manual_only 留空带引导、low draft 不 confirmed、high 带出处。"""
     from app.routers.cognition import _build_field_records
+    from app import schemas
 
     recs = _build_field_records(
+        schemas.BRIEF_FIELD_SPECS, schemas.MANUAL_GUIDE,
         {"project_name": "测试项目", "building_type": "住宅", "design_conflicts": ["矛盾A"]},
         doc_ids=[7],
     )
@@ -209,4 +211,117 @@ def test_extract_brief_field_grading_offline():
     assert by_key["design_entry_point"]["status"] == "empty"
     # 未抽到的 high 字段 → empty
     assert by_key["site_location"]["status"] == "empty"
+
+
+def test_all_a_modules_have_specs_and_guides():
+    """A1-A8 八个模块都已实现：有字段表、manual_only 字段都配了引导问题（阶段2）。"""
+    from app import schemas
+
+    impl = [m for m, v in schemas.COGNITION_MODULES.items() if v["implemented"]]
+    assert len(impl) == 8  # A1-A8 全实现
+    for m in impl:
+        specs = schemas.module_field_specs(m)
+        assert specs, f"{m} 无字段表"
+        guides = schemas.module_guides(m)
+        for f in specs:
+            if f["extractable"] == "manual_only":
+                assert guides.get(f["key"]), f"{m}.{f['key']} 缺引导问题"
+            # 每字段四档之一
+            assert f["extractable"] in ("high", "medium", "low", "manual_only")
+
+
+def test_build_field_records_generic_module():
+    """通用装配对非 brief 模块同样分档正确（以 site_research 为例）。"""
+    from app.routers.cognition import _build_field_records
+    from app import schemas
+
+    specs = schemas.module_field_specs("site_research")
+    guides = schemas.module_guides("site_research")
+    recs = _build_field_records(
+        specs, guides,
+        {"topography": "缓坡地，最大高差8米", "site_opportunities": ["南向景观面"]},
+        doc_ids=[3],
+    )
+    by = {r["key"]: r for r in recs}
+    assert by["topography"]["status"] == "draft" and by["topography"]["source"]["type"] == "doc"
+    assert by["site_opportunities"]["source"]["type"] == "inference"  # low→推理
+    assert by["site_strategy_stance"]["status"] == "empty"            # manual_only 留空
+    assert by["site_strategy_stance"]["guide"]                        # 带引导问题
+    assert by["surroundings"]["status"] == "empty"                   # 未抽到→empty
+
+
+def test_list_modules_endpoint(client):
+    pid = _new_project(client)
+    r = client.get(f"/api/projects/{pid}/cognition/modules")
+    assert r.status_code == 200
+    mods = {m["module"]: m for m in r.json()["modules"]}
+    assert mods["site_research"]["implemented"] is True
+    assert mods["brief"]["label"] == "任务书"
+
+
+def test_extract_unknown_module_404(client):
+    pid = _new_project(client)
+    r = client.post(f"/api/projects/{pid}/cognition/bogus_module/extract")
+    assert r.status_code == 404
+
+
+def test_extract_a2_no_material_or_not_configured(client):
+    """A2 场地研究空项目抽取：有key→no_material;无key→not_configured。均不写库（与A1同契约）。"""
+    pid = _new_project(client)
+    r = client.post(f"/api/projects/{pid}/cognition/site_research/extract")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] in {"no_material", "not_configured"}
+    assert body["cognition"] is None
+    assert client.get(f"/api/projects/{pid}/cognition").json() == []
+
+
+def test_update_rejects_empty_confirm_and_cleans_manual_only():
+    """update 红线：空值不能置 confirmed；manual_only 人工填值并确认后清掉 guide/confidence（规格1.2-1.3）。"""
+    from app.database import SessionLocal
+    from app import models, safe_json
+    from app.routers.cognition import update_cognition
+
+    db = SessionLocal()
+    try:
+        proj = models.Project(name="update红线测试", status="active")
+        db.add(proj)
+        db.commit()
+        db.refresh(proj)
+        manual_field = {
+            "key": "design_entry_point", "label": "方案切入点", "type": "string", "extractable": "manual_only",
+            "value": None, "status": "empty",
+            "source": {"type": "manual", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": None, "guide": "你打算从哪个角度切入？",
+        }
+        cog = models.ProjectCognition(
+            project_id=proj.id, module="brief", module_label="任务书",
+            fields_json=safe_json.dumps_safe([manual_field]),
+            status="draft", module_status="empty", version=1,
+        )
+        db.add(cog)
+        db.commit()
+        db.refresh(cog)
+
+        # 空值置 confirmed → 400
+        from fastapi import HTTPException
+        try:
+            update_cognition(proj.id, cog.id, {"design_entry_point": {"value": "", "status": "confirmed"}}, db)
+            assert False, "空值确认应被拒"
+        except HTTPException as e:
+            assert e.status_code == 400
+
+        # 人工填值确认 → guide/confidence 清空
+        out = update_cognition(proj.id, cog.id, {"design_entry_point": {"value": "以退台呼应海景", "status": "confirmed"}}, db)
+        f = next(x for x in out.fields if x.key == "design_entry_point")
+        assert f.status == "confirmed"
+        assert f.value == "以退台呼应海景"
+        assert f.guide == ""             # 引导问题已清
+        assert f.confidence is None      # manual_only confidence 恒 null
+        assert f.source.type == "manual"
+    finally:
+        db.query(models.ProjectCognition).filter_by(project_id=proj.id).delete()
+        db.query(models.Project).filter_by(id=proj.id).delete()
+        db.commit()
+        db.close()
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { CognitionField, ProjectCognition } from '@/types/schemas'
 
-/** 任务书结构化认知卡（Schema 规格 v1.0 前端）：
+/** 结构化认知卡（Schema 规格 v1.0 前端，A1-A8 通用）：
  *  每字段按 extractable 分档展示——high/medium 带出处、low 标"AI判断·草案"、manual_only 显引导问题。
  *  只 confirmed 字段会被共创营地推演注入。逐字段编辑/确认，不伪造。 */
 function valStr(v: unknown): string {
@@ -26,7 +26,15 @@ function fieldBadge(f: CognitionField): { text: string; cls: string } {
     : { text: '草案', cls: 'demo' }
 }
 
-export default function BriefCognitionCard({ projectId }: { projectId: number | null }) {
+export default function BriefCognitionCard({
+  projectId,
+  module = 'brief',
+  label = '任务书',
+}: {
+  projectId: number | null
+  module?: string
+  label?: string
+}) {
   const [cog, setCog] = useState<ProjectCognition | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -40,11 +48,11 @@ export default function BriefCognitionCard({ projectId }: { projectId: number | 
     }
     try {
       const items = await api.listCognition(projectId)
-      setCog(items.find((c) => c.module === 'brief') ?? null)
+      setCog(items.find((c) => c.module === module) ?? null)
     } catch {
       setCog(null)
     }
-  }, [projectId])
+  }, [projectId, module])
 
   useEffect(() => {
     load()
@@ -57,14 +65,14 @@ export default function BriefCognitionCard({ projectId }: { projectId: number | 
     setBusy(true)
     setNote(null)
     try {
-      const r = await api.extractBrief(projectId)
+      const r = await api.extractModule(projectId, module)
       if (r.status === 'ok' && r.cognition) {
         setCog(r.cognition)
         setNote('已按字段分档抽取（事实=草案待审，判断=AI草案，核心判断=待人工填）')
       } else if (r.status === 'not_configured') {
         setNote('AI 未配置，请到设置页配置 DeepSeek API Key（不会伪造）')
       } else if (r.status === 'no_material') {
-        setNote('本项目暂无可全文解析的任务书材料（大文件仅登记元数据、无正文）。请上传可解析的任务书。')
+        setNote('本项目暂无可全文解析的材料（大文件仅登记元数据、无正文）。请先上传可解析的资料。')
       } else {
         setNote(`抽取失败：${r.error_message || r.message}`)
       }
@@ -110,7 +118,7 @@ export default function BriefCognitionCard({ projectId }: { projectId: number | 
     <div className="card mt">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div className="ct" style={{ margin: 0 }}>
-          任务书结构化认知{' '}
+          {label}结构化认知{' '}
           {cog && (
             <span className={'statpill ' + (cog.module_status === 'confirmed' ? 'live' : 'demo')}>
               {cog.module_status} · 已确认 {confirmedCount}/{cog.fields.length}
@@ -119,7 +127,7 @@ export default function BriefCognitionCard({ projectId }: { projectId: number | 
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="anbtn" disabled={busy} onClick={extract}>
-            {busy ? '处理中…' : cog ? '重新抽取' : 'AI 抽取任务书'}
+            {busy ? '处理中…' : cog ? '重新抽取' : `AI 抽取${label}`}
           </button>
           {cog && (
             <button className="anbtn" disabled={busy} onClick={confirm} title="确认事实类(high/medium)字段">
@@ -131,7 +139,7 @@ export default function BriefCognitionCard({ projectId }: { projectId: number | 
 
       {!cog && (
         <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 0' }}>
-          尚未建立任务书结构化认知。上传可解析任务书入库后，点「AI 抽取任务书」按 16 字段分档读取（事实带出处、判断给草案、核心留人工）。
+          尚未建立{label}结构化认知。上传可解析资料入库后，点「AI 抽取{label}」按字段分档读取（事实带出处、判断给草案、核心留人工）。
         </div>
       )}
 

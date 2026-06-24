@@ -322,10 +322,22 @@ export const api = {
   async listCognition(projectId: number): Promise<ProjectCognition[]> {
     return z.array(ProjectCognitionSchema).parse(await request(`/api/projects/${projectId}/cognition`))
   },
-  async extractBrief(projectId: number): Promise<CognitionExtractOut> {
+  async listCognitionModules(
+    projectId: number,
+  ): Promise<{ module: string; label: string; implemented: boolean }[]> {
+    const r = (await request(`/api/projects/${projectId}/cognition/modules`)) as {
+      modules: { module: string; label: string; implemented: boolean }[]
+    }
+    return r.modules
+  },
+  async extractModule(projectId: number, module: string): Promise<CognitionExtractOut> {
     return CognitionExtractOutSchema.parse(
-      await request(`/api/projects/${projectId}/cognition/brief/extract`, { method: 'POST' }),
+      await request(`/api/projects/${projectId}/cognition/${module}/extract`, { method: 'POST' }),
     )
+  },
+  // A1 兼容别名（= extractModule(projectId, 'brief')）
+  async extractBrief(projectId: number): Promise<CognitionExtractOut> {
+    return this.extractModule(projectId, 'brief')
   },
   async confirmCognition(projectId: number, cogId: number): Promise<ProjectCognition> {
     return ProjectCognitionSchema.parse(
