@@ -30,6 +30,7 @@ class ProjectOut(ProjectBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    current_stage: str = "brief"
     created_at: datetime
     updated_at: datetime
 
