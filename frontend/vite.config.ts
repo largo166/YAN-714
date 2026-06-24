@@ -14,5 +14,6 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
+    strictPort: true, // 端口被占即报错退出,不悄悄换端口(避免「以为在5173实则在5174」的脏状态)
   },
 })

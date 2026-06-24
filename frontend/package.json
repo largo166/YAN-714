@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:clean": "node scripts/dev-clean.mjs && vite --force",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",
