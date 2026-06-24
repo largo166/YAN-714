@@ -39,6 +39,8 @@ export default function KnowledgePage() {
   const [lastWsPath, setLastWsPath] = useState('') // prompt 默认值(便利,非"已选择")
   const [selecting, setSelecting] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false) // 目录选择弹窗开关
+  // 识别模式:collection=子文件夹各一个项目(默认) | single=整个文件夹作一个项目
+  const [mode, setMode] = useState<'collection' | 'single'>('collection')
 
   // 一键整理:真实落库结果 + 失败标记 + 最近整理时间(用于状态机与结果卡)。
   const [ingesting, setIngesting] = useState(false)
@@ -160,11 +162,12 @@ export default function KnowledgePage() {
     path = path.trim()
     setErr(null)
     setSelecting(true)
-    // 选新来源:清掉上次预览/整理结果与失败态(已入库列表不动)
+    // 选新来源:清掉上次预览/整理结果与失败态(已入库列表不动);模式回默认 collection
     setPreview(null)
     setScan(null)
     setIngestResult(null)
     setIngestFailed(false)
+    setMode('collection')
     try {
       // previewBatchIngest 文件/目录通吃;路径不存在 → 后端 400(只读,不改任何数据)
       const pv = await api.previewBatchIngest(path)
@@ -193,7 +196,10 @@ export default function KnowledgePage() {
       window.alert('请先选择文件或文件夹')
       return
     }
-    if (preview && preview.total_supported === 0) {
+    // 按当前选中模式判断可接入数(集合/单项目各算各的)
+    const sel = mode === 'single' ? preview?.single_project : preview?.collection
+    const supported = sel ? sel.total_supported : preview?.total_supported ?? 0
+    if (preview && supported === 0) {
       window.alert('当前来源没有可解析/可接入的文件，请重新选择来源。')
       return
     }
@@ -201,7 +207,7 @@ export default function KnowledgePage() {
     setIngestFailed(false)
     setErr(null)
     try {
-      const r = await api.importBatchIngest(source.path)
+      const r = await api.importBatchIngest(source.path, mode)
       // 先把新项目灌入共享上下文,再渲染结果卡——卡上「设为当前项目」点击不会被 reload 回落覆盖(消除竞态)
       await reloadProjects()
       setIngestResult(r)
@@ -312,18 +318,47 @@ export default function KnowledgePage() {
                 </div>
               )}
 
-              {/* 识别到的项目/文件夹结构 */}
-              {preview.projects.length > 0 && (
-                <>
-                  <div className="ct" style={{ marginTop: 8 }}>识别到的项目/文件夹结构（{preview.total_projects}）</div>
-                  {preview.projects.map((p) => (
-                    <div className="kbrow" key={p.path}>
-                      <span className="pth">📁 {p.project_name}</span>
-                      <span className="meta">{p.supported_count} 可解析 / {p.unsupported_count} 不支持</span>
-                    </div>
-                  ))}
-                </>
+              {/* 识别模式单选:有子文件夹时让用户选「集合/单项目」(不自动猜) */}
+              {!preview.is_single_file && preview.mode_hint === 'choose_mode' && (
+                <div style={{ margin: '10px 2px', padding: '10px 12px', background: 'var(--panel)', border: '1px solid var(--line2)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>这个文件夹要怎么识别？</div>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
+                    <input type="radio" name="ingmode" checked={mode === 'collection'} onChange={() => setMode('collection')} />
+                    <span style={{ fontSize: 12.5 }}>
+                      📚 <b>项目集合</b>：里面装着 <b>{preview.collection?.total_projects ?? preview.total_projects}</b> 个项目(每个子文件夹各算一个项目)
+                    </span>
+                  </label>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
+                    <input type="radio" name="ingmode" checked={mode === 'single'} onChange={() => setMode('single')} />
+                    <span style={{ fontSize: 12.5 }}>
+                      📦 <b>单个项目</b>：整个文件夹是 <b>1</b> 个项目(子文件夹只是它的资料分类，如 原始资料/项目笔记)
+                    </span>
+                  </label>
+                  <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
+                    只有你知道哪种对——选错可在「设为当前项目」后重选来源重整。
+                  </div>
+                </div>
               )}
+
+              {/* 识别到的项目/文件夹结构(随所选模式) */}
+              {(() => {
+                const selp = mode === 'single' ? preview.single_project : preview.collection
+                const list = selp ? selp.projects : preview.projects
+                const cnt = selp ? selp.total_projects : preview.total_projects
+                return list.length > 0 ? (
+                  <>
+                    <div className="ct" style={{ marginTop: 8 }}>
+                      {mode === 'single' ? '将作为 1 个项目接入' : `识别到的项目/文件夹结构（${cnt}）`}
+                    </div>
+                    {list.map((p) => (
+                      <div className="kbrow" key={p.path}>
+                        <span className="pth">📁 {p.project_name}</span>
+                        <span className="meta">{p.supported_count} 可解析 / {p.unsupported_count} 不支持</span>
+                      </div>
+                    ))}
+                  </>
+                ) : null
+              })()}
 
               {/* 文件类型分布(仅文件夹扫描提供) */}
               {topTypes.length > 0 && (

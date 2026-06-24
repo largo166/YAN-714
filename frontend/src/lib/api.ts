@@ -537,11 +537,11 @@ export const api = {
       }),
     )
   },
-  async importBatchIngest(rootPath: string): Promise<BatchIngestImport> {
+  async importBatchIngest(rootPath: string, mode = 'collection'): Promise<BatchIngestImport> {
     return BatchIngestImportSchema.parse(
       await request('/api/projects/batch-ingest/import', {
         method: 'POST',
-        body: JSON.stringify({ root_path: rootPath, index_to_knowledge: true }),
+        body: JSON.stringify({ root_path: rootPath, index_to_knowledge: true, mode }),
       }),
     )
   },

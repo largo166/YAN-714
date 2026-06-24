@@ -497,6 +497,14 @@ export const BatchIngestProjectPreviewSchema = z.object({
   files: z.array(BatchIngestFileSchema),
   unsupported: z.array(BatchIngestFileSchema),
 })
+export const BatchIngestModeSummarySchema = z.object({
+  mode: z.string(),
+  total_projects: z.number().default(0),
+  total_supported: z.number().default(0),
+  total_unsupported: z.number().default(0),
+  projects: z.array(BatchIngestProjectPreviewSchema).default([]),
+})
+export type BatchIngestModeSummary = z.infer<typeof BatchIngestModeSummarySchema>
 export const BatchIngestPreviewSchema = z.object({
   accessible: z.boolean(),
   root: z.string(),
@@ -505,6 +513,11 @@ export const BatchIngestPreviewSchema = z.object({
   total_supported: z.number(),
   total_unsupported: z.number(),
   projects: z.array(BatchIngestProjectPreviewSchema),
+  // 新增(后端旧响应缺这些字段也能 parse)
+  is_single_file: z.boolean().default(false),
+  collection: BatchIngestModeSummarySchema.nullable().default(null),
+  single_project: BatchIngestModeSummarySchema.nullable().default(null),
+  mode_hint: z.string().default(''),
 })
 export type BatchIngestPreview = z.infer<typeof BatchIngestPreviewSchema>
 
