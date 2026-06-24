@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
+import RichText, { Foldable, coreLine, renderInline } from '@/components/RichText'
 import { ANALYSIS_TASKS, type AnalysisTaskKey, type ProjectAnalysis } from '@/types/schemas'
 
 const STATUS_HINT: Record<string, { text: string; cls: string }> = {
@@ -180,7 +181,18 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
 
           {reflowNote && <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>{reflowNote}</div>}
 
-          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, color: 'var(--ink)' }}>{current.content}</div>
+          {/* 研判正文：清洗 markdown 噪音渲染；长内容核心判断优先 + 折叠完整 */}
+          {current.status === 'ok' && (current.content || '').length > 220 ? (
+            <Foldable
+              summary={<div className="rom-core">{renderInline(coreLine(current.content))}</div>}
+              openLabel="展开完整研判"
+              closeLabel="收起完整研判"
+            >
+              <RichText text={current.content} />
+            </Foldable>
+          ) : (
+            <RichText text={current.content} />
+          )}
 
           {current.status === 'ok' && current.sources.length > 0 && (
             <div style={{ marginTop: 12, borderTop: '1px dashed var(--line2)', paddingTop: 8 }}>

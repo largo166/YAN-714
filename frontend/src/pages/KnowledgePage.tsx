@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { api, type WorkspaceScan } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
+import { renderInline } from '@/components/RichText'
 import CrossProjectLibrary from './CrossProjectLibrary'
 import FolderPicker from '@/components/FolderPicker'
 import type {
@@ -486,7 +487,7 @@ export default function KnowledgePage() {
                     <div className="kvline"><span className="kvk">文件类型</span>{d.file_type}{d.type ? ` · ${d.type}` : ''}</div>
                     <div className="kvline"><span className="kvk">来源路径</span><span className="mono" style={{ wordBreak: 'break-all' }}>{d.source_path || '—'}</span></div>
                     <div className="kvline"><span className="kvk">来源说明</span>{d.resource || '—'}</div>
-                    <div className="kvline"><span className="kvk">摘要</span>{d.description || '（未生成，可点「AI 生成元数据」）'}</div>
+                    <div className="kvline"><span className="kvk">摘要</span>{d.description ? renderInline(d.description) : '（未生成，可点「AI 生成元数据」）'}</div>
                     <div className="kvline"><span className="kvk">入库方式</span>复制接入（原文件不动，系统留受管副本）</div>
                     <div className="kvline"><span className="kvk">解析状态</span>{parseStatus}</div>
                     <div className="kvline" style={{ alignItems: 'flex-start' }}>

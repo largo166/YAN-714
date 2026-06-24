@@ -97,6 +97,8 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
         )
     else:
         chat_messages = []
+        # 文风约束置于最前：设定「先判断后解释、少套话、段落短」的表达基调（prose 对话）
+        chat_messages.append(llm.style_system_message())
         # 已确认认知置于最前（优先于知识库片段），让对话基于已审定项目认知
         if cog_prompt:
             chat_messages.append({"role": "system", "content": cog_prompt})

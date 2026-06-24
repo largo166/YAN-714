@@ -66,6 +66,40 @@ def test_delete_session(client):
     assert client.get(f"/api/chat/sessions/{sid}").status_code == 404
 
 
+def test_chat_injects_prose_style(client, monkeypatch):
+    """文风优化:配置 key 后,prose 对话的消息数组首条应是 PROSE_STYLE system 文风约束。
+    红线:文风只进 prose 对话,不进结构化抽取/JSON-mode(由设计保证,这里验对话注入)。"""
+    from app import llm
+    from app.database import SessionLocal
+    from app import models
+
+    captured = {}
+
+    def fake(messages, **kw):
+        captured["messages"] = messages
+        return "立面先定调,再谈材料。"  # 简短判断式回答
+
+    monkeypatch.setattr(llm, "chat_completion", fake)
+    # autouse 夹具刚清空 key,这里显式配上以走 configured 分支
+    db = SessionLocal()
+    try:
+        row = db.get(models.AppSetting, 1) or models.AppSetting(id=1)
+        db.add(row)
+        row.deepseek_api_key = "sk-test"
+        db.commit()
+    finally:
+        db.close()
+
+    sid = client.post("/api/chat/sessions", json={"title": "style"}).json()["id"]
+    r = client.post(f"/api/chat/sessions/{sid}/messages", json={"message": "这个项目立面怎么定?"})
+    assert r.status_code == 200
+    assert r.json()["assistant_message"]["status"] == "ok"
+    msgs = captured["messages"]
+    assert msgs and msgs[0]["role"] == "system"
+    assert msgs[0]["content"] == llm.PROSE_STYLE  # 文风置于最前
+    assert "先给判断结论" in msgs[0]["content"] and "少说套话" in msgs[0]["content"]
+
+
 # ── 知识库 ──
 def test_knowledge_crud_and_search(client):
     created = client.post(

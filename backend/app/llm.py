@@ -18,6 +18,24 @@ class LLMError(Exception):
     """调用 LLM 失败。"""
 
 
+# 文风约束（仅用于「自由文本/判断类」prose 输出：对话、研判、方案评审等）。
+# 红线：绝不注入结构化抽取/JSON-mode 调用（任务书认知、元数据推断、PPT/会议 json），
+# 那些需要严格字段输出，文风会污染。需要时由调用点显式拼入，不在 chat_completion 里全局塞。
+PROSE_STYLE = (
+    "表达风格（务必遵守）：\n"
+    "1) 先给判断结论，再给依据；不要铺垫，第一句直接给核心判断。\n"
+    "2) 少说套话——禁用「基于提供的材料」「总体认知如下」「我认为」「需要明确指出」"
+    "「无法完全具体化」这类空话；可以保留必要的不确定性，但表达要干净。\n"
+    "3) 像设计工作备忘：简洁、判断明确、可推进；不要写成报告腔或 AI 总结作文。\n"
+    "4) 每段尽量 1-3 行，多用要点，不要连续大段落。"
+)
+
+
+def style_system_message() -> dict:
+    """prose 调用点显式拼入的文风 system 消息。"""
+    return {"role": "system", "content": PROSE_STYLE}
+
+
 def chat_completion(
     messages: List[dict],
     *,
