@@ -10,7 +10,7 @@ function fmtSize(n: number): string {
 }
 
 /** 项目目录管理 + 安全清理（4C）。沿用原 ROM-AI 卡片/metric/sec/kbrow 样式。
- *  真实目录只做 scan/preview；apply 需用户单独确认（本组件不直接 apply，避免误操作）。 */
+ *  scan/preview 只读；apply 需两步确认后移入隔离区(永不删除)，并提供一键撤销恢复(v2红线 归档可逆)。 */
 export default function WorkspacePanel() {
   const [path, setPath] = useState('')
   const [input, setInput] = useState('')
@@ -19,6 +19,9 @@ export default function WorkspacePanel() {
   const [preview, setPreview] = useState<CleanupPreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [confirmApply, setConfirmApply] = useState(false)
+  const [lastQuarantine, setLastQuarantine] = useState<string | null>(null)
+  const [actionMsg, setActionMsg] = useState<string | null>(null)
 
   const loadStatus = useCallback(async () => {
     try {
@@ -65,8 +68,53 @@ export default function WorkspacePanel() {
   const doPreview = async () => {
     setBusy(true)
     setErr(null)
+    setConfirmApply(false)
+    setActionMsg(null)
     try {
       setPreview(await api.cleanupPreview())
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doApply = async () => {
+    const cands = preview?.candidates ?? []
+    if (cands.length === 0 || busy) return
+    setBusy(true)
+    setErr(null)
+    setActionMsg(null)
+    try {
+      const r = await api.cleanupApply(cands.map((c) => c.path))
+      if (r.ok) {
+        const ts = r.manifest?.timestamp || ''
+        setLastQuarantine(ts)
+        setActionMsg(`已移入隔离区 ${r.moved ?? 0} 项（时间戳 ${ts}）——未删除,可一键撤销。`)
+        setPreview(null) // 已执行,清空预览
+        setConfirmApply(false)
+      } else {
+        setErr(r.error || '清理失败')
+      }
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doRestore = async () => {
+    if (!lastQuarantine || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      const r = await api.cleanupRestore(lastQuarantine)
+      if (r.ok) {
+        setActionMsg(`已撤销恢复 ${r.restored ?? 0}/${r.total ?? 0} 项回原位。`)
+        setLastQuarantine(null)
+      } else {
+        setErr(r.error || '恢复失败')
+      }
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -199,14 +247,50 @@ export default function WorkspacePanel() {
               ✓ 未发现可自动清理的临时/缓存/重复文件，目录很干净。
             </div>
           ) : (
-            <div style={{ marginTop: 8 }}>
-              {preview.candidates?.slice(0, 12).map((c) => (
-                <div className="kbrow" key={c.abs_path}>
-                  <span className="pth">{c.path}</span>
-                  <span className="meta">{c.reason}</span>
+            <>
+              <div style={{ marginTop: 8 }}>
+                {preview.candidates?.slice(0, 12).map((c) => (
+                  <div className="kbrow" key={c.abs_path}>
+                    <span className="pth">{c.path}</span>
+                    <span className="meta">{c.reason}</span>
+                  </div>
+                ))}
+              </div>
+              {/* 两步确认执行：移入隔离区,永不删除,可撤销 */}
+              <div className="btnrow" style={{ marginTop: 10 }}>
+                {!confirmApply ? (
+                  <button className="btn" disabled={busy} onClick={() => setConfirmApply(true)}>
+                    🧹 执行清理（移入隔离区）
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn" disabled={busy} onClick={doApply} style={{ background: 'var(--terra)', color: '#fff' }}>
+                      {busy ? '执行中…' : `确认移入隔离区 ${preview.count} 项`}
+                    </button>
+                    <button className="btn ghost" disabled={busy} onClick={() => setConfirmApply(false)}>
+                      取消
+                    </button>
+                  </>
+                )}
+              </div>
+              {confirmApply && (
+                <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
+                  只移动到 <code>_ROMAI_CLEANUP_QUARANTINE/</code>，不删除；执行后可一键撤销。
                 </div>
-              ))}
-            </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 执行结果 + 一键撤销 */}
+      {actionMsg && (
+        <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--ink2)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>{actionMsg}</span>
+          {lastQuarantine && (
+            <button className="btn ghost" disabled={busy} onClick={doRestore}>
+              ↩ 一键撤销恢复
+            </button>
           )}
         </div>
       )}

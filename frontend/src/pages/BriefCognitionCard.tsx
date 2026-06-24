@@ -42,6 +42,22 @@ export default function BriefCognitionCard({
   const [editVal, setEditVal] = useState('')
   const [crossType, setCrossType] = useState('')
   const [crossTypes, setCrossTypes] = useState<{ type: string; label: string }[]>([])
+  const [versions, setVersions] = useState<
+    { id: number; version: number; summary_md: string; snapshot_reason: string; created_at: string }[] | null
+  >(null)
+
+  const loadVersions = async () => {
+    if (projectId == null || !cog) return
+    if (versions !== null) {
+      setVersions(null) // 再点折叠
+      return
+    }
+    try {
+      setVersions(await api.listCognitionVersions(projectId, cog.id))
+    } catch {
+      setVersions([])
+    }
+  }
 
   useEffect(() => {
     api.listCrossProjectTypes().then((t) => setCrossTypes(t)).catch(() => setCrossTypes([]))
@@ -159,8 +175,28 @@ export default function BriefCognitionCard({
               确认事实字段
             </button>
           )}
+          {cog && (
+            <button className="anbtn" disabled={busy} onClick={loadVersions} title="查看重抽/确认前的历史快照">
+              历史版本
+            </button>
+          )}
         </div>
       </div>
+
+      {cog && versions !== null && (
+        <div style={{ fontSize: 12, margin: '4px 0 8px', padding: '8px 10px', background: 'var(--panel2)', borderRadius: 8, border: '1px solid var(--line2)' }}>
+          <div style={{ color: 'var(--mut)', marginBottom: 4 }}>🕓 历史版本（{versions.length}）· 当前 v{cog.version}</div>
+          {versions.length === 0 ? (
+            <div style={{ color: 'var(--mut)' }}>暂无历史快照（首次抽取后,重抽/确认会自动存档旧版）。</div>
+          ) : (
+            versions.map((v) => (
+              <div key={v.id} style={{ color: 'var(--ink2)', padding: '1px 0' }}>
+                · v{v.version}（{v.snapshot_reason}）{v.summary_md ? `：${v.summary_md.slice(0, 40)}` : ''}
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {cog && confirmedCount > 0 && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>

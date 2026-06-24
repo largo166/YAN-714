@@ -128,6 +128,12 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           </button>
         </div>
         <div className="setbody">
+          {/* 诚实说明:哪些设置真落库,哪些是留接缝展示——消除"开了就生效"的误导 */}
+          <div className="setnote" style={{ margin: '0 0 10px' }}>
+            ⓘ 当前仅「AI 引擎与密钥」(DeepSeek Key / Base / 模型) 与「主题」会随下方「保存配置」写入后端；
+            本页其余开关 / 路径 / 单选为<strong>留接缝展示项</strong>，尚未接后端、切换不持久化。标「待接入 / 未接入」者同此。
+          </div>
+
           {/* 0 管理账号 */}
           <div className="setsec">
             <div className="setsech">管理账号</div>
@@ -366,7 +372,13 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                 <span className="statusdot"></span>已启用
               </span>
             </div>
-            <ToggleRow t="云同步备份" d="内主外备 · 默认关" />
+            <div className="setrow">
+              <div className="lbl">
+                <div className="t">云同步备份</div>
+                <div className="d">内主外备 · 本轮 OFF 范围</div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--mut)' }}>未接入</span>
+            </div>
             <div className="setbtns">
               <button className="btn ghost" disabled>
                 ⤓ 导出全部数据

@@ -341,6 +341,25 @@ export const api = {
   async listCognition(projectId: number): Promise<ProjectCognition[]> {
     return z.array(ProjectCognitionSchema).parse(await request(`/api/projects/${projectId}/cognition`))
   },
+  /** 认知版本历史(阶段6 版本层):列出某认知重抽/确认前的快照,只读回看。 */
+  async listCognitionVersions(
+    projectId: number,
+    cogId: number,
+  ): Promise<
+    { id: number; version: number; summary_md: string; module_status: string; snapshot_reason: string; created_at: string }[]
+  > {
+    return (await request(`/api/projects/${projectId}/cognition/${cogId}/versions`)) as never
+  },
+  /** 甲方诉求/黑话词典查询(原话→真实含义/设计影响/建议动作)。 */
+  async querySlang(
+    projectId: number,
+    q = '',
+  ): Promise<{ term: string; meaning: string; impact: string; action: string }[]> {
+    const r = (await request(`/api/projects/${projectId}/slang?q=${encodeURIComponent(q)}`)) as {
+      items: { term: string; meaning: string; impact: string; action: string }[]
+    }
+    return r.items
+  },
   async listCognitionModules(
     projectId: number,
   ): Promise<{ module: string; label: string; implemented: boolean }[]> {
@@ -422,6 +441,22 @@ export const api = {
   },
   async cleanupPreview(): Promise<CleanupPreview> {
     return request('/api/workspace/cleanup/preview', { method: 'POST' })
+  },
+  /** 执行安全清理：把候选文件移入隔离区(需 confirm=true)。永不删除,返回 quarantine 时间戳供 restore。 */
+  async cleanupApply(
+    relPaths: string[],
+  ): Promise<{ ok: boolean; quarantine?: string; moved?: number; manifest?: { timestamp: string }; error?: string }> {
+    return request('/api/workspace/cleanup/apply', {
+      method: 'POST',
+      body: JSON.stringify({ rel_paths: relPaths, confirm: true }),
+    })
+  },
+  /** 一键撤销：按隔离区时间戳把文件还原回原位(v2红线 归档可逆)。 */
+  async cleanupRestore(timestamp: string): Promise<{ ok: boolean; restored?: number; total?: number; error?: string }> {
+    return request('/api/workspace/cleanup/restore', {
+      method: 'POST',
+      body: JSON.stringify({ timestamp }),
+    })
   },
 
   // ── 4D: 项目文件 ──

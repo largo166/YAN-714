@@ -14,6 +14,7 @@ import ProjectAnalysisPanel from './ProjectAnalysisPanel'
 import ProjectFilesPanel from './ProjectFilesPanel'
 import CognitionSection from './CognitionSection'
 import StageProgressPanel from './StageProgressPanel'
+import SlangDictPanel from './SlangDictPanel'
 import MeetingPanel from './MeetingPanel'
 import TencentMeetingCard from './TencentMeetingCard'
 import WorkspacePanel from './WorkspacePanel'
@@ -160,6 +161,7 @@ export default function ProjectCenterPage() {
 
       <StageProgressPanel projectId={curId} />
       <CognitionSection projectId={curId} />
+      <SlangDictPanel projectId={curId} />
 
       <ProjectFilesPanel projectId={curId} />
 
