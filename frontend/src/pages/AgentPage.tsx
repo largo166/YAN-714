@@ -258,49 +258,23 @@ export default function AgentPage() {
       </div>
 
       {/* 会话列表（横向 chip） */}
-      {sessions.length > 0 && (
-        <div className="row" style={{ marginBottom: 14, gap: 8 }}>
-          {sessions.map((s) => (
-            <button
-              key={s.id}
-              className={'chip' + (s.id === curSid ? ' on' : '')}
-              style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-              onClick={() => openSession(s.id)}
-            >
-              {s.title}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="row" style={{ marginBottom: 14, gap: 8, alignItems: 'center' }}>
+        <span className="chip" style={{ background: 'var(--terra-soft)', color: 'var(--terra)', borderColor: 'var(--terra-line)', fontWeight: 600, cursor: 'default' }}>
+          ROM-AI 操作台
+        </span>
+        {sessions.map((s) => (
+          <button
+            key={s.id}
+            className={'chip' + (s.id === curSid ? ' on' : '')}
+            style={{ cursor: 'pointer', fontFamily: 'inherit' }}
+            onClick={() => openSession(s.id)}
+          >
+            {s.title}
+          </button>
+        ))}
+      </div>
 
       <div className="card agent-chat-card">
-        <div className="chatlog" ref={logRef} style={messages.length ? undefined : { display: 'none' }}>
-          {messages.map((m) => (
-            <div key={m.id} className={'bubble ' + (m.role === 'user' ? 'u' : 'a')}>
-              {m.status === 'not_configured' ? (
-                <span>
-                  ⚠ {m.content}
-                  <span className="mini">
-                    <span>前往设置页配置 DeepSeek API Key</span>
-                  </span>
-                </span>
-              ) : m.status === 'error' ? (
-                <span style={{ color: 'var(--red)' }}>
-                  ✕ {m.content}
-                  {m.error_message && (
-                    <span className="mini">
-                      <span>{m.error_message}</span>
-                    </span>
-                  )}
-                </span>
-              ) : (
-                m.content
-              )}
-            </div>
-          ))}
-          {sending && <div className="bubble a">…思考中</div>}
-        </div>
-
         {aiConfigured === false && (
           <div className="setnote" style={{ marginBottom: 10 }}>
             AI 引擎未配置，请前往设置页配置 DeepSeek API Key。当前发送会返回明确的「未配置」提示，不会伪造回复。
@@ -393,6 +367,33 @@ export default function AgentPage() {
             </button>
           </div>
           <div className="dropmask">松开添加文件（任意类型）</div>
+        </div>
+
+        <div className="chatlog" ref={logRef} style={messages.length ? { marginTop: 12 } : { display: 'none' }}>
+          {messages.map((m) => (
+            <div key={m.id} className={'bubble ' + (m.role === 'user' ? 'u' : 'a')}>
+              {m.status === 'not_configured' ? (
+                <span>
+                  ⚠ {m.content}
+                  <span className="mini">
+                    <span>前往设置页配置 DeepSeek API Key</span>
+                  </span>
+                </span>
+              ) : m.status === 'error' ? (
+                <span style={{ color: 'var(--red)' }}>
+                  ✕ {m.content}
+                  {m.error_message && (
+                    <span className="mini">
+                      <span>{m.error_message}</span>
+                    </span>
+                  )}
+                </span>
+              ) : (
+                m.content
+              )}
+            </div>
+          ))}
+          {sending && <div className="bubble a">…思考中</div>}
         </div>
 
         {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
