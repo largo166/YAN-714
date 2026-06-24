@@ -299,6 +299,8 @@ class SettingsOut(BaseModel):
     deepseek_base_url: str
     deepseek_model: str
     theme: str
+    repository_root_path: str = ""        # 受管资料库(仓库)根;""=未配置→回退 uploads
+    repository_configured: bool = False   # 便于前端显示「已配置/未配置」徽章
 
 
 class SettingsUpdate(BaseModel):
@@ -306,6 +308,7 @@ class SettingsUpdate(BaseModel):
     deepseek_base_url: Optional[str] = None
     deepseek_model: Optional[str] = None
     theme: Optional[str] = None
+    repository_root_path: Optional[str] = None  # 非空=校验后配置;""=解除配置
 
 
 # ── 4B: 聊天 ──

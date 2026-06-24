@@ -21,6 +21,48 @@ UPLOADS_ROOT = DATA_DIR / "uploads"
 TRASH_DIRNAME = "_trash"
 
 
+def _norm(p: str | Path) -> Path:
+    """绝对化 + resolve,作仓库根/嵌套判定的规范形式。"""
+    return Path(p).expanduser().resolve()
+
+
+def _reject_nested_with_uploads(root: Path) -> None:
+    """拒绝仓库根 = uploads 自身 / 其祖先 / 其子孙(否则 _trash 与 uploads 树嵌套、cleanup 误删)。"""
+    up = _norm(UPLOADS_ROOT)
+    if root == up or root.is_relative_to(up) or up.is_relative_to(root):
+        raise PathValidationError("仓库根不能是程序内部上传目录或其父/子目录,请另选一个独立文件夹")
+
+
+def validate_repository_root(path: str) -> Path:
+    """校验「用户仓库根」可作受管根:非空 / 绝对 / 存在 / 是目录 / 非 symlink / 可写 / 不与 uploads 嵌套。
+
+    返回 resolve 后绝对 Path(供归一存库)。任一条不满足抛 PathValidationError(端点转 400)。
+    与 validate_path 不同:这是校验「能否做根」,不是「target 是否落在某 base 内」。
+    """
+    if not path or not str(path).strip():
+        raise PathValidationError("仓库路径为空")
+    raw = Path(str(path).strip()).expanduser()
+    if not raw.is_absolute():
+        raise PathValidationError("请填写绝对路径(如 D:\\ROM-AI-仓库)")
+    if raw.is_symlink():
+        raise PathValidationError("仓库根不能是符号链接")
+    if not raw.exists():
+        raise PathValidationError("该文件夹不存在,请先在资源管理器里新建它")
+    if not raw.is_dir():
+        raise PathValidationError("该路径不是文件夹")
+    root = raw.resolve()
+    _reject_nested_with_uploads(root)
+    # 可写探针:建一个临时子目录再删,确认有写权限(fail closed)
+    probe = root / ".romai_write_probe"
+    try:
+        probe.mkdir(exist_ok=True)
+        probe.rmdir()
+    except OSError as e:
+        raise PathValidationError(f"仓库文件夹不可写:{e}")
+    return root
+
+
+
 def _project_dir(project_id: int) -> Path:
     d = UPLOADS_ROOT / str(int(project_id))
     d.mkdir(parents=True, exist_ok=True)
