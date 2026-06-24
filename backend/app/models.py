@@ -119,6 +119,30 @@ class ChatMessage(Base):
     session: Mapped["ChatSession"] = relationship(back_populates="messages")
 
 
+class SkillResult(Base):
+    """技能/命令执行的成果落库(供归档回查)。现成果只在内存,刷新即丢——此表补全持久化。
+    成功/失败都落(状态如实,不伪造);image_path 指向项目 uploads 内的图(相对 stored_path)。"""
+
+    __tablename__ = "skill_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    session_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 关联 chat 会话(0=无)
+    skill_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="ok", nullable=False)  # ok|not_configured|no_material|error
+    content: Mapped[str] = mapped_column(Text, default="", nullable=False)        # markdown
+    output_json: Mapped[str] = mapped_column(Text, default="", nullable=False)    # 结构化 JSON 字符串
+    image_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 生图:项目内 stored_path
+    image_model: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    sources_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
 # ── Phase 4B: 知识库 ──
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"

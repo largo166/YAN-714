@@ -282,6 +282,7 @@ class SkillListOut(BaseModel):
 class SkillRunIn(BaseModel):
     input: str = ""  # 可选用户补充指令
     model: str = ""  # 生图技能选模型(gpt-image-1-official | gemini-3-pro-image-preview);其它技能忽略
+    session_id: int = 0  # 关联的对话会话(成果归档用;0=无)
 
 
 class SkillRunOut(BaseModel):
@@ -292,9 +293,33 @@ class SkillRunOut(BaseModel):
     output_json: str = ""       # 结构化结果 JSON 字符串(PPT/会议纪要;供前端「复制 JSON」)
     image_url: str = ""         # 生图:本地 stored 路径(已下载存 uploads,不过期)
     image_model: str = ""       # 生图实际使用的模型
+    result_id: int = 0          # 落库成果 id(供归档回查;0=未落库)
     sources: List[SkillSourceOut] = []
     model: str = ""
     error_message: str = ""
+
+
+class SkillResultOut(BaseModel):
+    """归档成果(项目维度回查)。"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    skill_id: str
+    title: str = ""
+    status: str
+    content: str = ""
+    output_json: str = ""
+    image_path: str = ""        # 项目内 stored_path(前端用 /image?path= 取图)
+    image_model: str = ""
+    model: str = ""
+    error_message: str = ""
+    created_at: datetime
+
+
+class SkillResultListOut(BaseModel):
+    items: List[SkillResultOut]
+    total: int
 
 
 # ── 设置 ──

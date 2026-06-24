@@ -139,3 +139,23 @@ def test_img_not_configured_no_network(client, monkeypatch):
     assert body["image_url"] == ""  # 不伪造图
 
 
+def test_skill_result_archived(client, monkeypatch):
+    """成果落库归档:run 后能在项目成果历史里查到(含 result_id);not_configured 也如实落库。"""
+    import json as _json
+    from app import llm
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: _json.dumps({"title": "x", "slides": [{"title": "a", "keyMessage": "b"}]}, ensure_ascii=False))
+    pid = _new_project(client, name="成果归档测试")
+    _set_key()
+    client.post(f"/api/projects/{pid}/files", files={"file": ("任务书.md", "# 任务书\n退台立面".encode("utf-8"), "text/markdown")})
+    r = client.post(f"/api/projects/{pid}/skills/ppt/run", json={"input": "做 3 页"}).json()
+    assert r["status"] == "ok" and r["result_id"] > 0
+    # 历史能查到
+    hist = client.get(f"/api/projects/{pid}/skill-results").json()
+    assert hist["total"] >= 1
+    assert any(x["id"] == r["result_id"] and x["skill_id"] == "ppt" for x in hist["items"])
+    # 单条详情
+    one = client.get(f"/api/projects/{pid}/skill-results/{r['result_id']}").json()
+    assert one["title"] == "PPT 大纲" and one["output_json"]
+
+
+

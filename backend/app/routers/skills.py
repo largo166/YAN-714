@@ -60,6 +60,21 @@ def list_skills() -> schemas.SkillListOut:
     return schemas.SkillListOut(items=_SKILLS, total=len(_SKILLS))
 
 
+def _save_result(db: Session, project_id: int, session_id: int, out: schemas.SkillRunOut) -> int:
+    """把成果落库(成功/失败都落,状态如实),返回 result_id 供归档回查。"""
+    row = models.SkillResult(
+        project_id=project_id, session_id=session_id or 0, skill_id=out.skill_id,
+        title=out.title, status=out.status, content=out.content, output_json=out.output_json,
+        image_path=out.image_url, image_model=out.image_model,
+        sources_json=safe_json.dumps_safe([s.model_dump() for s in out.sources]),
+        model=out.model, error_message=out.error_message,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row.id
+
+
 @router.post(
     "/api/projects/{project_id}/skills/{skill_id}/run",
     response_model=schemas.SkillRunOut,
@@ -67,7 +82,16 @@ def list_skills() -> schemas.SkillListOut:
 def run_skill(
     project_id: int, skill_id: str, payload: schemas.SkillRunIn, db: Session = Depends(get_db)
 ) -> schemas.SkillRunOut:
-    """执行技能 → 成果卡。围绕当前项目 + 项目级知识检索做 RAG，不伪造（规则 3/9/10）。"""
+    """执行技能 → 成果卡(落库归档,不伪造)。围绕当前项目 + 项目级 RAG（规则 3/9/10）。"""
+    out = _run_skill_inner(project_id, skill_id, payload, db)
+    out.result_id = _save_result(db, project_id, payload.session_id, out)
+    return out
+
+
+def _run_skill_inner(
+    project_id: int, skill_id: str, payload: schemas.SkillRunIn, db: Session
+) -> schemas.SkillRunOut:
+    """技能执行内核（产 SkillRunOut，不落库）。run_skill / command 复用。"""
     project = db.get(models.Project, project_id)
     if project is None:
         raise HTTPException(404, "项目不存在")
@@ -218,3 +242,26 @@ def run_skill(
             content="AI 调用失败，请稍后重试或检查设置。", model=cfg.deepseek_model,
             error_message=str(e),
         )
+
+
+# ── 成果归档:项目维度回查历史成果 ──
+@router.get("/api/projects/{project_id}/skill-results", response_model=schemas.SkillResultListOut)
+def list_skill_results(project_id: int, db: Session = Depends(get_db)) -> schemas.SkillResultListOut:
+    """项目历史成果(按时间倒序),供归档回查——过几天翻出上次做的 PPT/图。"""
+    if db.get(models.Project, project_id) is None:
+        raise HTTPException(404, "项目不存在")
+    rows = (
+        db.query(models.SkillResult)
+        .filter(models.SkillResult.project_id == project_id)
+        .order_by(models.SkillResult.created_at.desc())
+        .all()
+    )
+    return schemas.SkillResultListOut(items=rows, total=len(rows))
+
+
+@router.get("/api/projects/{project_id}/skill-results/{result_id}", response_model=schemas.SkillResultOut)
+def get_skill_result(project_id: int, result_id: int, db: Session = Depends(get_db)) -> schemas.SkillResultOut:
+    row = db.get(models.SkillResult, result_id)
+    if row is None or row.project_id != project_id:
+        raise HTTPException(404, "成果不存在")
+    return row
