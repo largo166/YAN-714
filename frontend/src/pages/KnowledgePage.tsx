@@ -227,6 +227,11 @@ export default function KnowledgePage() {
               <div style={{ fontSize: 12, color: 'var(--mut)', margin: '6px 2px' }}>
                 当前数据基地已入库 <b>{stats?.documents ?? docs.length}</b> 条 · 本次扫描可接入 <b>{report.preview.total_supported}</b> 条（待处理）
               </div>
+              {report.preview.total_projects > 1 && report.scan.total_files > report.preview.total_supported + report.preview.total_unsupported && (
+                <div style={{ fontSize: 11, color: 'var(--mut)', margin: '0 2px 6px' }}>
+                  注：该文件夹含多个子项目，按子文件夹接入；直接散落在根目录、不属于任何子项目的文件本次不接入。
+                </div>
+              )}
 
               {/* 识别到的项目/文件夹结构 */}
               {report.preview.projects.length > 0 && (

@@ -230,3 +230,28 @@ def test_batch_ingest_flat_folder_root_as_project(client, tmp_path):
     finally:
         for pid in pids:
             _cleanup_project_dir(pid)
+
+
+def test_batch_ingest_excludes_quarantine_and_empty_dirs(client, tmp_path):
+    """清理隔离区不当项目接入;无可解析文件的子目录不创建空项目(对抗复核坐实点)。"""
+    root = tmp_path / "资料根"
+    (root / "真项目" ).mkdir(parents=True)
+    (root / "真项目" / "任务书.md").write_text("# 任务书", encoding="utf-8")
+    (root / "_ROMAI_CLEANUP_QUARANTINE" / "20260101-000000").mkdir(parents=True)
+    (root / "_ROMAI_CLEANUP_QUARANTINE" / "20260101-000000" / "垃圾.md").write_text("junk", encoding="utf-8")
+    (root / "空目录").mkdir()           # 无文件
+    (root / "只有图.d").mkdir()          # 仅不可解析(目录名带点干扰)
+    (root / "只有图.d" / "x.zip").write_bytes(b"zip")
+
+    pv = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(root)}).json()
+    names = [p["project_name"] for p in pv["projects"]]
+    assert "_ROMAI_CLEANUP_QUARANTINE" not in names   # 隔离区被排除
+    imp = client.post("/api/projects/batch-ingest/import", json={"root_path": str(root)}).json()
+    pids = [p["project_id"] for p in imp["projects"]]
+    try:
+        created = [p["project_name"] for p in imp["projects"]]
+        assert created == ["真项目"]                   # 空目录/纯不可解析目录不创建项目
+        assert "垃圾.md" not in [d["title"] for d in client.get("/api/knowledge/documents").json()["items"]]
+    finally:
+        for pid in pids:
+            _cleanup_project_dir(pid)

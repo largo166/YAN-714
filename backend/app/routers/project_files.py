@@ -19,7 +19,12 @@ def _project_dirs(root_path: str) -> tuple[Path, list[Path]]:
     root = Path(root_path)
     if not root.exists() or not root.is_dir():
         raise HTTPException(400, "目录不存在或不可访问")
-    subdirs = sorted([p for p in root.iterdir() if p.is_dir()], key=lambda p: p.name)
+    # 排除清理隔离区(_ROMAI_CLEANUP_QUARANTINE)——它是 workspace 安全清理的隔离目录,
+    # 不是项目,否则会把已隔离文件当项目误接入(与 workspace.scan 的过滤口径一致)。
+    subdirs = sorted(
+        [p for p in root.iterdir() if p.is_dir() and p.name != "_ROMAI_CLEANUP_QUARANTINE"],
+        key=lambda p: p.name,
+    )
     # 子文件夹=各自一个项目;若根目录是【扁平文件夹】(无子目录、仅散落文件)→ 把根目录本身当作一个项目,
     # 否则散落在根的文件永远不会被接入(数据基地"选文件夹整理"对扁平文件夹就成了空操作)。
     if not subdirs:
@@ -136,6 +141,9 @@ def batch_ingest_import(
 
     for pdir in project_dirs:
         if allowed and pdir.name not in allowed:
+            continue
+        # 预检:无任何可解析文件的目录直接跳过,不创建空项目(避免污染项目列表)
+        if not any(p.is_file() and parsing.is_supported(p.name) for p in pdir.rglob("*")):
             continue
         project = _find_or_create_project(db, pdir.name)
         copied = indexed = failed = skipped = 0
