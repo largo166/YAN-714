@@ -456,6 +456,7 @@ class ProjectFileOut(BaseModel):
     project_id: int
     filename: str
     stored_path: str
+    storage_root: str = ""   # 落盘时受管根(空=回退 uploads);供溯源/还原
     file_type: str
     size: int
     parse_status: str

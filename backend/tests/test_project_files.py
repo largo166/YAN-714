@@ -331,6 +331,54 @@ def test_batch_ingest_single_unsupported_file(client, tmp_path):
     assert imp["total_projects"] == 0 and imp["copied"] == 0   # 无可解析文件 → 不建空项目
 
 
+def test_batch_ingest_into_repository(client, tmp_path):
+    """配置仓库后:一键整理把文件复制进 {仓库}/{项目名}/{原名},stored_path 相对仓库根,
+    storage_root 记仓库绝对根;详情/软删/恢复全通;最后解除仓库回退 uploads。"""
+    from pathlib import Path
+
+    repo = tmp_path / "ROM-AI-仓库"
+    repo.mkdir()
+    src = tmp_path / "源-YAN"
+    (src / "石家庄市庄项目").mkdir(parents=True)
+    (src / "石家庄市庄项目" / "市庄任务书.md").write_text("# 市庄\n退台立面", encoding="utf-8")
+
+    # 配置仓库根
+    r = client.put("/api/settings", json={"repository_root_path": str(repo)})
+    assert r.status_code == 200 and r.json()["repository_configured"] is True
+    pids = []
+    try:
+        imp = client.post("/api/projects/batch-ingest/import", json={"root_path": str(src)}).json()
+        pids = [p["project_id"] for p in imp["projects"]]
+        assert imp["copied"] == 1 and imp["failed"] == 0
+
+        # 文件真实落在 仓库/项目名/原名(资源管理器可见结构),源目录不动
+        landed = repo / "石家庄市庄项目" / "市庄任务书.md"
+        assert landed.is_file(), f"未落到仓库:{landed}"
+        assert (src / "石家庄市庄项目" / "市庄任务书.md").is_file()  # 源仍在(复制不移动)
+
+        pid = pids[0]
+        files = client.get(f"/api/projects/{pid}/files").json()["items"]
+        assert len(files) == 1
+        fid = files[0]["id"]
+        det = client.get(f"/api/projects/{pid}/files/{fid}").json()
+        assert det["stored_path"] == "石家庄市庄项目/市庄任务书.md"   # 相对仓库根
+        assert det["storage_root"]                                    # 记了仓库绝对根
+
+        # 软删 → _trash 落在 仓库/项目名/_trash 下;恢复回原位
+        d = client.delete(f"/api/projects/{pid}/files/{fid}")
+        assert d.status_code == 200
+        ts = d.json()["trash_timestamp"]
+        assert (repo / "石家庄市庄项目" / "_trash" / ts / "manifest.json").exists()
+        assert not landed.exists()                                    # 已移入隔离区
+        rr = client.post(f"/api/projects/{pid}/files/{fid}/restore", params={"timestamp": ts})
+        assert rr.status_code == 200 and rr.json()["status"] == "active"
+        assert landed.is_file()                                       # 恢复回仓库原位
+    finally:
+        client.put("/api/settings", json={"repository_root_path": ""})  # 解除仓库,回退 uploads
+        for pid in pids:
+            _cleanup_project_dir(pid)
+
+
 def test_batch_ingest_excludes_quarantine_and_empty_dirs(client, tmp_path):
     """清理隔离区不当项目接入;无可解析文件的子目录不创建空项目(对抗复核坐实点)。"""
     root = tmp_path / "资料根"

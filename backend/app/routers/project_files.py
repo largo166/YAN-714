@@ -84,6 +84,27 @@ def _norm_source(p) -> str:
         return str(p)
 
 
+def _managed_layout(db: Session, project: models.Project) -> tuple:
+    """据 AppSetting 解析「受管根 + 子目录 + storage_root(存库归一根)」。
+
+    配置仓库 → (仓库根, 项目名, 归一仓库根);未配置 → (UPLOADS_ROOT, str(pid), "")。
+    storage_root 存空串=回退行(还原视作 uploads),与历史行为一致。
+    """
+    cfg = db.get(models.AppSetting, 1)
+    repo = (cfg.repository_root_path if cfg else "") or ""
+    base = uploads.managed_root(repo)
+    if base != uploads.UPLOADS_ROOT:
+        return base, project.name, _norm_source(base)  # 仓库模式:{仓库}/{项目名}/
+    return base, str(project.id), ""                    # 回退模式:{uploads}/{pid}/
+
+
+def _store_file(db: Session, project: models.Project, path) -> tuple:
+    """把单个源文件复制进受管根,返回 (StoredFile, storage_root)。"""
+    base, subdir, storage_root = _managed_layout(db, project)
+    stored = uploads.copy_into_root(base, subdir, path)
+    return stored, storage_root
+
+
 def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> models.Project:
     """按【源文件夹路径】去重(可靠键,支持重新整理):同 source_path 已存在→复用(不改名,
     保留用户在项目中心可能做过的手动改名);否则用文件夹原名新建并记录来源路径。"""
@@ -169,6 +190,12 @@ def batch_ingest_import(
     allowed = set(payload.project_names or [])
     results: list[schemas.BatchIngestProjectImportOut] = []
 
+    # 仓库模式:导入前预检仓库根可访问(掉线→整体 400,不留半截);未配置则回退 uploads 不预检。
+    cfg = db.get(models.AppSetting, 1)
+    repo_path = (cfg.repository_root_path if cfg else "") or ""
+    if repo_path and not Path(repo_path).is_dir():
+        raise HTTPException(400, f"仓库不可访问,请检查仓库文件夹是否存在:{repo_path}")
+
     for pdir in project_dirs:
         if allowed and _project_name(pdir) not in allowed:
             continue
@@ -187,12 +214,13 @@ def batch_ingest_import(
                 skipped += 1
                 continue
             try:
-                stored = uploads.copy_into_uploads(project.id, path)
+                stored, storage_root = _store_file(db, project, path)
                 pr = parsing.parse_file(stored.abs_path)
                 pf = models.ProjectFile(
                     project_id=project.id,
                     filename=stored.filename,
                     stored_path=stored.stored_path,
+                    storage_root=storage_root,
                     file_type=stored.filename.rsplit(".", 1)[-1].lower()
                     if "." in stored.filename
                     else "",
@@ -256,13 +284,17 @@ def _file_or_404(db: Session, project_id: int, file_id: int) -> models.ProjectFi
 async def upload_file(
     project_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)
 ):
-    _project_or_404(db, project_id)
+    project = _project_or_404(db, project_id)
     if not parsing.is_supported(file.filename or ""):
         raise HTTPException(400, "仅支持 txt/md/pdf/docx/pptx/xlsx/png/jpg/jpeg")
 
     data = await file.read()
 
-    stored = uploads.save_upload(project_id, file.filename or "untitled", data)
+    # 单文件上传与批量接入一致:配置仓库则落仓库 {仓库}/{项目名}/,否则回退 {uploads}/{pid}/。
+    base, subdir, storage_root = _managed_layout(db, project)
+    if storage_root and not base.is_dir():
+        raise HTTPException(400, f"仓库不可访问,请检查仓库文件夹是否存在:{base}")
+    stored = uploads.write_into_root(base, subdir, file.filename or "untitled", data)
     # 同步解析（文件通常不大）
     pr = parsing.parse_file(stored.abs_path)
 
@@ -270,6 +302,7 @@ async def upload_file(
         project_id=project_id,
         filename=stored.filename,
         stored_path=stored.stored_path,
+        storage_root=storage_root,
         file_type=stored.filename.rsplit(".", 1)[-1].lower() if "." in stored.filename else "",
         size=stored.size,
         parse_status=pr.status,
