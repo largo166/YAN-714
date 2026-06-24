@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import RichText, { Foldable, coreLine, renderInline } from '@/components/RichText'
+import RichText, { Foldable, JudgmentView, coreLine, parseJudgment, renderInline } from '@/components/RichText'
 import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill, SkillRun, SkillResult, Agent } from '@/types/schemas'
 
 /** 统一对话流条目:聊天气泡 + 技能成果卡按时间混排(成果进对话流,不再分两区)。 */
@@ -84,16 +84,23 @@ function ResultCard({ run, projectId }: { run: SkillRun; projectId: number | nul
               </Foldable>
             )}
           </>
-        ) : longText ? (
-          <Foldable
-            summary={<div className="rom-core">{renderInline(coreLine(r.content))}</div>}
-            openLabel="展开完整内容"
-            closeLabel="收起完整内容"
-          >
-            <RichText text={r.content} />
-          </Foldable>
         ) : (
-          <RichText text={r.content} />
+          (() => {
+            // 判断类成果(方案评审/任务/竞品)有结构化 output_json → 分字段卡;否则清洗渲染
+            const j = parseJudgment(r.output_json)
+            if (j) return <JudgmentView j={j} />
+            return longText ? (
+              <Foldable
+                summary={<div className="rom-core">{renderInline(coreLine(r.content))}</div>}
+                openLabel="展开完整内容"
+                closeLabel="收起完整内容"
+              >
+                <RichText text={r.content} />
+              </Foldable>
+            ) : (
+              <RichText text={r.content} />
+            )
+          })()
         )
       ) : (
         <div style={{ color: 'var(--mut)', fontSize: 13 }}>

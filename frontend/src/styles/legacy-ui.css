@@ -622,3 +622,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 .archrow{border:1px solid var(--line2);border-radius:10px;margin-bottom:8px;background:var(--panel);overflow:hidden}
 .archrow-hd{width:100%;display:flex;align-items:center;gap:4px;font-family:inherit;background:none;border:0;padding:9px 12px;cursor:pointer;text-align:left;color:var(--ink)}
 .archrow-hd:hover{background:var(--panel2)}
+
+/* ── 结构化判断卡(研判/方案评审/任务/竞品):核心优先 + 分段要点 ── */
+.judgment .jhd{font-size:12px;font-weight:700;color:var(--mut);letter-spacing:.02em;margin:2px 0 4px}
+.judgment .jpoint{font-size:13px;line-height:1.6;margin:3px 0;display:flex;gap:8px;align-items:baseline}
+.judgment .jlabel{flex:none;font-size:11.5px;font-weight:600;color:var(--terra);border:1px solid var(--terra-line);background:var(--terra-soft);border-radius:6px;padding:1px 7px}

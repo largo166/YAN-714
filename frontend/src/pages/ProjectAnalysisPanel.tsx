@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
-import RichText, { Foldable, coreLine, renderInline } from '@/components/RichText'
+import RichText, { Foldable, JudgmentView, coreLine, parseJudgment, renderInline } from '@/components/RichText'
 import { ANALYSIS_TASKS, type AnalysisTaskKey, type ProjectAnalysis } from '@/types/schemas'
 
 const STATUS_HINT: Record<string, { text: string; cls: string }> = {
@@ -181,18 +181,23 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
 
           {reflowNote && <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>{reflowNote}</div>}
 
-          {/* 研判正文：清洗 markdown 噪音渲染；长内容核心判断优先 + 折叠完整 */}
-          {current.status === 'ok' && (current.content || '').length > 220 ? (
-            <Foldable
-              summary={<div className="rom-core">{renderInline(coreLine(current.content))}</div>}
-              openLabel="展开完整研判"
-              closeLabel="收起完整研判"
-            >
+          {/* 研判正文：结构化判断优先(核心判断/关键要点/下一步/待确认)；
+              无结构化(回落纯文本/旧记录)→ 清洗 markdown 渲染,长文核心优先+折叠 */}
+          {(() => {
+            const j = current.status === 'ok' ? parseJudgment(current.output_json) : null
+            if (j) return <JudgmentView j={j} />
+            return (current.content || '').length > 220 ? (
+              <Foldable
+                summary={<div className="rom-core">{renderInline(coreLine(current.content))}</div>}
+                openLabel="展开完整研判"
+                closeLabel="收起完整研判"
+              >
+                <RichText text={current.content} />
+              </Foldable>
+            ) : (
               <RichText text={current.content} />
-            </Foldable>
-          ) : (
-            <RichText text={current.content} />
-          )}
+            )
+          })()}
 
           {current.status === 'ok' && current.sources.length > 0 && (
             <div style={{ marginTop: 12, borderTop: '1px dashed var(--line2)', paddingTop: 8 }}>

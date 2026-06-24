@@ -172,6 +172,89 @@ export default function RichText({ text, style }: { text: string; style?: React.
   )
 }
 
+/** 结构化判断(研判 / 方案评审 / 任务 / 竞品):core/points/actions/questions/detail。 */
+export type Judgment = {
+  core: string
+  points: { label: string; text: string }[]
+  actions: string[]
+  questions: string[]
+  detail: string
+}
+
+/** 解析后端 output_json 为 Judgment;非该形态(如 PPT/会议结构、纯文本)返回 null,由调用方回落。 */
+export function parseJudgment(outputJson: string): Judgment | null {
+  if (!outputJson) return null
+  let v: unknown
+  try {
+    v = JSON.parse(outputJson)
+  } catch {
+    return null
+  }
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const core = typeof o.core === 'string' ? o.core : ''
+  const points = Array.isArray(o.points)
+    ? o.points
+        .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
+        .map((p) => ({ label: String(p.label ?? ''), text: String(p.text ?? '') }))
+        .filter((p) => p.label || p.text)
+    : []
+  if (!core && points.length === 0) return null // 不是 judgment 形态
+  const strArr = (x: unknown) => (Array.isArray(x) ? x.map((s) => String(s)).filter(Boolean) : [])
+  return {
+    core,
+    points,
+    actions: strArr(o.actions),
+    questions: strArr(o.questions),
+    detail: typeof o.detail === 'string' ? o.detail : '',
+  }
+}
+
+/** 结构化判断卡:核心判断高亮 → 关键要点 → 下一步 → 待确认 → 展开完整内容。 */
+export function JudgmentView({ j }: { j: Judgment }) {
+  return (
+    <div className="judgment">
+      {j.core && <div className="rom-core" style={{ marginBottom: 10 }}>{renderInline(j.core)}</div>}
+      {j.points.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div className="jhd">关键要点</div>
+          {j.points.map((p, i) => (
+            <div key={i} className="jpoint">
+              {p.label && <span className="jlabel">{p.label}</span>}
+              <span>{renderInline(p.text)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {j.actions.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div className="jhd">下一步</div>
+          <ol style={{ margin: '4px 0', paddingLeft: 18 }}>
+            {j.actions.map((a, i) => (
+              <li key={i} style={{ margin: '2px 0' }}>{renderInline(a)}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {j.questions.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div className="jhd">待确认</div>
+          <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
+            {j.questions.map((q, i) => (
+              <li key={i} style={{ margin: '2px 0' }}>{renderInline(q)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {j.detail && (
+        <Foldable openLabel="展开完整内容" closeLabel="收起完整内容">
+          <RichText text={j.detail} />
+        </Foldable>
+      )}
+    </div>
+  )
+}
+
 /** 折叠块:默认只显示 summary(核心),点“展开详情”看完整内容。长内容默认收起。 */
 export function Foldable({
   summary,

@@ -632,6 +632,7 @@ export const ProjectAnalysisSchema = z.object({
   task: z.string(),
   status: z.string(), // ok|not_configured|no_material|error
   content: z.string(),
+  output_json: z.string().default(''), // 结构化判断 JSON(core/points/actions/questions/detail);回落纯文本时空
   sources: z.array(AnalysisSourceSchema),
   model: z.string(),
   error_message: z.string(),
