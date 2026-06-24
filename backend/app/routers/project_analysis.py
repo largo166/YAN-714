@@ -57,6 +57,21 @@ def analyze(project_id: int, payload: schemas.AnalyzeIn, db: Session = Depends(g
     if payload.task not in analysis.TASKS:
         raise HTTPException(400, f"未知研判任务：{payload.task}")
 
+    # 缓存快路:非强制重跑时,已有成功结果直接返回(不重调 LLM,消除卡顿)。
+    if not payload.force:
+        cached = (
+            db.query(models.ProjectAnalysis)
+            .filter(
+                models.ProjectAnalysis.project_id == project_id,
+                models.ProjectAnalysis.task == payload.task,
+                models.ProjectAnalysis.status == "ok",
+            )
+            .order_by(models.ProjectAnalysis.created_at.desc())
+            .first()
+        )
+        if cached is not None:
+            return _to_out(cached)
+
     cfg = _settings(db)
     configured = bool(cfg.deepseek_api_key)
 
@@ -111,6 +126,26 @@ def list_analyses(project_id: int, db: Session = Depends(get_db)):
         .all()
     )
     return schemas.ProjectAnalysisListOut(items=[_to_out(r) for r in rows], total=len(rows))
+
+
+@router.get("/{project_id}/analyses/latest", response_model=schemas.ProjectAnalysisListOut)
+def latest_analyses(project_id: int, db: Session = Depends(get_db)):
+    """每个 task 的最新成功(ok)结果各一条。供前端进页面/切项目时批量回填,点 tab 秒显不重跑。"""
+    _project_or_404(db, project_id)
+    rows = (
+        db.query(models.ProjectAnalysis)
+        .filter(
+            models.ProjectAnalysis.project_id == project_id,
+            models.ProjectAnalysis.status == "ok",
+        )
+        .order_by(models.ProjectAnalysis.created_at.desc())
+        .all()
+    )
+    latest_by_task: dict[str, models.ProjectAnalysis] = {}
+    for r in rows:  # rows 已按时间倒序,首次见到的即该 task 最新
+        latest_by_task.setdefault(r.task, r)
+    items = [_to_out(r) for r in latest_by_task.values()]
+    return schemas.ProjectAnalysisListOut(items=items, total=len(items))
 
 
 @router.get("/{project_id}/analyses/{analysis_id}", response_model=schemas.ProjectAnalysisOut)

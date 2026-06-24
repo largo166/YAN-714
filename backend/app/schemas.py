@@ -596,6 +596,7 @@ class AnalysisSourceOut(BaseModel):
 class AnalyzeIn(BaseModel):
     task: str = Field(description="overview|difficulty|demand|plan|report")
     top_k: int = 5
+    force: bool = False   # True=强制重跑;默认 False=已有成功结果则直接返回(秒回不重跑 LLM)
 
 
 class ProjectAnalysisOut(BaseModel):

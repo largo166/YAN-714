@@ -127,6 +127,60 @@ def test_analyze_ok_with_sources(client, monkeypatch):
         _cleanup(pid)
 
 
+def test_analyze_cache_hit_no_rerun(client, monkeypatch):
+    """缓存快路:同 task 第二次 POST 不再调 LLM,返回同一条记录(修卡顿核心)。"""
+    from app import llm
+
+    calls = {"n": 0}
+
+    def _stub(messages, **kw):
+        calls["n"] += 1
+        return f"研判结论(第{calls['n']}次调用)"
+
+    monkeypatch.setattr(llm, "chat_completion", _stub)
+    pid = _new_project(client)
+    _set_key()
+    try:
+        files = {"file": ("任务书.md", "# 任务书\n退台立面材料质感。".encode("utf-8"), "text/markdown")}
+        client.post(f"/api/projects/{pid}/files", files=files)
+
+        r1 = client.post(f"/api/projects/{pid}/analyze", json={"task": "overview"}).json()
+        assert r1["status"] == "ok" and calls["n"] == 1
+        # 第二次:命中缓存,不再调 LLM,返回同一 id
+        r2 = client.post(f"/api/projects/{pid}/analyze", json={"task": "overview"}).json()
+        assert calls["n"] == 1, "缓存命中不应再调 LLM"
+        assert r2["id"] == r1["id"]
+
+        # force=true:强制重跑,调一次 LLM,新增记录(id 变)
+        r3 = client.post(f"/api/projects/{pid}/analyze", json={"task": "overview", "force": True}).json()
+        assert calls["n"] == 2 and r3["id"] != r1["id"] and r3["status"] == "ok"
+    finally:
+        _cleanup(pid)
+
+
+def test_latest_analyses_only_ok(client, monkeypatch):
+    """latest 端点:每 task 最新 ok 各一条,供前端批量回填。"""
+    from app import llm
+
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: "结论(桩)")
+    pid = _new_project(client)
+    _set_key()
+    try:
+        files = {"file": ("任务书.md", "# 任务书\n退台立面。".encode("utf-8"), "text/markdown")}
+        client.post(f"/api/projects/{pid}/files", files=files)
+        client.post(f"/api/projects/{pid}/analyze", json={"task": "overview"})
+        client.post(f"/api/projects/{pid}/analyze", json={"task": "difficulty"})
+        # 同 task 重跑一次 → latest 仍只回最新一条
+        client.post(f"/api/projects/{pid}/analyze", json={"task": "overview", "force": True})
+
+        latest = client.get(f"/api/projects/{pid}/analyses/latest").json()
+        tasks = sorted(i["task"] for i in latest["items"])
+        assert tasks == ["difficulty", "overview"]  # 每 task 一条,无重复
+        assert all(i["status"] == "ok" for i in latest["items"])
+    finally:
+        _cleanup(pid)
+
+
 def test_unknown_task_rejected(client):
     pid = _new_project(client)
     _set_key()
