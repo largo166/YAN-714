@@ -102,11 +102,48 @@ export const SkillRunSchema = z.object({
   output_json: z.string().default(''),   // PPT/会议纪要 结构化 JSON 字符串(复制 JSON)
   image_url: z.string().default(''),      // 生图:项目内 stored_path
   image_model: z.string().default(''),
+  result_id: z.number().default(0),       // 落库成果 id(归档)
   sources: z.array(SkillSourceSchema).default([]),
   model: z.string().default(''),
   error_message: z.string().default(''),
 })
 export type SkillRun = z.infer<typeof SkillRunSchema>
+
+// 归档成果(项目维度回查历史)
+export const SkillResultSchema = z.object({
+  id: z.number(),
+  project_id: z.number(),
+  skill_id: z.string(),
+  title: z.string().default(''),
+  status: z.string(),
+  content: z.string().default(''),
+  output_json: z.string().default(''),
+  image_path: z.string().default(''),
+  image_model: z.string().default(''),
+  model: z.string().default(''),
+  error_message: z.string().default(''),
+  created_at: z.string(),
+})
+export type SkillResult = z.infer<typeof SkillResultSchema>
+export const SkillResultListSchema = z.object({ items: z.array(SkillResultSchema), total: z.number() })
+export type SkillResultList = z.infer<typeof SkillResultListSchema>
+
+// 斜杠命令
+export const SkillCommandDefSchema = z.object({
+  command: z.string(), skill_id: z.string(), label: z.string(), needs_confirm: z.boolean().default(false),
+})
+export const SkillCommandListSchema = z.object({ items: z.array(SkillCommandDefSchema) })
+export type SkillCommandDef = z.infer<typeof SkillCommandDefSchema>
+export type SkillCommandList = z.infer<typeof SkillCommandListSchema>
+export const SkillCommandSchema = z.object({
+  status: z.string(),
+  skill_id: z.string().default(''),
+  result: SkillRunSchema.nullable().default(null),
+  prompt: z.string().default(''),
+  model: z.string().default(''),
+  message: z.string().default(''),
+})
+export type SkillCommand = z.infer<typeof SkillCommandSchema>
 
 // ── 协作平台 / 驾驶舱（C4/C5）──
 export const AgentSchema = z.object({
@@ -128,6 +165,7 @@ export const AgentRunSchema = z.object({
   output_json: z.string().default(''),  // 与 SkillRun 对齐(agent 恒空),便于成果卡统一渲染
   image_url: z.string().default(''),
   image_model: z.string().default(''),
+  result_id: z.number().default(0),
   sources: z.array(SkillSourceSchema).default([]),
   model: z.string().default(''),
   error_message: z.string().default(''),

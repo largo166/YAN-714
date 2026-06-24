@@ -605,3 +605,20 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 #srv-err code{background:#f0ece1;padding:2px 7px;border-radius:6px;font-size:12px}
 #srv-err button{margin-top:18px;padding:10px 22px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-size:14px;cursor:pointer}
 #srv-err .sub{font-size:12px;color:var(--mut);margin-top:14px}
+
+/* ── 共创营地闭环：斜杠命令菜单 / 成果卡进对话流 / 项目成果归档 ── */
+.cmdmenu{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:var(--panel);border:1px solid var(--line2);border-radius:11px;box-shadow:0 12px 30px #1b1a1722;padding:6px;z-index:30;max-height:280px;overflow:auto}
+.cmdmenu-hd{font-size:11px;color:var(--mut);padding:4px 8px 6px;letter-spacing:.02em}
+.cmdmenu-it{width:100%;display:flex;align-items:center;gap:4px;font-family:inherit;font-size:13px;color:var(--ink);background:none;border:0;border-radius:8px;padding:8px 10px;cursor:pointer;text-align:left}
+.cmdmenu-it:hover{background:var(--panel2)}
+.cmdmenu-it b{color:var(--terra)}
+/* 成果卡：作为一条富消息进入对话流，左对齐、占满宽，和气泡区分 */
+.rescard{align-self:stretch;width:100%;background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--terra-line);border-radius:12px;padding:12px 14px;margin:2px 0}
+.rescard-tag{font-size:10px;font-weight:600;color:var(--terra);border:1px solid var(--terra-line);background:var(--terra-soft);border-radius:20px;padding:2px 8px}
+/* 核心判断：高亮摘要块（折叠态默认展示） */
+.rom-core{background:var(--terra-soft);border:1px solid var(--terra-line);border-radius:9px;padding:9px 11px;font-size:13.5px;line-height:1.55;color:var(--ink);font-weight:500}
+.richtext code{font-family:'Space Mono',monospace}
+/* 归档行 */
+.archrow{border:1px solid var(--line2);border-radius:10px;margin-bottom:8px;background:var(--panel);overflow:hidden}
+.archrow-hd{width:100%;display:flex;align-items:center;gap:4px;font-family:inherit;background:none;border:0;padding:9px 12px;cursor:pointer;text-align:left;color:var(--ink)}
+.archrow-hd:hover{background:var(--panel2)}

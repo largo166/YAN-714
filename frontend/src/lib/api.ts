@@ -35,6 +35,12 @@ import {
   TeamAssignmentSchema,
   SkillListSchema,
   SkillRunSchema,
+  SkillCommandSchema,
+  SkillCommandListSchema,
+  SkillResultListSchema,
+  type SkillCommand,
+  type SkillCommandList,
+  type SkillResultList,
   AgentListSchema,
   AgentRunSchema,
   TeamMemberListSchema,
@@ -192,13 +198,28 @@ export const api = {
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
   },
-  async runSkill(projectId: number, skillId: string, input = '', model = ''): Promise<SkillRun> {
+  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0): Promise<SkillRun> {
     return SkillRunSchema.parse(
       await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ input, model }),
+        body: JSON.stringify({ input, model, session_id: sessionId }),
       }),
     )
+  },
+  /** 斜杠命令:文本类直跑(result)/出图轻确认(confirm_image)/非命令(not_command)。 */
+  async runCommand(projectId: number, text: string, sessionId = 0, model = ''): Promise<SkillCommand> {
+    return SkillCommandSchema.parse(
+      await request(`/api/projects/${projectId}/command`, {
+        method: 'POST',
+        body: JSON.stringify({ text, session_id: sessionId, model }),
+      }),
+    )
+  },
+  async listSkillCommands(): Promise<SkillCommandList> {
+    return SkillCommandListSchema.parse(await request('/api/skill-commands'))
+  },
+  async listSkillResults(projectId: number): Promise<SkillResultList> {
+    return SkillResultListSchema.parse(await request(`/api/projects/${projectId}/skill-results`))
   },
   /** 生图成果卡的图片 URL(按项目 stored_path 取项目内图片)。 */
   projectImageUrl(projectId: number, storedPath: string): string {
