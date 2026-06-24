@@ -193,6 +193,16 @@ export default function BriefCognitionCard({
         </div>
       )}
 
+      {/* 隐形质检层(阶段6)：防假认知 advisory 警告,不阻断 */}
+      {cog && cog.quality_warnings.length > 0 && (
+        <div style={{ fontSize: 12, margin: '4px 0 8px', padding: '8px 10px', background: 'var(--panel2)', borderRadius: 8, border: '1px solid var(--line2)' }}>
+          <div style={{ color: 'var(--mut)', marginBottom: 4 }}>⚠ 质检提示（{cog.quality_warnings.length}）：</div>
+          {cog.quality_warnings.map((w, i) => (
+            <div key={i} style={{ color: w.level === 'high' ? 'var(--red)' : w.level === 'medium' ? 'var(--terra)' : 'var(--mut)' }}>· {w.message}</div>
+          ))}
+        </div>
+      )}
+
       {cog && (
         <div style={{ display: 'grid', gap: 6 }}>
           {cog.fields.map((f) => {

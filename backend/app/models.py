@@ -220,6 +220,25 @@ class ProjectCognition(Base):
     )
 
 
+class ProjectCognitionVersion(Base):
+    """认知版本快照（阶段6 版本层）：每次重抽/重大变更前,把旧状态存一份,不丢工作历史。
+    append-only 审计轨,只读回看,不参与下游消费。"""
+
+    __tablename__ = "project_cognition_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cognition_id: Mapped[int] = mapped_column(
+        ForeignKey("project_cognitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 快照的那个版本号
+    fields_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    summary_md: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    module_status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    snapshot_reason: Mapped[str] = mapped_column(String(40), default="re-extract", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
 # ── 会议纪要（五段式 + 内外双版）──
 class Meeting(Base):
     __tablename__ = "meetings"

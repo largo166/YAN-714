@@ -8,6 +8,8 @@
 - 沉淀条目带真实出处（resource=源项目名·模块标签），不凭空造可复用资产。
 - 删除/覆盖走知识库既有软删链路，不在此另开高风险写路径。
 """
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 

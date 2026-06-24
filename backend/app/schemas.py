@@ -823,8 +823,22 @@ class ProjectCognitionOut(BaseModel):
     version: int = 1
     sources: List[CognitionSourceOut] = []
     model: str = ""
+    quality_warnings: List[dict] = []    # 隐形质检层(阶段6)：防假认知 advisory 警告,不阻断
     created_at: datetime
     updated_at: datetime
+
+
+class CognitionVersionOut(BaseModel):
+    """认知版本快照(阶段6 版本层)。"""
+    id: int
+    cognition_id: int
+    version: int
+    summary_md: str = ""
+    module_status: str = "draft"
+    model: str = ""
+    snapshot_reason: str = ""
+    fields: List[CognitionField] = []
+    created_at: datetime
 
 
 class CognitionExtractOut(BaseModel):

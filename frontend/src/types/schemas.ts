@@ -354,6 +354,9 @@ export const ProjectCognitionSchema = z.object({
   version: z.number().default(1),
   sources: z.array(CognitionSourceSchema).default([]),
   model: z.string().default(''),
+  quality_warnings: z
+    .array(z.object({ field: z.string(), level: z.string(), code: z.string(), message: z.string() }))
+    .default([]), // 隐形质检层(阶段6)
   created_at: z.string(),
   updated_at: z.string(),
 })

@@ -13,12 +13,14 @@ A1-A8 模块均由 schemas.MODULE_FIELD_SPECS 注册表驱动同一套抽取逻�
 红线（规格 1.3）：high/medium 抽取带原文出处；low 只给 draft+推理依据、禁 confirmed；
 manual_only 不填值、只输出引导问题(status=empty)；无 key→not_configured、无正文→no_material 不写库不伪造。
 """
+from __future__ import annotations
+
 import re
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, safe_json, schemas
+from .. import analysis, llm, models, quality, safe_json, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/projects", tags=["cognition"])
@@ -72,9 +74,21 @@ def _to_out(row: models.ProjectCognition) -> schemas.ProjectCognitionOut:
         version=row.version,
         sources=[schemas.CognitionSourceOut(**s) for s in safe_json.loads_or(row.sources_json, [])],
         model=row.model,
+        quality_warnings=quality.audit_fields(fields),  # 隐形质检层:随输出自动算,不阻断
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
+
+
+def _snapshot_version(db: Session, row: models.ProjectCognition, reason: str) -> None:
+    """版本层:把认知当前(旧)状态存一份快照,再被覆盖。仅在已有内容时存(空行不存)。"""
+    if not row.id or row.fields_json in ("", "[]", None):
+        return
+    db.add(models.ProjectCognitionVersion(
+        cognition_id=row.id, version=row.version or 0,
+        fields_json=row.fields_json, summary_md=row.summary_md,
+        module_status=row.module_status, model=row.model, snapshot_reason=reason,
+    ))
 
 
 def _strip_fence(s: str) -> str:
@@ -83,6 +97,33 @@ def _strip_fence(s: str) -> str:
         t = re.sub(r"^```[a-zA-Z]*\n?", "", t)
         t = re.sub(r"\n?```$", "", t)
     return t.strip()
+
+
+@router.get("/{project_id}/cognition/{cog_id}/versions", response_model=list[schemas.CognitionVersionOut])
+def list_cognition_versions(project_id: int, cog_id: int, db: Session = Depends(get_db)):
+    """版本层(阶段6)：列出某认知的历史快照(重抽前存档),只读回看。"""
+    _project_or_404(db, project_id)
+    row = db.get(models.ProjectCognition, cog_id)
+    if row is None or row.project_id != project_id:
+        raise HTTPException(404, "认知记录不存在")
+    vers = (
+        db.query(models.ProjectCognitionVersion)
+        .filter(models.ProjectCognitionVersion.cognition_id == cog_id)
+        .order_by(models.ProjectCognitionVersion.version.desc())
+        .all()
+    )
+    out = []
+    for v in vers:
+        raw = safe_json.loads_or(v.fields_json, [])
+        fields = raw if isinstance(raw, list) else []
+        out.append(schemas.CognitionVersionOut(
+            id=v.id, cognition_id=v.cognition_id, version=v.version,
+            summary_md=v.summary_md, module_status=v.module_status, model=v.model,
+            snapshot_reason=v.snapshot_reason,
+            fields=[schemas.CognitionField(**f) for f in fields],
+            created_at=v.created_at,
+        ))
+    return out
 
 
 @router.get("/{project_id}/cognition", response_model=list[schemas.ProjectCognitionOut])
@@ -207,6 +248,9 @@ def _extract_module(module: str, project_id: int, db: Session) -> schemas.Cognit
     if row is None:
         row = models.ProjectCognition(project_id=project_id, module=module, version=0)
         db.add(row)
+    else:
+        # 版本层:重抽前先把旧版本快照存档,不丢工作历史(阶段6)
+        _snapshot_version(db, row, reason="re-extract")
     row.module_label = label
     row.schema_version = schemas.SCHEMA_VERSION
     row.scope_constraint = schemas.SCOPE_CONSTRAINT
@@ -235,6 +279,7 @@ def confirm_cognition(project_id: int, cog_id: int, db: Session = Depends(get_db
     row = db.get(models.ProjectCognition, cog_id)
     if row is None or row.project_id != project_id:
         raise HTTPException(404, "认知记录不存在")
+    _snapshot_version(db, row, reason="confirm")  # 版本层:确认前存档旧状态(可回退到 AI 草案)
     fields = safe_json.loads_or(row.fields_json, [])
     for f in fields:
         # 仅把 有值的 high/medium draft 字段批量确认；low(判断)/manual_only 留待人工逐条
@@ -260,6 +305,7 @@ def update_cognition(
     row = db.get(models.ProjectCognition, cog_id)
     if row is None or row.project_id != project_id:
         raise HTTPException(404, "认知记录不存在")
+    _snapshot_version(db, row, reason="update")  # 版本层:人工编辑前存档(校验失败抛错则随事务回滚,不留快照)
     # 合法 key = 该行(该 module)字段记录里已有的 key（A1-A8 通用，不再硬编码 BRIEF）
     fields = safe_json.loads_or(row.fields_json, [])
     by_key = {f["key"]: f for f in fields}
