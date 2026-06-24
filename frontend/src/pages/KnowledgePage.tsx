@@ -65,7 +65,7 @@ export default function KnowledgePage() {
   }, [docs])
 
   // 可折叠分区(库存与健康除外——它默认展开且不可折叠)
-  const [open, setOpen] = useState<Record<string, boolean>>({ src: true, docs: true, assets: false })
+  const [open, setOpen] = useState<Record<string, boolean>>({ src: true, docs: false, assets: false })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
   const loadDocs = useCallback(async () => {
@@ -452,7 +452,7 @@ export default function KnowledgePage() {
           <span className="scount">{docs.length}</span>
           <span className="shint">点条目展开详情 · SQLite 落库</span>
         </button>
-        <div className="secbody" style={{ display: 'block' }}>
+        <div className="secbody">
           {loading && <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>加载中…</div>}
           {!loading && docs.length === 0 && (
             <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>
