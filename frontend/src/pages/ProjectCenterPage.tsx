@@ -14,7 +14,6 @@ import ProjectAnalysisPanel from './ProjectAnalysisPanel'
 import ProjectFilesPanel from './ProjectFilesPanel'
 import CognitionSection from './CognitionSection'
 import StageProgressPanel from './StageProgressPanel'
-import SlangDictPanel from './SlangDictPanel'
 import MeetingPanel from './MeetingPanel'
 import TencentMeetingCard from './TencentMeetingCard'
 import WorkspacePanel from './WorkspacePanel'
@@ -63,8 +62,10 @@ export default function ProjectCenterPage() {
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const [renameErr, setRenameErr] = useState<string | null>(null)
-  // 各内容块折叠状态(默认全部折叠);点标题展开/收起
-  const [open, setOpen] = useState<Record<string, boolean>>({})
+  // 各内容块折叠状态;这 6 块默认展开,其余(未列=undefined)默认折叠。点标题切换。
+  const [open, setOpen] = useState<Record<string, boolean>>({
+    tencent: true, meeting: true, overview: true, stage: true, cognition: true, analysis: true,
+  })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
   const doRename = async () => {
@@ -192,6 +193,14 @@ export default function ProjectCenterPage() {
         </div>
       </Collapsible>
 
+      <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
+        <TencentMeetingCard projectId={curId} />
+      </Collapsible>
+
+      <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
+        <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
+      </Collapsible>
+
       <Collapsible open={!!open.overview} onToggle={() => toggle('overview')} title="项目概览" hint="文件 / 会议 / 待办 / 风险 / 资产">
         <div className="grid4">
           <div className="metric">
@@ -227,25 +236,23 @@ export default function ProjectCenterPage() {
         </div>
       </Collapsible>
 
-      <Collapsible open={!!open.stage} onToggle={() => toggle('stage')} title="阶段推进">
+      <Collapsible open={!!open.stage} onToggle={() => toggle('stage')} title="阶段拆解">
         <StageProgressPanel projectId={curId} />
       </Collapsible>
 
-      <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} title="项目结构化认知" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
+      <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} title="项目解读" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
         <CognitionSection projectId={curId} />
       </Collapsible>
 
-      <Collapsible open={!!open.slang} onToggle={() => toggle('slang')} title="甲方黑话词典">
-        <SlangDictPanel projectId={curId} />
+      <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} title="智能研判"
+        count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
+        <ProjectAnalysisPanel projectId={curId} />
       </Collapsible>
+
+      {/* 甲方黑话词典:作为 ROM-AI 内在解读能力(后端研判/解读时使用),项目中心不再单独显示。 */}
 
       <Collapsible open={!!open.files} onToggle={() => toggle('files')} title="项目文件" hint="拖拽 / 选择上传 · txt/md/pdf/docx/pptx">
         <ProjectFilesPanel projectId={curId} />
-      </Collapsible>
-
-      <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} title="AI 智能研判"
-        count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
-        <ProjectAnalysisPanel projectId={curId} />
       </Collapsible>
 
       <Collapsible open={!!open.milestones} onToggle={() => toggle('milestones')} title="里程碑 · 风险看板">
@@ -298,14 +305,6 @@ export default function ProjectCenterPage() {
             )}
           </div>
         </div>
-      </Collapsible>
-
-      <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
-        <TencentMeetingCard projectId={curId} />
-      </Collapsible>
-
-      <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议成果交付中心" hint="创建会议 / 上传材料 / 纪要回流">
-        <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
       </Collapsible>
 
       <Collapsible open={!!open.workspace} onToggle={() => toggle('workspace')} title="项目目录 · 读取与安全清理">
