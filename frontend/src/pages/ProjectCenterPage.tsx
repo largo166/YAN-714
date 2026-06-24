@@ -25,6 +25,36 @@ const STAGE_CHIP: Record<string, string> = {
   completed: '已完成',
 }
 
+/** 可折叠分区外壳(复用 .sec/data-open 折叠骨架):点标题展开/收起,默认折叠。
+ *  纯包裹,不改内部任何功能。 */
+function Collapsible({
+  open,
+  onToggle,
+  title,
+  count,
+  hint,
+  children,
+}: {
+  open: boolean
+  onToggle: () => void
+  title: string
+  count?: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="sec" data-open={open ? '1' : '0'}>
+      <button className="sechead" type="button" onClick={onToggle}>
+        <span className="chev">▸</span>
+        <span className="stitle">{title}</span>
+        {count && <span className="scount">{count}</span>}
+        {hint && <span className="shint">{hint}</span>}
+      </button>
+      <div className="secbody">{children}</div>
+    </section>
+  )
+}
+
 /** 项目中心：原 ROM-AI 五段布局。项目下拉 / KPI 接新后端真实数据。
  *  当前项目走共享上下文（useProject）→ 共创营地/数据基地随之联动。 */
 export default function ProjectCenterPage() {
@@ -33,7 +63,9 @@ export default function ProjectCenterPage() {
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const [renameErr, setRenameErr] = useState<string | null>(null)
-  const [analysisOpen, setAnalysisOpen] = useState(false) // AI 智能研判区:默认折叠
+  // 各内容块折叠状态(默认全部折叠);点标题展开/收起
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
   const doRename = async () => {
     if (curId == null || !renameVal.trim()) return
@@ -153,126 +185,132 @@ export default function ProjectCenterPage() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: 'var(--mut)' }}>阶段进度</span>
-          <span style={{ fontSize: 12, color: 'var(--terra)', fontWeight: 600 }}>
-            {progress?.next_node
-              ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}`
-              : '下一节点 · 待接入项目里程碑'}
-          </span>
-        </div>
+      <Collapsible open={!!open.progress} onToggle={() => toggle('progress')} title="阶段进度"
+        hint={progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'}>
         <div className="prog">
           <i style={{ width: `${progress?.pct ?? 0}%` }}></i>
         </div>
-      </div>
+      </Collapsible>
 
-      <div className="grid4">
-        <div className="metric">
-          <div className="l">📄 文件</div>
-          <div className="v">{overview ? overview.files : '—'}</div>
-        </div>
-        <div className="metric">
-          <div className="l">📅 会议</div>
-          <div className="v">{overview ? overview.meetings : '—'}</div>
-        </div>
-        <div className="metric">
-          <div className="l">✓ 待办</div>
-          <div className="v t">{overview ? overview.todos : '—'}</div>
-        </div>
-        <div className="metric">
-          <div className="l">🔊 会议纪要</div>
-          <div className="v t">{overview ? overview.minutes : '—'}</div>
-        </div>
-      </div>
-      <div className="grid3 mt">
-        <div className="metric">
-          <div className="l">⚠ 风险</div>
-          <div className="v r">{overview ? overview.risks : '—'}</div>
-        </div>
-        <div className="metric">
-          <div className="l">◎ 成果缺口</div>
-          <div className="v">{overview ? overview.gaps : '—'}</div>
-        </div>
-        <div className="metric">
-          <div className="l">⟳ 可复用资产</div>
-          <div className="v">{overview ? overview.assets : '—'}</div>
-        </div>
-      </div>
-
-      <StageProgressPanel projectId={curId} />
-      <CognitionSection projectId={curId} />
-      <SlangDictPanel projectId={curId} />
-
-      <ProjectFilesPanel projectId={curId} />
-
-      <section className="sec" data-open={analysisOpen ? '1' : '0'}>
-        <button className="sechead" type="button" onClick={() => setAnalysisOpen((v) => !v)}>
-          <span className="chev">▸</span>
-          <span className="stitle">AI 智能研判</span>
-          <span className="scount">前期分析 · 5 项</span>
-          <span className="shint">总览 / 难点 / 诉求 / 推进计划 / 汇报提纲</span>
-        </button>
-        <div className="secbody">
-          <ProjectAnalysisPanel projectId={curId} />
-        </div>
-      </section>
-
-      <div className="grid2 mt">
-        <div className="card">
-          <div className="ct">下一步 · 里程碑</div>
-          <div id="pj-steps">
-            {milestones.length === 0 ? (
-              <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
-                暂无里程碑。接入项目任务后在此显示（负责人 · 截止）。
-              </div>
-            ) : (
-              milestones.map((m, i) => (
-                <div className="li" key={i}>
-                  <span className="b" style={{ background: m.urgent ? 'var(--red)' : 'var(--terra)' }}></span>
-                  {m.title}
-                  <span className="who">{m.owner} · {m.due}</span>
-                </div>
-              ))
-            )}
+      <Collapsible open={!!open.overview} onToggle={() => toggle('overview')} title="项目概览" hint="文件 / 会议 / 待办 / 风险 / 资产">
+        <div className="grid4">
+          <div className="metric">
+            <div className="l">📄 文件</div>
+            <div className="v">{overview ? overview.files : '—'}</div>
+          </div>
+          <div className="metric">
+            <div className="l">📅 会议</div>
+            <div className="v">{overview ? overview.meetings : '—'}</div>
+          </div>
+          <div className="metric">
+            <div className="l">✓ 待办</div>
+            <div className="v t">{overview ? overview.todos : '—'}</div>
+          </div>
+          <div className="metric">
+            <div className="l">🔊 会议纪要</div>
+            <div className="v t">{overview ? overview.minutes : '—'}</div>
           </div>
         </div>
-        <div className="card">
-          <div className="ct">风险看板 · 可复用资产</div>
-          <div id="pj-riskboard">
-            {risks.length === 0 ? (
-              <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
-                暂无风险项。接入 AI 研判风险后在此显示。
-              </div>
-            ) : (
-              risks.map((r, i) => (
-                <div className="li" key={i}>
-                  <span className={'pill ' + (r.level === 'high' ? 'h' : 'm')}>
-                    {r.level === 'high' ? '高' : '中'}
-                  </span>
-                  {r.text}
-                </div>
-              ))
-            )}
+        <div className="grid3 mt">
+          <div className="metric">
+            <div className="l">⚠ 风险</div>
+            <div className="v r">{overview ? overview.risks : '—'}</div>
           </div>
-          {reuseTags.length > 0 && (
-            <div className="tags" style={{ marginTop: 10 }}>
-              {reuseTags.map((t, i) => (
-                <span className="tg" key={i}>
-                  <span className="k">{t.kind}</span>
-                  {t.name}
-                </span>
-              ))}
+          <div className="metric">
+            <div className="l">◎ 成果缺口</div>
+            <div className="v">{overview ? overview.gaps : '—'}</div>
+          </div>
+          <div className="metric">
+            <div className="l">⟳ 可复用资产</div>
+            <div className="v">{overview ? overview.assets : '—'}</div>
+          </div>
+        </div>
+      </Collapsible>
+
+      <Collapsible open={!!open.stage} onToggle={() => toggle('stage')} title="阶段推进">
+        <StageProgressPanel projectId={curId} />
+      </Collapsible>
+
+      <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} title="项目结构化认知" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
+        <CognitionSection projectId={curId} />
+      </Collapsible>
+
+      <Collapsible open={!!open.slang} onToggle={() => toggle('slang')} title="甲方黑话词典">
+        <SlangDictPanel projectId={curId} />
+      </Collapsible>
+
+      <Collapsible open={!!open.files} onToggle={() => toggle('files')} title="项目文件" hint="拖拽 / 选择上传 · txt/md/pdf/docx/pptx">
+        <ProjectFilesPanel projectId={curId} />
+      </Collapsible>
+
+      <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} title="AI 智能研判"
+        count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
+        <ProjectAnalysisPanel projectId={curId} />
+      </Collapsible>
+
+      <Collapsible open={!!open.milestones} onToggle={() => toggle('milestones')} title="里程碑 · 风险看板">
+        <div className="grid2">
+          <div className="card">
+            <div className="ct">下一步 · 里程碑</div>
+            <div id="pj-steps">
+              {milestones.length === 0 ? (
+                <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
+                  暂无里程碑。接入项目任务后在此显示（负责人 · 截止）。
+                </div>
+              ) : (
+                milestones.map((m, i) => (
+                  <div className="li" key={i}>
+                    <span className="b" style={{ background: m.urgent ? 'var(--red)' : 'var(--terra)' }}></span>
+                    {m.title}
+                    <span className="who">{m.owner} · {m.due}</span>
+                  </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
+          <div className="card">
+            <div className="ct">风险看板 · 可复用资产</div>
+            <div id="pj-riskboard">
+              {risks.length === 0 ? (
+                <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
+                  暂无风险项。接入 AI 研判风险后在此显示。
+                </div>
+              ) : (
+                risks.map((r, i) => (
+                  <div className="li" key={i}>
+                    <span className={'pill ' + (r.level === 'high' ? 'h' : 'm')}>
+                      {r.level === 'high' ? '高' : '中'}
+                    </span>
+                    {r.text}
+                  </div>
+                ))
+              )}
+            </div>
+            {reuseTags.length > 0 && (
+              <div className="tags" style={{ marginTop: 10 }}>
+                {reuseTags.map((t, i) => (
+                  <span className="tg" key={i}>
+                    <span className="k">{t.kind}</span>
+                    {t.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </Collapsible>
 
-      <TencentMeetingCard projectId={curId} />
+      <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
+        <TencentMeetingCard projectId={curId} />
+      </Collapsible>
 
-      <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
+      <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议成果交付中心" hint="创建会议 / 上传材料 / 纪要回流">
+        <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
+      </Collapsible>
 
-      <WorkspacePanel />
+      <Collapsible open={!!open.workspace} onToggle={() => toggle('workspace')} title="项目目录 · 读取与安全清理">
+        <WorkspacePanel />
+      </Collapsible>
     </>
   )
 }
