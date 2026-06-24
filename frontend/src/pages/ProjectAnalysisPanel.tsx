@@ -20,6 +20,26 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
   const [current, setCurrent] = useState<ProjectAnalysis | null>(null)
   const [history, setHistory] = useState<ProjectAnalysis[]>([])
   const [err, setErr] = useState<string | null>(null)
+  const [reflowNote, setReflowNote] = useState<string | null>(null)
+  const [reflowing, setReflowing] = useState(false)
+
+  const reflow = async () => {
+    if (!current || current.status !== 'ok' || reflowing) return
+    setReflowing(true)
+    setReflowNote(null)
+    try {
+      const r = await api.reflowAnalysis(current.id)
+      if (r.status === 'ok') setReflowNote(`已回流到数据基地：${r.title}（可被其它项目检索复用）`)
+      else if (r.status === 'already') setReflowNote('该研判已回流，未重复写入。')
+      else if (r.status === 'not_confirmed') setReflowNote(r.message || '该研判无有效结论，不能回流（不伪造）。')
+      else if (r.status === 'empty') setReflowNote(r.message || '无可回流内容。')
+      else setReflowNote(r.message || '无法回流')
+    } catch (e) {
+      setReflowNote((e as Error).message)
+    } finally {
+      setReflowing(false)
+    }
+  }
 
   const reloadHistory = useCallback(() => {
     if (projectId == null) return
@@ -87,17 +107,26 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
               </span>
             </b>
             {current.status === 'ok' && (
-              <a
-                className="anbtn"
-                href={api.analysisExportUrl(projectId as number, current.id)}
-                target="_blank"
-                rel="noreferrer"
-                style={{ textDecoration: 'none' }}
-              >
-                导出 MD
-              </a>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="anbtn" disabled={reflowing} onClick={reflow} title="把这次研判结论回写数据基地,供其它项目检索复用">
+                  {reflowing ? '回流中…' : '回流入库'}
+                </button>
+                <a
+                  className="anbtn"
+                  href={api.analysisExportUrl(projectId as number, current.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ textDecoration: 'none' }}
+                >
+                  导出 MD
+                </a>
+              </div>
             )}
           </div>
+
+          {reflowNote && (
+            <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>{reflowNote}</div>
+          )}
 
           <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, color: 'var(--ink)' }}>
             {current.content}
@@ -134,7 +163,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
                 key={h.id}
                 className="anbtn"
                 style={{ textAlign: 'left' }}
-                onClick={() => setCurrent(h)}
+                onClick={() => { setCurrent(h); setReflowNote(null) }}
               >
                 {taskLabel(h.task)} · {new Date(h.created_at).toLocaleString()} ·{' '}
                 {STATUS_HINT[h.status]?.text ?? h.status}

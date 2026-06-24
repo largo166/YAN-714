@@ -28,12 +28,16 @@ def _text_chunks(content: str) -> list[str]:
     return [part.strip() for part in re.split(r"\n\s*\n|\n", content or "") if part.strip()]
 
 
+# 派生知识条目（跨项目沉淀/回流成果）的 file_type——它们各有专属视图(/cross-project、回流面板),
+# 不混入数据基地"常规库"列表/统计("常规库"=用户直接上传/创建的原始资料)。
+_DERIVED_FILE_TYPES = ("cross_project", "reflow_analysis", "reflow_minute")
+
+
 @router.get("/documents", response_model=schemas.KnowledgeDocListOut)
 def list_documents(db: Session = Depends(get_db)):
-    # 排除跨项目库条目(file_type=cross_project)——它们由 /api/cross-project 独立管理,不混入常规库列表
     items = (
         db.query(models.KnowledgeDocument)
-        .filter(models.KnowledgeDocument.file_type != "cross_project")
+        .filter(models.KnowledgeDocument.file_type.notin_(_DERIVED_FILE_TYPES))
         .order_by(models.KnowledgeDocument.updated_at.desc())
         .all()
     )
@@ -42,10 +46,10 @@ def list_documents(db: Session = Depends(get_db)):
 
 @router.get("/stats", response_model=schemas.KnowledgeStatsOut)
 def knowledge_stats(db: Session = Depends(get_db)) -> schemas.KnowledgeStatsOut:
-    # 同 list_documents：常规库统计不含跨项目库沉淀条目
+    # 同 list_documents：常规库统计不含派生条目(跨项目沉淀/回流成果)
     docs = (
         db.query(models.KnowledgeDocument)
-        .filter(models.KnowledgeDocument.file_type != "cross_project")
+        .filter(models.KnowledgeDocument.file_type.notin_(_DERIVED_FILE_TYPES))
         .all()
     )
     engine = "fts5" if retrieval.fts5_available(db) else "like"
@@ -175,6 +179,13 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
     doc = db.get(models.KnowledgeDocument, document_id)
     if doc is None:
         raise HTTPException(404, "文档不存在")
+    # 清掉回流反向引用,避免 reflowed_doc_id 指向已删文档导致幂等失效(对抗复核坐实点)
+    db.query(models.ProjectAnalysis).filter(
+        models.ProjectAnalysis.reflowed_doc_id == document_id
+    ).update({"reflowed_doc_id": 0})
+    db.query(models.MeetingMinute).filter(
+        models.MeetingMinute.reflowed_doc_id == document_id
+    ).update({"reflowed_doc_id": 0})
     db.delete(doc)
     db.commit()
     retrieval.remove_one(db, document_id)

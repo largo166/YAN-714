@@ -186,6 +186,8 @@ class ProjectAnalysis(Base):
     sources_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # 结构化出处
     model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # 回流契约(阶段5)：研判成果经人工触发回写数据基地后,指向 knowledge_documents.id(0=未回流)。幂等用。
+    reflowed_doc_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
 
@@ -269,6 +271,9 @@ class MeetingMinute(Base):
     # draft（AI 草案）/ confirmed（人工审定）
     review_status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     reflowed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # 回流契约(阶段5)：纪要对外版回写数据基地后,指向 knowledge_documents.id(0=未回流)。
+    # 用确定的 id 链做幂等,避免同名会议标题碰撞导致静默丢失(对抗复核坐实点)。
+    reflowed_doc_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)

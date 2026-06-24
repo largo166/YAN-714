@@ -13,6 +13,7 @@ import {
   CrossProjectItemOutSchema,
   PrecipitateOutSchema,
   StageProgressOutSchema,
+  ReflowResultOutSchema,
   KnowledgeSearchOutSchema,
   MeetingDetailSchema,
   MeetingListSchema,
@@ -169,6 +170,17 @@ export const api = {
   },
   async getStageProgress(id: number): Promise<import('@/types/schemas').StageProgressOut> {
     return StageProgressOutSchema.parse(await request(`/api/projects/${id}/stage-progress`))
+  },
+  // ── 回流契约（阶段5）──
+  async reflowAnalysis(analysisId: number): Promise<import('@/types/schemas').ReflowResultOut> {
+    return ReflowResultOutSchema.parse(
+      await request(`/api/reflow/analysis/${analysisId}`, { method: 'POST' }),
+    )
+  },
+  async reflowMinuteToKb(minuteId: number): Promise<import('@/types/schemas').ReflowResultOut> {
+    return ReflowResultOutSchema.parse(
+      await request(`/api/reflow/minute/${minuteId}`, { method: 'POST' }),
+    )
   },
   async getProjectProgress(id: number): Promise<ProjectProgress> {
     return ProjectProgressSchema.parse(await request(`/api/projects/${id}/progress`))

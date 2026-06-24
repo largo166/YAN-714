@@ -419,6 +419,18 @@ export const StageProgressOutSchema = z.object({
 })
 export type StageProgressOut = z.infer<typeof StageProgressOutSchema>
 
+// ── 回流契约（成果回写数据基地，阶段5）──
+export const REFLOW_STATUS_VALUES = ['ok', 'already', 'not_confirmed', 'empty'] as const
+export const ReflowResultOutSchema = z.object({
+  status: z.enum(REFLOW_STATUS_VALUES).catch('ok'), // 未知值兜底,不让 parse 崩
+  document_id: z.number().default(0),
+  title: z.string().default(''),
+  resource: z.string().default(''),
+  message: z.string().default(''),
+})
+export type ReflowResultOut = z.infer<typeof ReflowResultOutSchema>
+
+
 
 
 export const KnowledgeDocListSchema = z.object({

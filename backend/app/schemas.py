@@ -894,6 +894,16 @@ class StageProgressOut(BaseModel):
     suggestions: List[StageSuggestionOut] = []
 
 
+# ── 回流契约（成果回写数据基地，阶段5）──
+class ReflowResultOut(BaseModel):
+    """把人工确认的成果(研判/纪要)回写数据基地的结果。"""
+    status: str                      # ok|already|not_confirmed|empty（成果不存在走 HTTP 404）
+    document_id: int = 0             # 回流生成/已存在的 knowledge_documents.id
+    title: str = ""
+    resource: str = ""               # 出处（源项目/源成果）
+    message: str = ""
+
+
 # ── 会议纪要 ──
 class TranscriptSegment(BaseModel):
     text: str
