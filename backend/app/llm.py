@@ -25,6 +25,7 @@ def chat_completion(
     base_url: str,
     model: str,
     timeout: float = 60.0,
+    response_format: Optional[dict] = None,
 ) -> str:
     if not api_key:
         raise NotConfigured("AI 引擎未配置，请先在设置中配置 API Key")
@@ -32,6 +33,8 @@ def chat_completion(
     url = base_url.rstrip("/") + "/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "stream": False}
+    if response_format is not None:
+        payload["response_format"] = response_format  # DeepSeek 支持 {"type":"json_object"} 强制 JSON
     try:
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, headers=headers, json=payload)

@@ -9,7 +9,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas
+from .. import analysis, llm, models, schemas, skill_structured, safe_json
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -88,6 +88,59 @@ def run_skill(
             skill_id=skill_id, status="not_configured", title=title,
             content=NOT_CONFIGURED_MSG, sources=[],
         )
+
+    # ── 结构化技能：PPT 大纲 / 会议纪要（json mode + normalizer 兜底 + markdown）──
+    if skill_id == "ppt":
+        if material.empty:
+            return schemas.SkillRunOut(skill_id=skill_id, status="no_material", title=title, content=NO_MATERIAL_MSG)
+        n = skill_structured.slide_count_from_input(payload.input)
+        sysp, userp, fmt = skill_structured.build_ppt_prompt(project.name, material.context or "", payload.input, n)
+        try:
+            answer = llm.chat_completion(
+                [{"role": "system", "content": sysp}, {"role": "user", "content": userp}],
+                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+                response_format=fmt, timeout=120.0,
+            )
+        except llm.LLMError as e:
+            return schemas.SkillRunOut(skill_id=skill_id, status="error", title=title,
+                                       content="AI 调用失败，请稍后重试或检查设置。", model=cfg.deepseek_model, error_message=str(e))
+        result = skill_structured.normalize_ppt(skill_structured.parse_json_loose(answer), n)
+        return schemas.SkillRunOut(
+            skill_id=skill_id, status="ok", title="PPT 大纲",
+            content=skill_structured.ppt_to_markdown(result),
+            output_json=safe_json.dumps_safe(result), sources=sources, model=cfg.deepseek_model,
+        )
+
+    if skill_id == "meeting":
+        # 取材优先用项目最新会议的转写原文（比纯检索更贴会议纪要）
+        latest = (
+            db.query(models.Meeting)
+            .filter(models.Meeting.project_id == project_id)
+            .order_by(models.Meeting.created_at.desc())
+            .first()
+        )
+        transcript = (latest.raw_text if latest else "") or material.context or ""
+        if not transcript.strip():
+            return schemas.SkillRunOut(skill_id=skill_id, status="no_material", title=title,
+                                       content="本项目暂无会议转写,也无可用材料。请先创建会议/上传转写后再生成纪要。")
+        sysp, userp, fmt = skill_structured.build_meeting_prompt(project.name, transcript, payload.input)
+        try:
+            answer = llm.chat_completion(
+                [{"role": "system", "content": sysp}, {"role": "user", "content": userp}],
+                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+                response_format=fmt, timeout=120.0,
+            )
+        except llm.LLMError as e:
+            return schemas.SkillRunOut(skill_id=skill_id, status="error", title=title,
+                                       content="AI 调用失败，请稍后重试或检查设置。", model=cfg.deepseek_model, error_message=str(e))
+        result = skill_structured.normalize_meeting(skill_structured.parse_json_loose(answer))
+        return schemas.SkillRunOut(
+            skill_id=skill_id, status="ok", title="会议纪要",
+            content=skill_structured.meeting_to_markdown(result),
+            output_json=safe_json.dumps_safe(result),
+            sources=sources if latest is None else [], model=cfg.deepseek_model,
+        )
+
     # 需检索的技能：无材料则不伪造；不需检索的(生图提示词)允许无材料直接生成
     if needs_rag and material.empty:
         return schemas.SkillRunOut(

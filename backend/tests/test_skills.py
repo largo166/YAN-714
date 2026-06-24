@@ -60,3 +60,64 @@ def test_project_scoped_search_empty_when_no_indexed_docs(client):
     r = client.post("/api/knowledge/search", json={"query": "立面", "top_k": 5, "project_id": pid})
     assert r.status_code == 200
     assert r.json()["hits"] == []
+
+
+def _set_key(value="sk-test"):
+    from app.database import SessionLocal
+    from app import models
+    db = SessionLocal()
+    try:
+        row = db.get(models.AppSetting, 1) or models.AppSetting(id=1)
+        db.add(row)
+        row.deepseek_api_key = value
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_ppt_structured_forces_n_slides(client, monkeypatch):
+    """PPT 技能：DeepSeek 返回少于目标页数 → normalizer 补足到 N 页;输出 markdown 分页 + output_json。"""
+    import json as _json
+    from app import llm
+    # 模型只返回 2 页,但用户要 5 页 → 必须补足到 5
+    fake = {"title": "测试汇报", "slides": [
+        {"title": "封面", "keyMessage": "项目定位", "bullets": ["a", "b", "c"]},
+        {"title": "现状", "keyMessage": "场地分析", "bullets": ["d", "e"]},
+    ]}
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: _json.dumps(fake, ensure_ascii=False))
+    pid = _new_project(client, name="PPT结构化测试")
+    _set_key()
+    # 上传材料让 gather_material 非空
+    client.post(f"/api/projects/{pid}/files", files={"file": ("任务书.md", "# 任务书\n退台立面与展示区品质".encode("utf-8"), "text/markdown")})
+    r = client.post(f"/api/projects/{pid}/skills/ppt/run", json={"input": "做 5 页"})
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["output_json"]
+    result = _json.loads(body["output_json"])
+    assert len(result["slides"]) == 5  # 强制补足到 5 页
+    assert "第 5 页" in body["content"]  # markdown 分页到第 5 页
+    assert "需人工补充" in body["content"]  # 补足页明确标占位,不伪造
+
+
+def test_meeting_structured_uses_transcript(client, monkeypatch):
+    """会议纪要技能:优先用项目最新会议转写;输出五段式 JSON。"""
+    import json as _json
+    from app import llm
+    fake = {"title": "评审会纪要", "overview": "出3版比选。",
+            "coreMatters": [{"title": "立面", "details": ["朱红金属板点缀"]}],
+            "clientNeedsTranslated": [{"original": "要大气", "translated": "强化体量与退台层次", "implication": "影响立面方案"}],
+            "decisions": [{"decision": "出3版比选", "owner": "严硕"}],
+            "actionItems": [{"task": "下周出比选", "owner": "团队", "deadline": "下周五"}],
+            "chapters": []}
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: _json.dumps(fake, ensure_ascii=False))
+    pid = _new_project(client, name="会议纪要测试")
+    _set_key()
+    # 建一个含转写的会议
+    client.post(f"/api/projects/{pid}/meetings", json={"title": "方案评审会", "raw_text": "甲方:要大气。结论:出3版比选。"})
+    r = client.post(f"/api/projects/{pid}/skills/meeting/run", json={"input": ""})
+    body = r.json()
+    assert body["status"] == "ok"
+    result = _json.loads(body["output_json"])
+    assert result["overview"] and result["clientNeedsTranslated"]  # 五段式有诉求转译
+    assert "甲方诉求转译" in body["content"]
+

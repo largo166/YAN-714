@@ -281,13 +281,17 @@ class SkillListOut(BaseModel):
 
 class SkillRunIn(BaseModel):
     input: str = ""  # 可选用户补充指令
+    model: str = ""  # 生图技能选模型(gpt-image-1-official | gemini-3-pro-image-preview);其它技能忽略
 
 
 class SkillRunOut(BaseModel):
     skill_id: str
     status: str  # ok|not_configured|no_material|error
     title: str = ""
-    content: str = ""
+    content: str = ""           # markdown(向后兼容现有成果卡纯文本渲染)
+    output_json: str = ""       # 结构化结果 JSON 字符串(PPT/会议纪要;供前端「复制 JSON」)
+    image_url: str = ""         # 生图:本地 stored 路径(已下载存 uploads,不过期)
+    image_model: str = ""       # 生图实际使用的模型
     sources: List[SkillSourceOut] = []
     model: str = ""
     error_message: str = ""
