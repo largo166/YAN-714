@@ -3,14 +3,17 @@
 核心原则（用户指令 2026-06，替换旧的「>20MB 即降级」逻辑）：
 - 文件大小【不】决定读不读正文。所有支持格式都尝试提取「内容层」（文字层/文本框/正文/表格）。
 - 决策维度只剩两个：「文件类型」决定怎么读、「有没有内容层」决定读不读得到。大小完全消失。
-- 只取内容层、跳过媒体：PDF 只抽文字层（pypdf，不渲染图像、不 OCR）；PPTX 抽文本框+演讲者备注
-  （跳过嵌入图片/视频）；Word/MD/txt 读正文；xlsx 抽表格；图片登记元数据。
-  → 实测 394MB PDF 文字层 1.7s、588MB PPTX 0.5s 即读到正文，跟总大小无关（重的是图，不是字）。
+- 只取内容层、跳过媒体：PDF 只抽文字层（PyMuPDF/fitz，不渲染图像、不 OCR）；PPTX 抽文本框+演讲者
+  备注（跳过嵌入图片/视频）；Word/MD/txt 读正文；xlsx 抽表格；图片登记元数据。
+  → 实测 fitz：394MB PDF 文字层 0.14s 读完全文、195MB 0.19s，跟总大小无关（重的是图，不是字）。
+    fitz 比 pypdf 快约 10-14×，是 ROM-AI 实际该用的提取器。
 - 性能保护用【超时】而非【大小预判】：内容层提取本身就快；个别异常慢的文件命中提取超时
   → extraction_timeout，标记待人工，而不是按大小预先放弃。
 
 分级返回 parse_status，绝不伪造内容（纲要规则 3/4）：
-- ok                抽到非空正文（任意大小）。
+- ok                完整读完非空正文（任意大小）。
+- ok_truncated      读到正文但中途截断（触顶 MAX_TEXT_CHARS 字符上限）；如实标 truncated_at_page/total_pages，
+                    不把截断值当全文报。仍是可用正文、可入库。
 - metadata_only     文件有效、但【真的提不出内容】：扫描件无文字层(需OCR) / 加密 / 结构损坏。
                     如实登记元数据 + 原因(reason)，不伪造正文；仍可靠 文件名/类型 入库检索。
 - extraction_timeout 内容层提取超过 PARSE_TIMEOUT_SECONDS（异常慢的个例），标记待人工，不按大小放弃。
@@ -18,7 +21,7 @@
 - unsupported       非支持格式。
 - failed            提取过程未预期异常（捕获分级，不阻断批量里的其它文件）。
 
-支持格式：.txt .md（内建）/ .pdf（pypdf 文字层）/ .docx（python-docx）/ .pptx（python-pptx 文本框+备注）/
+支持格式：.txt .md（内建）/ .pdf（PyMuPDF/fitz 文字层）/ .docx（python-docx）/ .pptx（python-pptx 文本框+备注）/
 .xlsx（轻量 XML 抽取）/ 图片资产元数据（png/jpg/jpeg，不做 OCR）。
 """
 from __future__ import annotations
@@ -44,10 +47,13 @@ PARSE_TIMEOUT_SECONDS = 30
 
 @dataclass
 class ParseResult:
-    status: str  # ok / metadata_only / extraction_timeout / empty / unsupported / failed
+    status: str  # ok / ok_truncated / metadata_only / extraction_timeout / empty / unsupported / failed
     text: str = ""
     error: str = ""
     reason: str = ""  # metadata_only 的细分：needs_ocr / encrypted / unreadable；超时为 timeout
+    # 截断信息（仅 ok_truncated 有意义；如实告知停在哪、共多少页，不把截断值当全文）
+    truncated_at_page: int = 0
+    total_pages: int = 0
 
 
 def is_supported(filename: str) -> bool:
@@ -147,14 +153,16 @@ def _read_text(p: Path) -> str:
 
 
 def _read_pdf(p: Path) -> ParseResult:
-    """只抽 PDF 文字层（不渲染图像、不 OCR）——故跟文件总大小无关，秒级。
-    分档：结构损坏→metadata_only(unreadable)；加密→metadata_only(encrypted)；
-    有效但无文字层(扫描件)→metadata_only(needs_ocr)；有文字层→ok。
-    增量累积到 MAX_TEXT_CHARS 即停，超大 PDF 不白读后续页。"""
-    from pypdf import PdfReader
+    """用 PyMuPDF/fitz 只抽 PDF 文字层（不渲染图像、不 OCR）——故跟文件总大小无关，秒级。
+    实测 fitz 比 pypdf 快约 10-14×（394MB 0.14s / 195MB 0.19s 读完全文）。
+    分档（绝不伪造、如实区分）：
+      结构损坏→metadata_only(unreadable)；加密无法解→metadata_only(encrypted)；
+      有效但无文字层(扫描件)→metadata_only(needs_ocr)；
+      读完全文→ok；触顶 MAX_TEXT_CHARS 中途截断→ok_truncated(标停在第N页/共M页，不把截断值当全文)。"""
+    import fitz  # PyMuPDF
 
     try:
-        reader = PdfReader(str(p))
+        doc = fitz.open(str(p))
     except Exception as e:  # noqa: BLE001  结构损坏/非法 PDF
         return ParseResult(
             status="metadata_only", reason="unreadable",
@@ -162,41 +170,48 @@ def _read_pdf(p: Path) -> ParseResult:
                                 f"PDF 结构无法解析（{type(e).__name__}），已登记元数据、未提取正文（不伪造）。"),
         )
 
-    if reader.is_encrypted:
-        try:
-            unlocked = reader.decrypt("")  # 试空密码
-        except Exception:  # noqa: BLE001
-            unlocked = 0
-        if not unlocked:
+    try:
+        if doc.is_encrypted and not doc.authenticate(""):  # 试空密码
             return ParseResult(
                 status="metadata_only", reason="encrypted",
                 text=_register_note(p, ".pdf", "加密",
                                     "PDF 已加密、无法提取正文，已登记元数据（不伪造）。"),
             )
 
-    parts: list[str] = []
-    chars = 0
-    for page in reader.pages:
-        try:
-            t = page.extract_text() or ""
-        except Exception:  # noqa: BLE001  单页异常跳过，不放弃整篇
-            t = ""
-        if t:
-            parts.append(t)
-            chars += len(t)
-            if chars >= MAX_TEXT_CHARS:
-                break
+        total_pages = doc.page_count
+        parts: list[str] = []
+        last_page_read = 0  # 已读到的最后页号（1-based）
+        for i in range(total_pages):
+            try:
+                t = doc.load_page(i).get_text("text") or ""
+            except Exception:  # noqa: BLE001  单页异常跳过，不放弃整篇
+                t = ""
+            last_page_read = i + 1
+            if t:
+                parts.append(t)
+                # 用归一化后的累计长度判截断（与最终返回文本同口径，不靠 raw len 估）
+                if len(unicodedata.normalize("NFKC", "\n".join(parts))) >= MAX_TEXT_CHARS:
+                    break
+    finally:
+        doc.close()
 
-    text = unicodedata.normalize("NFKC", "\n".join(parts)).strip()
+    full = unicodedata.normalize("NFKC", "\n".join(parts))
+    text = full[:MAX_TEXT_CHARS].strip()
+    # 截断判定基于归一化后真实长度（含 join 的换行、NFKC 展开），不把截断值当全文报
+    truncated_at = last_page_read if len(full) > MAX_TEXT_CHARS else 0
     if not text:
         # 有效 PDF 但无文字层 → 扫描件/图片型，需 OCR（如实标记，不伪造正文）
         return ParseResult(
-            status="metadata_only", reason="needs_ocr",
+            status="metadata_only", reason="needs_ocr", total_pages=total_pages,
             text=_register_note(p, ".pdf", "需OCR",
-                                "未检测到文字层（可能为扫描件/图片型 PDF），需 OCR 才能提取正文；"
-                                "已登记元数据，不伪造正文。"),
+                                f"未检测到文字层（可能为扫描件/图片型 PDF，共 {total_pages} 页），"
+                                "需 OCR 才能提取正文；已登记元数据，不伪造正文。"),
         )
-    return ParseResult(status="ok", text=text[:MAX_TEXT_CHARS])
+    if truncated_at:
+        # 如实告知截断：停在第 N 页 / 共 M 页，不把截断值当全文
+        return ParseResult(status="ok_truncated", text=text,
+                           truncated_at_page=truncated_at, total_pages=total_pages)
+    return ParseResult(status="ok", text=text, total_pages=total_pages)
 
 
 def _read_docx(p: Path) -> str:

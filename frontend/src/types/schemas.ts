@@ -386,7 +386,7 @@ export const ProjectFileSchema = z.object({
   stored_path: z.string(),
   file_type: z.string(),
   size: z.number(),
-  parse_status: z.string(), // pending|ok|metadata_only|extraction_timeout|empty|unsupported|failed
+  parse_status: z.string(), // pending|ok|ok_truncated|metadata_only|extraction_timeout|empty|unsupported|failed
   parse_error: z.string(),
   indexed_doc_id: z.number(),
   status: z.string(), // active|trashed

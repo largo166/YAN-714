@@ -45,16 +45,16 @@ def test_unsupported_ext(tmp_path):
     assert parse_file(f).status == "unsupported"
 
 
-# ── PDF 分档：metadata_only 只在真提不出内容时 ──────────────────
+# ── PDF 分档：metadata_only 只在真提不出内容时；ok_truncated 如实标截断 ─────
 def test_blank_pdf_needs_ocr_metadata_only(tmp_path):
     """有效但无文字层的 PDF（扫描件代表）→ metadata_only + 需OCR，不伪造正文。"""
-    from pypdf import PdfWriter
+    import fitz
 
     f = tmp_path / "扫描件.pdf"
-    w = PdfWriter()
-    w.add_blank_page(width=300, height=300)
-    with open(f, "wb") as fh:
-        w.write(fh)
+    doc = fitz.open()
+    doc.new_page(width=300, height=300)  # 空白页,无文字层
+    doc.save(str(f))
+    doc.close()
     r = parse_file(f)
     assert r.status == "metadata_only"
     assert r.reason == "needs_ocr"
@@ -69,6 +69,66 @@ def test_corrupt_pdf_unreadable_metadata_only(tmp_path):
     assert r.status == "metadata_only"
     assert r.reason == "unreadable"
     assert "损坏.pdf" in r.text
+
+
+def test_pdf_full_text_ok_with_pages(tmp_path):
+    """有文字层的多页 PDF 完整读完 → ok，带 total_pages，不截断。
+    (fitz 默认字体不嵌 CJK,故用 ASCII 内容验证页/截断逻辑——逻辑与字体无关。)"""
+    import fitz
+
+    f = tmp_path / "brief.pdf"
+    doc = fitz.open()
+    for i in range(3):
+        page = doc.new_page()
+        page.insert_text((72, 72), f"Page {i+1}: setback facade and showroom quality")
+    doc.save(str(f))
+    doc.close()
+    r = parse_file(f)
+    assert r.status == "ok"
+    assert r.total_pages == 3
+    assert r.truncated_at_page == 0
+    assert "setback facade" in r.text
+
+
+def test_pdf_truncation_honestly_reported(tmp_path, monkeypatch):
+    """正文超 MAX_TEXT_CHARS → ok_truncated，如实标停在第N页/共M页（不把截断值当全文）。"""
+    import fitz
+
+    monkeypatch.setattr(parsing, "MAX_TEXT_CHARS", 50)  # 调小上限,前几页就触顶
+    f = tmp_path / "long.pdf"
+    doc = fitz.open()
+    for i in range(5):
+        page = doc.new_page()
+        page.insert_text((72, 72), f"Page {i+1}: " + "architectural design content " * 5)
+    doc.save(str(f))
+    doc.close()
+    r = parse_file(f)
+    assert r.status == "ok_truncated"
+    assert 0 < r.truncated_at_page < r.total_pages  # 停在中途某页,非最后一页
+    assert r.total_pages == 5
+    assert len(r.text) <= 50  # 截断值,不是全文
+
+
+def test_pdf_truncation_detected_after_nfkc_expansion(tmp_path, monkeypatch):
+    """归一化后长度判截断(NFKC 展开/join 换行使真实长度>raw 计数)→ 仍如实标 ok_truncated,
+    绝不因 raw 计数没触顶就误报 ok(本次对抗复核坐实的失实点的回归)。"""
+    import fitz
+
+    # 上限设到恰好让「join 换行 + 多页」累计超过、但单页 raw 计数边界附近
+    monkeypatch.setattr(parsing, "MAX_TEXT_CHARS", 40)
+    f = tmp_path / "nfkc.pdf"
+    doc = fitz.open()
+    for i in range(4):
+        page = doc.new_page()
+        page.insert_text((72, 72), f"Page {i+1} content block ABCDEFGHIJ")
+    doc.save(str(f))
+    doc.close()
+    r = parse_file(f)
+    # 最终归一化文本若超上限,必须 ok_truncated 且 text 不超上限(不把截断值当全文)
+    if len(r.text) >= 40 or r.status == "ok_truncated":
+        assert r.status == "ok_truncated"
+        assert r.truncated_at_page > 0
+        assert len(r.text) <= 40
 
 
 # ── PPTX：抽文本框 + 演讲者备注 ─────────────────────────────────

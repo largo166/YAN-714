@@ -148,11 +148,16 @@ class ProjectFile(Base):
     stored_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对 uploads 根
     file_type: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 扩展名
     size: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    # 解析状态(见 parsing.py)：pending / ok / metadata_only(需OCR|加密|损坏) /
-    # extraction_timeout(提取超时待人工) / empty / unsupported / failed。注:不再按文件大小降级。
+    # 解析状态(见 parsing.py)：pending / ok / ok_truncated(截断但真实正文) /
+    # metadata_only(需OCR|加密|损坏) / extraction_timeout(提取超时待人工) /
+    # empty / unsupported / failed。注:不再按文件大小降级。
     parse_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     parse_error: Mapped[str] = mapped_column(Text, default="", nullable=False)
     content_text: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 抽取文本
+    # 截断信息（仅 ok_truncated 有意义）：正文停在第几页 / 共多少页；0/0 表示读完或不适用。
+    # 注入 RAG 时据此如实标注「(正文截断,停在第N页/共M页)」,不让 LLM 误以为是全文。
+    truncated_at_page: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_pages: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # 回流后指向 knowledge_documents.id（未入库则为 0）
     indexed_doc_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # active / trashed（软删，永不硬删）

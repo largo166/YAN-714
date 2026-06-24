@@ -103,12 +103,14 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
         )
 
     # 路1：本项目已解析文件（取前若干，作为项目现场材料）
+    # ok=完整正文；ok_truncated=截断但仍是真实正文（停在第N页），二者都可作材料；
+    # metadata_only/extraction_timeout 是登记说明、非正文，绝不注入（不伪造，纲要规则3/4）。
     files = (
         db.query(models.ProjectFile)
         .filter(
             models.ProjectFile.project_id == project_id,
             models.ProjectFile.status == "active",
-            models.ProjectFile.parse_status == "ok",
+            models.ProjectFile.parse_status.in_(["ok", "ok_truncated"]),
         )
         .order_by(models.ProjectFile.created_at.desc())
         .limit(top_k)
@@ -117,8 +119,13 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
     for f in files:
         if not f.content_text.strip():
             continue
+        # ok_truncated：正文被截断,如实在标题标注「(正文截断,停在第N页/共M页)」,
+        # 让 LLM 知道这不是全文,不据残缺正文当完整材料下判断（不伪造）。
+        title = f.filename
+        if f.parse_status == "ok_truncated" and f.total_pages:
+            title = f"{f.filename}（正文截断·读到第{f.truncated_at_page}页/共{f.total_pages}页）"
         sources.append(
-            Source(kind="project_file", ref_id=f.id, title=f.filename,
+            Source(kind="project_file", ref_id=f.id, title=title,
                    snippet=_file_snippet(f.content_text), engine="file")
         )
 

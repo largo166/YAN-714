@@ -98,7 +98,7 @@ async def create_meeting_from_material(
         pr = parsing.parse_file(tmp.name)
     finally:
         os.unlink(tmp.name)
-    if pr.status != "ok" or not pr.text.strip():
+    if pr.status not in ("ok", "ok_truncated") or not pr.text.strip():
         raise HTTPException(400, f"材料无可用文本（{pr.status}），无法创建会议（不伪造）")
 
     segs = transcription.text_to_segments(pr.text)

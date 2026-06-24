@@ -6,6 +6,7 @@ import type { ProjectFile } from '@/types/schemas'
 const ACCEPT = '.txt,.md,.pdf,.docx,.pptx'
 const PARSE_LABEL: Record<string, { text: string; cls: string }> = {
   ok: { text: '已解析', cls: 'live' },
+  ok_truncated: { text: '已解析·截断', cls: 'live' }, // 读到正文但触顶上限,停在第N页(仍是真材料)
   metadata_only: { text: '未提取到正文·见说明', cls: 'demo' }, // 扫描件/加密/损坏:真提不出内容(与大小无关)
   extraction_timeout: { text: '提取超时·待人工', cls: 'demo' },
   pending: { text: '待解析', cls: 'demo' },
@@ -194,14 +195,19 @@ export default function ProjectFilesPanel({
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button
                     className="anbtn"
-                    disabled={(f.parse_status !== 'ok' && f.parse_status !== 'metadata_only') || f.indexed_doc_id > 0}
+                    disabled={
+                      !['ok', 'ok_truncated', 'metadata_only'].includes(f.parse_status) ||
+                      f.indexed_doc_id > 0
+                    }
                     onClick={() => onIndex(f.id)}
                     title={
                       f.parse_status === 'metadata_only'
                         ? '未提取到正文（扫描件/加密/损坏），已登记，可入库靠文件名/类型检索'
-                        : f.parse_status !== 'ok'
-                          ? '仅可解析文件可入库'
-                          : '索引到知识库'
+                        : f.parse_status === 'ok_truncated'
+                          ? '正文超上限已截断（仍是真材料），可入库'
+                          : f.parse_status !== 'ok'
+                            ? '仅可解析文件可入库'
+                            : '索引到知识库'
                     }
                   >
                     入库

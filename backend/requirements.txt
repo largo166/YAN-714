@@ -7,7 +7,8 @@ python-dotenv==1.0.1
 httpx==0.28.1
 alembic==1.13.3
 python-multipart==0.0.20
-pypdf==5.1.0
+pypdf==5.1.0          # 已由 PyMuPDF(fitz) 替代(更快/CJK 更稳);保留待明确移除,勿自删(打包红线)
+PyMuPDF==1.26.5       # PDF 文字层提取器(实际使用)
 python-docx==1.1.2
 python-pptx==1.0.2
 pytest==8.3.4
