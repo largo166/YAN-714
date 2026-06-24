@@ -96,6 +96,95 @@ def test_confirmed_cognition_injected_into_gather_material():
         db.close()
 
 
+def test_cognition_system_prompt_for_chat_path():
+    """上下文供给协议(阶段1)：confirmed 认知能经 cognition_system_prompt 注入对话路径；
+    draft 不注入；无确认认知→空(不造空壳)。修「共创营地对话拿不到认知」的脊椎断点。"""
+    from app.database import SessionLocal
+    from app import models, analysis, safe_json
+
+    db = SessionLocal()
+    try:
+        # 无认知 → 空
+        proj = models.Project(name="对话注入测试", status="active")
+        db.add(proj)
+        db.commit()
+        db.refresh(proj)
+        text0, src0 = analysis.cognition_system_prompt(db, proj.id)
+        assert text0 == "" and src0 == []
+
+        confirmed_field = {
+            "key": "site_location", "label": "基地位置", "type": "string", "extractable": "high",
+            "value": "三亚海棠湾", "status": "confirmed",
+            "source": {"type": "doc", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": 0.8, "guide": "",
+        }
+        draft_field = {
+            "key": "design_conflicts", "label": "设计矛盾", "type": "array", "extractable": "low",
+            "value": ["造价与品质矛盾"], "status": "draft",
+            "source": {"type": "inference", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": 0.4, "guide": "",
+        }
+        cog = models.ProjectCognition(
+            project_id=proj.id, module="brief", module_label="任务书",
+            fields_json=safe_json.dumps_safe([confirmed_field, draft_field]),
+            summary_md="电竞主题地产", status="confirmed", module_status="partial", version=1,
+        )
+        db.add(cog)
+        db.commit()
+        text1, src1 = analysis.cognition_system_prompt(db, proj.id)
+        assert "已确认的结构化认知" in text1
+        assert "三亚海棠湾" in text1          # confirmed 注入对话
+        assert "造价与品质矛盾" not in text1   # draft 不注入
+        assert any(s.kind == "cognition" for s in src1)
+    finally:
+        db.query(models.ProjectCognition).filter_by(project_id=proj.id).delete()
+        db.query(models.Project).filter_by(id=proj.id).delete()
+        db.commit()
+        db.close()
+
+
+def test_cognition_nested_empty_value_not_injected():
+    """嵌套空壳值([None]/{'k':None}/['  '])即便 status=confirmed 也不注入——
+    避免被 str() 成 '[None]' 当真实认知喂 LLM（不伪造，对抗复核坐实点）。"""
+    from app.database import SessionLocal
+    from app import models, analysis, safe_json
+
+    db = SessionLocal()
+    try:
+        proj = models.Project(name="嵌套空壳测试", status="active")
+        db.add(proj)
+        db.commit()
+        db.refresh(proj)
+        hollow = {
+            "key": "program_composition", "label": "功能构成", "type": "array", "extractable": "medium",
+            "value": [None, "  "], "status": "confirmed",  # 嵌套空壳
+            "source": {"type": "doc", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": 0.6, "guide": "",
+        }
+        real = {
+            "key": "site_location", "label": "基地位置", "type": "string", "extractable": "high",
+            "value": "海棠湾", "status": "confirmed",
+            "source": {"type": "doc", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": 0.8, "guide": "",
+        }
+        cog = models.ProjectCognition(
+            project_id=proj.id, module="brief", module_label="任务书",
+            fields_json=safe_json.dumps_safe([hollow, real]),
+            summary_md="", status="confirmed", module_status="confirmed", version=1,
+        )
+        db.add(cog)
+        db.commit()
+        text1, _ = analysis.cognition_system_prompt(db, proj.id)
+        assert "海棠湾" in text1        # 真实值注入
+        assert "None" not in text1      # 嵌套空壳不泄漏为 "[None]"
+        assert "功能构成" not in text1   # 空壳字段整条不出现
+    finally:
+        db.query(models.ProjectCognition).filter_by(project_id=proj.id).delete()
+        db.query(models.Project).filter_by(id=proj.id).delete()
+        db.commit()
+        db.close()
+
+
 def test_extract_brief_field_grading_offline():
     """离线验证字段分档装配(_build_field_records)：manual_only 留空带引导、low draft 不 confirmed、high 带出处。"""
     from app.routers.cognition import _build_field_records

@@ -368,6 +368,7 @@ class SendMessageOut(BaseModel):
     knowledge_hits: List[KnowledgeHitOut] = []
     model: str
     ai_configured: bool
+    cognition_injected: bool = False  # 本次是否注入了该项目【已确认】结构化认知（上下文供给协议）
 
 
 # ── 4B: 知识库 ──

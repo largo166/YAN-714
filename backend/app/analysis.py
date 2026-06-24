@@ -66,12 +66,27 @@ def _file_snippet(text: str, width: int = 200) -> str:
     return (t[:width] + "…") if len(t) > width else t
 
 
-def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5) -> Material:
-    """三路取材：本项目已确认结构化认知(最高优先) + 已解析文件 + 全局知识库检索。结构化为 sources。"""
-    sources: List[Source] = []
-    lines: List[str] = []
+def gather_cognition(db: Session, project_id: int) -> tuple[List[str], List[Source]]:
+    """上下文供给协议·路0：取本项目【已确认】结构化认知（规格 1.5：只 status=confirmed 字段）。
 
-    # 路0：本项目结构化认知——只注入 status=confirmed 的字段（规格 1.5），让推演基于"已审定认知"
+    单一注入点——chat / skill / agent / 研判 全都经此拿同一份已审定认知，脊椎不再因入口不同而断。
+    返回 (认知文本块行, cognition 出处)。draft/empty 永不注入（不伪造）。
+    """
+    import json as _json
+
+    def _nonempty(v) -> bool:
+        """递归判定字段值是否有实质内容：剔除 None/空串/空集合,以及 [None]/{"k":None} 这类
+        嵌套空壳——避免占位空值被 str() 成 "[None]" 注入 prompt（不伪造，纲要规则3/4）。"""
+        if v in (None, "", [], {}):
+            return False
+        if isinstance(v, (list, tuple, set)):
+            return any(_nonempty(x) for x in v)
+        if isinstance(v, dict):
+            return any(_nonempty(x) for x in v.values())
+        if isinstance(v, str):
+            return bool(v.strip())
+        return True
+
     cogs = (
         db.query(models.ProjectCognition)
         .filter(models.ProjectCognition.project_id == project_id)
@@ -79,15 +94,18 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
         .all()
     )
     cog_block: List[str] = []
-    import json as _json
+    sources: List[Source] = []
     for c in cogs:
         try:
             raw = _json.loads(c.fields_json) if c.fields_json else []
         except (ValueError, TypeError):
             raw = []
         fields = raw if isinstance(raw, list) else []
-        # 只取已确认字段（draft/empty 不注入，规格 1.5）
-        confirmed = [f for f in fields if isinstance(f, dict) and f.get("status") == "confirmed" and f.get("value") not in (None, "", [], {})]
+        confirmed = [
+            f for f in fields
+            if isinstance(f, dict) and f.get("status") == "confirmed"
+            and _nonempty(f.get("value"))
+        ]
         if not confirmed:
             continue
         label = c.module_label or c.module
@@ -101,6 +119,27 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
                    snippet=(c.summary_md or "; ".join(f"{f.get('label')}:{f.get('value')}" for f in confirmed[:3]))[:200],
                    engine="cognition")
         )
+    return cog_block, sources
+
+
+def cognition_system_prompt(db: Session, project_id: int) -> tuple[str, List[Source]]:
+    """供对话路径（chat）用：把已确认认知组装成一段 system 提示文本 + 出处。
+    无已确认认知 → ("", [])，调用方据此决定是否注入（不造空壳）。"""
+    cog_block, sources = gather_cognition(db, project_id)
+    if not cog_block:
+        return "", []
+    text = "以下是本项目【已确认的结构化认知】，请优先据此理解项目、回答问题：\n" + "\n".join(cog_block)
+    return text, sources
+
+
+def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5) -> Material:
+    """三路取材：本项目已确认结构化认知(最高优先) + 已解析文件 + 全局知识库检索。结构化为 sources。"""
+    sources: List[Source] = []
+    lines: List[str] = []
+
+    # 路0：本项目结构化认知——只注入 status=confirmed 的字段（规格 1.5），让推演基于"已审定认知"
+    cog_block, cog_sources = gather_cognition(db, project_id)
+    sources.extend(cog_sources)
 
     # 路1：本项目已解析文件（取前若干，作为项目现场材料）
     # ok=完整正文；ok_truncated=截断但仍是真实正文（停在第N页），二者都可作材料；
@@ -129,8 +168,9 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
                    snippet=_file_snippet(f.content_text), engine="file")
         )
 
-    # 路2：全局知识库检索
-    hits = retrieval.search(db, query, top_k=top_k)
+    # 路2：知识库检索——限定到本项目已索引文档（与 chat/knowledge 的项目级检索一致，
+    # 不混读其它项目的资料）。项目无任何已索引文档时 retrieval.search 返回空（不报错）。
+    hits = retrieval.search(db, query, top_k=top_k, project_id=project_id)
     for h in hits:
         sources.append(
             Source(kind="knowledge", ref_id=h.document_id, title=h.title,

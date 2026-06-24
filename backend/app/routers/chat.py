@@ -3,11 +3,13 @@
 key 未配置 → assistant 消息 status=not_configured（不伪造回复）。
 key 已配置 → 调用 DeepSeek；失败 → status=error。
 use_knowledge=true → 先检索知识库，把片段作为 system 上下文。
+project_id 给定 → 注入该项目【已确认】结构化认知（上下文供给协议，规格 1.5）：
+  让用户在共创营地直接对话时也能基于已审定认知，而不只是技能/Agent 运行按钮。
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import llm, models, retrieval, schemas
+from .. import analysis, llm, models, retrieval, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -79,6 +81,12 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
         q = payload.knowledge_query or payload.message
         hits = retrieval.search(db, q, top_k=payload.top_k, project_id=payload.project_id)
 
+    # 2.5) 上下文供给协议：给定 project_id 时注入该项目【已确认】结构化认知（规格 1.5）
+    cog_prompt, _cog_sources = ("", [])
+    if payload.project_id is not None:
+        cog_prompt, _cog_sources = analysis.cognition_system_prompt(db, payload.project_id)
+    cognition_injected = False
+
     # 3) 生成 assistant 消息
     if not configured:
         assistant = models.ChatMessage(
@@ -89,6 +97,10 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
         )
     else:
         chat_messages = []
+        # 已确认认知置于最前（优先于知识库片段），让对话基于已审定项目认知
+        if cog_prompt:
+            chat_messages.append({"role": "system", "content": cog_prompt})
+            cognition_injected = True
         ctx = llm.build_context_prompt([h.__dict__ for h in hits]) if hits else None
         if ctx:
             chat_messages.append({"role": "system", "content": ctx})
@@ -140,4 +152,5 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
         knowledge_hits=[schemas.KnowledgeHitOut(**h.__dict__) for h in hits],
         model=cfg.deepseek_model,
         ai_configured=configured,
+        cognition_injected=cognition_injected,
     )

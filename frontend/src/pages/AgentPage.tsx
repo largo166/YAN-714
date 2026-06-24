@@ -28,6 +28,7 @@ export default function AgentPage() {
   const [mode, setMode] = useState('Auto')
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
   const [lastHits, setLastHits] = useState<KnowledgeHit[]>([])
+  const [cognitionInjected, setCognitionInjected] = useState(false)
   const [skills, setSkills] = useState<Skill[]>([])
   const [channels, setChannels] = useState<ResultSendChannel[]>([])
   const [sendNote, setSendNote] = useState<string | null>(null)
@@ -148,13 +149,15 @@ export default function AgentPage() {
       const res = await api.sendMessage(sid, {
         message: content,
         use_knowledge: useKnowledge,
-        // 作用于当前项目：开启知识库时，按当前项目范围检索（E1 项目级检索，避免混读其他项目）
-        project_id: useKnowledge && cur ? cur.id : undefined,
+        // 作用于当前项目：选中项目即传 project_id——既限定知识库检索范围(E1)，
+        // 也让后端注入该项目【已确认】结构化认知(上下文供给协议)，与知识库开关无关。
+        project_id: cur ? cur.id : undefined,
         top_k: 5,
       })
       setAiConfigured(res.ai_configured)
       setModel(res.model || model)
       setLastHits(res.knowledge_hits)
+      setCognitionInjected(res.cognition_injected)
       // 用服务端真实消息替换乐观项 + 追加 assistant
       setMessages((m) => [
         ...m.filter((x) => x.id !== optimistic.id),
@@ -393,6 +396,13 @@ export default function AgentPage() {
         </div>
 
         {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
+
+        {cognitionInjected && (
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--ink2)' }}>
+            <span className="statpill live" style={{ marginRight: 6 }}>已注入项目认知</span>
+            本次回答已基于「{cur?.name ?? '当前项目'}」的已确认结构化认知（任务书等）作答。
+          </div>
+        )}
 
         {lastHits.length > 0 && (
           <div style={{ marginTop: 12 }}>

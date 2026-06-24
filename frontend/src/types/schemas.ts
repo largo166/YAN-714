@@ -269,6 +269,7 @@ export const SendMessageOutSchema = z.object({
   knowledge_hits: z.array(KnowledgeHitSchema),
   model: z.string(),
   ai_configured: z.boolean(),
+  cognition_injected: z.boolean().default(false), // 本次是否注入了项目已确认结构化认知
 })
 export type SendMessageOut = z.infer<typeof SendMessageOutSchema>
 
