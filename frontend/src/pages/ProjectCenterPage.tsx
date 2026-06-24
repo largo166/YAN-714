@@ -33,6 +33,7 @@ export default function ProjectCenterPage() {
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const [renameErr, setRenameErr] = useState<string | null>(null)
+  const [analysisOpen, setAnalysisOpen] = useState(false) // AI 智能研判区:默认折叠
 
   const doRename = async () => {
     if (curId == null || !renameVal.trim()) return
@@ -205,7 +206,17 @@ export default function ProjectCenterPage() {
 
       <ProjectFilesPanel projectId={curId} />
 
-      <ProjectAnalysisPanel projectId={curId} />
+      <section className="sec" data-open={analysisOpen ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => setAnalysisOpen((v) => !v)}>
+          <span className="chev">▸</span>
+          <span className="stitle">AI 智能研判</span>
+          <span className="scount">前期分析 · 5 项</span>
+          <span className="shint">总览 / 难点 / 诉求 / 推进计划 / 汇报提纲</span>
+        </button>
+        <div className="secbody">
+          <ProjectAnalysisPanel projectId={curId} />
+        </div>
+      </section>
 
       <div className="grid2 mt">
         <div className="card">

@@ -553,17 +553,23 @@ export const api = {
   },
 
   // ── 4D: AI 研判 ──
-  async analyzeProject(projectId: number, task: string, topK = 5): Promise<ProjectAnalysis> {
+  async analyzeProject(projectId: number, task: string, opts: { force?: boolean; topK?: number } = {}): Promise<ProjectAnalysis> {
     return ProjectAnalysisSchema.parse(
       await request(`/api/projects/${projectId}/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ task, top_k: topK }),
+        body: JSON.stringify({ task, top_k: opts.topK ?? 5, force: opts.force ?? false }),
       }),
     )
   },
   async listProjectAnalyses(projectId: number) {
     return ProjectAnalysisListSchema.parse(
       await request(`/api/projects/${projectId}/analyses`),
+    )
+  },
+  /** 每个 task 最新成功结果各一条(供进页面批量回填,点 tab 秒显不重跑)。 */
+  async latestAnalyses(projectId: number) {
+    return ProjectAnalysisListSchema.parse(
+      await request(`/api/projects/${projectId}/analyses/latest`),
     )
   },
   analysisExportUrl(projectId: number, analysisId: number): string {

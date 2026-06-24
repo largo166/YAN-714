@@ -14,14 +14,87 @@ function taskLabel(key: string): string {
   return ANALYSIS_TASKS.find((t) => t.key === key)?.label ?? key
 }
 
-/** 4D 研判域：5 任务 + 三态 + 结构化出处 + 导出 MD。结论与出处分离展示。 */
+/** 4D 研判域:tab 切换=显示该任务已生成结果(秒显不重跑);
+ *  「前期分析」总按钮串行跑全部(缓存快路、显进度、跳过已生成);每 tab 可「重新生成」(force)。 */
 export default function ProjectAnalysisPanel({ projectId }: { projectId: number | null }) {
-  const [running, setRunning] = useState<string | null>(null)
-  const [current, setCurrent] = useState<ProjectAnalysis | null>(null)
-  const [history, setHistory] = useState<ProjectAnalysis[]>([])
+  const [active, setActive] = useState<AnalysisTaskKey>('overview')
+  const [byTask, setByTask] = useState<Record<string, ProjectAnalysis>>({}) // 各 task 最新结果缓存
+  const [runningTask, setRunningTask] = useState<string | null>(null)        // 单任务重新生成中
+  const [batchRunning, setBatchRunning] = useState(false)                    // 前期分析(全部)进行中
+  const [progress, setProgress] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [reflowNote, setReflowNote] = useState<string | null>(null)
   const [reflowing, setReflowing] = useState(false)
+
+  // 进页面/切项目:批量回填已生成结果(点 tab 秒显,不触发生成)
+  const backfill = useCallback(() => {
+    if (projectId == null) return
+    api
+      .latestAnalyses(projectId)
+      .then((d) => {
+        const map: Record<string, ProjectAnalysis> = {}
+        for (const a of d.items) map[a.task] = a
+        setByTask(map)
+      })
+      .catch((e: Error) => setErr(e.message))
+  }, [projectId])
+
+  useEffect(() => {
+    setByTask({})
+    setErr(null)
+    setReflowNote(null)
+    setProgress(null)
+    setActive('overview')
+    backfill()
+  }, [backfill])
+
+  const current = byTask[active] ?? null
+
+  /** 重新生成当前任务(force=true,真重跑)。 */
+  const regenerate = async (task: AnalysisTaskKey) => {
+    if (projectId == null || runningTask || batchRunning) return
+    setErr(null)
+    setReflowNote(null)
+    setRunningTask(task)
+    try {
+      const r = await api.analyzeProject(projectId, task, { force: true })
+      setByTask((m) => ({ ...m, [task]: r }))
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setRunningTask(null)
+    }
+  }
+
+  /** 前期分析:串行跑全部任务(缓存快路=已生成秒回、没有的才真生成),显进度、如实跳过。 */
+  const runAll = async () => {
+    if (projectId == null || batchRunning) return
+    setBatchRunning(true)
+    setErr(null)
+    setReflowNote(null)
+    try {
+      let done = 0
+      let skipped = 0
+      for (let i = 0; i < ANALYSIS_TASKS.length; i++) {
+        const t = ANALYSIS_TASKS[i]
+        setProgress(`正在分析 ${i + 1}/${ANALYSIS_TASKS.length} · ${t.label}…`)
+        try {
+          const r = await api.analyzeProject(projectId, t.key) // 默认 force=false:命中缓存秒回
+          setByTask((m) => ({ ...m, [t.key]: r }))
+          if (r.status === 'ok') done++
+          else if (r.status === 'not_configured') {
+            setProgress('AI 未配置,请到设置页配置 DeepSeek API Key 后再分析(不会伪造)。')
+            return
+          } else skipped++ // no_material / error:如实跳过,继续下一个
+        } catch {
+          skipped++
+        }
+      }
+      setProgress(`分析完成:成功 ${done} 个${skipped ? ` · 跳过 ${skipped} 个(无材料/失败)` : ''}。切换标签查看各项。`)
+    } finally {
+      setBatchRunning(false)
+    }
+  }
 
   const reflow = async () => {
     if (!current || current.status !== 'ok' || reflowing) return
@@ -41,63 +114,44 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
     }
   }
 
-  const reloadHistory = useCallback(() => {
-    if (projectId == null) return
-    api
-      .listProjectAnalyses(projectId)
-      .then((d) => setHistory(d.items))
-      .catch((e: Error) => setErr(e.message))
-  }, [projectId])
-
-  useEffect(() => {
-    setCurrent(null)
-    setHistory([])
-    setErr(null)
-    reloadHistory()
-  }, [reloadHistory])
-
-  const run = async (task: AnalysisTaskKey) => {
-    if (projectId == null) return
-    setErr(null)
-    setRunning(task)
-    try {
-      const r = await api.analyzeProject(projectId, task)
-      setCurrent(r)
-      reloadHistory()
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setRunning(null)
-    }
-  }
-
   return (
     <div className="card mt">
-      <div className="ct">
-        AI 智能研判 <span className="statpill live">已接入</span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      {/* tab 行 + 前期分析总按钮 */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
         {ANALYSIS_TASKS.map((t) => (
           <button
             key={t.key}
-            className={'anbtn' + (current?.task === t.key ? ' on' : '')}
-            disabled={projectId == null || running !== null}
-            onClick={() => run(t.key)}
+            className={'anbtn' + (active === t.key ? ' on' : '')}
+            style={active === t.key ? { background: 'var(--terra)', color: '#fff' } : undefined}
+            disabled={projectId == null}
+            onClick={() => { setActive(t.key); setReflowNote(null) }}
           >
-            {running === t.key ? '研判中…' : t.label}
+            {t.label}
+            {byTask[t.key]?.status === 'ok' ? ' ✓' : ''}
           </button>
         ))}
+        <span style={{ flex: 1 }} />
+        <button
+          className="btn"
+          disabled={projectId == null || batchRunning}
+          onClick={runAll}
+          style={{ background: 'var(--terra)', color: '#fff' }}
+          title="对全部任务依次分析(已生成的秒回、没有的才生成)"
+        >
+          {batchRunning ? '分析中…' : '✦ 前期分析(全部)'}
+        </button>
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
         研判基于「本项目已解析文件 + 知识库检索」生成并带出处；完整段落级溯源将在检索升级（P6）后增强。
       </div>
-
+      {progress && (
+        <div style={{ fontSize: 12, color: batchRunning ? 'var(--terra)' : 'var(--mut)', marginBottom: 8 }}>{progress}</div>
+      )}
       {err && <div style={{ color: 'var(--red)', fontSize: 12.5, marginBottom: 8 }}>{err}</div>}
 
-      {/* 当前研判结果 */}
-      {current && (
+      {/* 当前 tab 的研判结果(来自缓存,秒显) */}
+      {current ? (
         <div style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <b style={{ fontSize: 14 }}>
@@ -106,44 +160,35 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
                 {STATUS_HINT[current.status]?.text ?? current.status}
               </span>
             </b>
-            {current.status === 'ok' && (
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button className="anbtn" disabled={reflowing} onClick={reflow} title="把这次研判结论回写数据基地,供其它项目检索复用">
-                  {reflowing ? '回流中…' : '回流入库'}
-                </button>
-                <a
-                  className="anbtn"
-                  href={api.analysisExportUrl(projectId as number, current.id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ textDecoration: 'none' }}
-                >
-                  导出 MD
-                </a>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="anbtn" disabled={runningTask === active || batchRunning} onClick={() => regenerate(active)}
+                      title="忽略缓存,重新调用 AI 生成">
+                {runningTask === active ? '生成中…' : '重新生成'}
+              </button>
+              {current.status === 'ok' && (
+                <>
+                  <button className="anbtn" disabled={reflowing} onClick={reflow} title="把这次研判结论回写数据基地,供其它项目检索复用">
+                    {reflowing ? '回流中…' : '回流入库'}
+                  </button>
+                  <a className="anbtn" href={api.analysisExportUrl(projectId as number, current.id)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                    导出 MD
+                  </a>
+                </>
+              )}
+            </div>
           </div>
 
-          {reflowNote && (
-            <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>{reflowNote}</div>
-          )}
+          {reflowNote && <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>{reflowNote}</div>}
 
-          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, color: 'var(--ink)' }}>
-            {current.content}
-          </div>
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.7, color: 'var(--ink)' }}>{current.content}</div>
 
-          {/* 出处区块（仅 ok 且有 sources 时） */}
           {current.status === 'ok' && current.sources.length > 0 && (
             <div style={{ marginTop: 12, borderTop: '1px dashed var(--line2)', paddingTop: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mut)', marginBottom: 6 }}>
-                出处（{current.sources.length}）
-              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mut)', marginBottom: 6 }}>出处（{current.sources.length}）</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {current.sources.map((s, i) => (
                   <div key={i} style={{ fontSize: 12, color: 'var(--mut)' }}>
-                    <span className="pill l" style={{ marginRight: 6 }}>
-                      {s.kind === 'project_file' ? '项目文件' : '知识库'}
-                    </span>
+                    <span className="pill l" style={{ marginRight: 6 }}>{s.kind === 'project_file' ? '项目文件' : '知识库'}</span>
                     《{s.title}》 — {s.snippet}
                   </div>
                 ))}
@@ -151,25 +196,13 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
             </div>
           )}
         </div>
-      )}
-
-      {/* 历史（PC-10 雏形） */}
-      {history.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 6 }}>分析历史（{history.length}）</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {history.slice(0, 8).map((h) => (
-              <button
-                key={h.id}
-                className="anbtn"
-                style={{ textAlign: 'left' }}
-                onClick={() => { setCurrent(h); setReflowNote(null) }}
-              >
-                {taskLabel(h.task)} · {new Date(h.created_at).toLocaleString()} ·{' '}
-                {STATUS_HINT[h.status]?.text ?? h.status}
-              </button>
-            ))}
-          </div>
+      ) : (
+        <div style={{ border: '1px dashed var(--line2)', borderRadius: 8, padding: '14px', fontSize: 13, color: 'var(--mut)' }}>
+          「{taskLabel(active)}」尚未生成。点上方「✦ 前期分析(全部)」一次生成全部,或点
+          <button className="anbtn" disabled={projectId == null || runningTask === active || batchRunning} onClick={() => regenerate(active)} style={{ margin: '0 6px' }}>
+            {runningTask === active ? '生成中…' : '单独生成本项'}
+          </button>
+          。
         </div>
       )}
     </div>
