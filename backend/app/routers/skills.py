@@ -44,6 +44,19 @@ _SKILL_PROMPTS = {
 }
 
 
+# ── 斜杠命令映射(对话框打 /xxx 直接触发技能;别名→skill_id)──
+_COMMANDS = [
+    ("/ppt", "ppt", "PPT 大纲", False),
+    ("/会议纪要", "meeting", "会议纪要", False),
+    ("/纪要", "meeting", "会议纪要", False),
+    ("/评审", "review", "方案评审", False),
+    ("/任务", "task", "任务安排", False),
+    ("/竞品", "compete", "竞品分析", False),
+    ("/出图", "img", "AI 生图(需确认)", True),
+]
+_CMD_MAP = {c: (sid, confirm) for c, sid, _label, confirm in _COMMANDS}
+
+
 def _settings(db: Session) -> models.AppSetting:
     row = db.get(models.AppSetting, 1)
     if row is None:
@@ -265,3 +278,43 @@ def get_skill_result(project_id: int, result_id: int, db: Session = Depends(get_
     if row is None or row.project_id != project_id:
         raise HTTPException(404, "成果不存在")
     return row
+
+
+# ── 斜杠命令:对话框打 /xxx 直接触发技能 ──
+@router.get("/api/skill-commands", response_model=schemas.SkillCommandListOut)
+def list_skill_commands() -> schemas.SkillCommandListOut:
+    """命令清单(供前端 / 菜单渲染)。"""
+    items = [
+        schemas.SkillCommandDef(command=c, skill_id=sid, label=label, needs_confirm=confirm)
+        for c, sid, label, confirm in _COMMANDS
+    ]
+    return schemas.SkillCommandListOut(items=items)
+
+
+@router.post("/api/projects/{project_id}/command", response_model=schemas.SkillCommandOut)
+def run_command(project_id: int, payload: schemas.SkillCommandIn, db: Session = Depends(get_db)) -> schemas.SkillCommandOut:
+    """解析对话框命令:文本类直跑落库;/出图需轻确认;非命令→走普通对话。"""
+    text = (payload.text or "").strip()
+    if not text.startswith("/"):
+        return schemas.SkillCommandOut(status="not_command")
+    head, _, rest = text.partition(" ")
+    if head not in _CMD_MAP:
+        return schemas.SkillCommandOut(status="not_command", message=f"未知命令：{head}")
+    skill_id, needs_confirm = _CMD_MAP[head]
+    rest = rest.strip()
+
+    if needs_confirm:  # /出图:不直接跑,返回提示词草案 + 默认模型让前端轻确认
+        from .. import image_gen
+        if not image_gen.is_configured():
+            return schemas.SkillCommandOut(status="confirm_image", skill_id=skill_id,
+                                           prompt=rest, model=image_gen.DEFAULT_MODEL,
+                                           message=image_gen.NOT_CONFIGURED_MSG)
+        return schemas.SkillCommandOut(status="confirm_image", skill_id=skill_id,
+                                       prompt=rest or "(将据当前项目材料自动生成提示词)",
+                                       model=payload.model or image_gen.DEFAULT_MODEL)
+
+    # 文本类命令:直接执行 + 落库
+    run_in = schemas.SkillRunIn(input=rest, session_id=payload.session_id)
+    out = _run_skill_inner(project_id, skill_id, run_in, db)
+    out.result_id = _save_result(db, project_id, payload.session_id, out)
+    return schemas.SkillCommandOut(status="result", skill_id=skill_id, result=out)

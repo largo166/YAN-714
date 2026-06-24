@@ -158,4 +158,48 @@ def test_skill_result_archived(client, monkeypatch):
     assert one["title"] == "PPT 大纲" and one["output_json"]
 
 
+def test_skill_commands_list(client):
+    r = client.get("/api/skill-commands")
+    assert r.status_code == 200
+    cmds = {c["command"]: c for c in r.json()["items"]}
+    assert "/ppt" in cmds and cmds["/ppt"]["skill_id"] == "ppt"
+    assert cmds["/出图"]["needs_confirm"] is True  # 生图需轻确认
+
+
+def test_command_text_runs_and_archives(client, monkeypatch):
+    """/ppt 文本类命令:直接执行 + 落库 + 返回 result。"""
+    import json as _json
+    from app import llm
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: _json.dumps({"slides": [{"title": "a", "keyMessage": "b"}]}, ensure_ascii=False))
+    pid = _new_project(client, name="命令测试")
+    _set_key()
+    client.post(f"/api/projects/{pid}/files", files={"file": ("x.md", "# 任务\n退台立面".encode("utf-8"), "text/markdown")})
+    r = client.post(f"/api/projects/{pid}/command", json={"text": "/ppt 做 4 页"}).json()
+    assert r["status"] == "result" and r["result"]["status"] == "ok" and r["result"]["result_id"] > 0
+    # 落库了
+    assert client.get(f"/api/projects/{pid}/skill-results").json()["total"] >= 1
+
+
+def test_command_img_needs_confirm(client, monkeypatch):
+    """/出图:不直接生图,返回 confirm_image(prompt+model)让前端轻确认。"""
+    from app import image_gen
+    called = {"gen": False}
+    def _boom(*a, **k):
+        called["gen"] = True
+        raise AssertionError("不应直接生图")
+    monkeypatch.setattr(image_gen, "generate_image", _boom)
+    pid = _new_project(client, name="出图确认测试")
+    r = client.post(f"/api/projects/{pid}/command", json={"text": "/出图 退台立面"}).json()
+    assert r["status"] == "confirm_image" and r["skill_id"] == "img"
+    assert called["gen"] is False  # 确认前绝不生图(防白烧钱)
+
+
+def test_command_not_a_command(client):
+    """非斜杠/未知命令 → not_command,前端走普通对话。"""
+    pid = _new_project(client, name="非命令测试")
+    assert client.post(f"/api/projects/{pid}/command", json={"text": "这个项目甲方诉求?"}).json()["status"] == "not_command"
+    assert client.post(f"/api/projects/{pid}/command", json={"text": "/不认识 x"}).json()["status"] == "not_command"
+
+
+
 

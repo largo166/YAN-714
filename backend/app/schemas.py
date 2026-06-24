@@ -322,6 +322,38 @@ class SkillResultListOut(BaseModel):
     total: int
 
 
+# ── 斜杠命令(对话框打 /xxx 触发技能) ──
+class SkillCommandIn(BaseModel):
+    text: str = ""           # 用户输入,如 "/ppt 做6页"
+    session_id: int = 0
+    model: str = ""          # /出图 确认后带模型
+
+
+class SkillCommandOut(BaseModel):
+    """命令解析结果:
+    - status=result:文本类命令已直接执行,result 是成果(落库)
+    - status=confirm_image:/出图,需前端轻确认(prompt+model),确认后再调 img run
+    - status=not_command:非命令(无/或未知),前端走普通对话
+    """
+    status: str
+    skill_id: str = ""
+    result: Optional[SkillRunOut] = None
+    prompt: str = ""         # confirm_image:将用于生图的提示词草案
+    model: str = ""          # confirm_image:默认模型
+    message: str = ""
+
+
+class SkillCommandDef(BaseModel):
+    command: str             # 如 "/ppt"
+    skill_id: str
+    label: str
+    needs_confirm: bool = False
+
+
+class SkillCommandListOut(BaseModel):
+    items: List[SkillCommandDef]
+
+
 # ── 设置 ──
 class SettingsOut(BaseModel):
     deepseek_api_key_set: bool
