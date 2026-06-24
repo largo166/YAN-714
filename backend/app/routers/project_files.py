@@ -19,7 +19,12 @@ def _project_dirs(root_path: str) -> tuple[Path, list[Path]]:
     root = Path(root_path)
     if not root.exists() or not root.is_dir():
         raise HTTPException(400, "目录不存在或不可访问")
-    return root, sorted([p for p in root.iterdir() if p.is_dir()], key=lambda p: p.name)
+    subdirs = sorted([p for p in root.iterdir() if p.is_dir()], key=lambda p: p.name)
+    # 子文件夹=各自一个项目;若根目录是【扁平文件夹】(无子目录、仅散落文件)→ 把根目录本身当作一个项目,
+    # 否则散落在根的文件永远不会被接入(数据基地"选文件夹整理"对扁平文件夹就成了空操作)。
+    if not subdirs:
+        return root, [root]
+    return root, subdirs
 
 
 def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPreviewOut:

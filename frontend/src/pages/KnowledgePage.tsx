@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { api } from '@/lib/api'
+import { api, type WorkspaceScan } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import CrossProjectLibrary from './CrossProjectLibrary'
 import type {
@@ -8,52 +8,37 @@ import type {
   BatchIngestPreview,
   KnowledgeDoc,
   KnowledgeDocListItem,
-  KnowledgeHit,
   KnowledgeStats,
 } from '@/types/schemas'
 
-/** 数据基地（知识库）：接入真实 knowledge API。保留原 ROM-AI 检索/分区视觉。
- *  C2.1：去 mock — 数据源/库存/可复用资产一律取真实数据或空态，不伪造（原则 9/13）。
- *  效果图范围随共享当前项目联动（useProject）。 */
+function fmtSize(n: number): string {
+  if (n >= 1 << 30) return (n / (1 << 30)).toFixed(1) + ' GB'
+  if (n >= 1 << 20) return (n / (1 << 20)).toFixed(1) + ' MB'
+  if (n >= 1 << 10) return (n / (1 << 10)).toFixed(1) + ' KB'
+  return n + ' B'
+}
+
+/** 数据基地：本地文件夹接入 → 一键整理 → 索引展示 的主入口。
+ *  核心动作:选择/授权本地文件夹、一键整理、看整理结构与索引状态、看已入库文件、对单文件生成 AI 元数据、删错误条目。
+ *  技术说明:全文检索走本地 FTS5 / BM25(SQLite)。所有按钮都接真实 API、不伪造、不留无效占位。 */
 export default function KnowledgePage() {
   const { cur } = useProject()
   const [docs, setDocs] = useState<KnowledgeDocListItem[]>([])
-  const [query, setQuery] = useState('')
-  const [hits, setHits] = useState<KnowledgeHit[] | null>(null)
-  const [engine, setEngine] = useState<string>('')
-  const [searching, setSearching] = useState(false)
   const [detail, setDetail] = useState<KnowledgeDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  // 类型筛选：按真实 doc.type 字段（元数据层）。"全部"=不筛。
-  const [typeFilter, setTypeFilter] = useState('全部')
-  const TYPE_OPTIONS = ['全部', '任务书', '会议纪要', '方案文本', '图纸', '案例', '方法', '其他']
-  const docType = (id: number) => docs.find((d) => d.id === id)?.type || ''
-  const matchType = (type: string) => typeFilter === '全部' || type === typeFilter
-  // 来源筛选：按 resource 的来源项目名（resource = "项目名 / 路径"）。
-  const [sourceFilter, setSourceFilter] = useState('全部')
-  const sourceProjects = useMemo(() => {
-    const set = new Set<string>()
-    for (const d of docs) {
-      const p = (d.resource || '').split(' / ')[0].trim()
-      if (p) set.add(p)
-    }
-    return [...set]
-  }, [docs])
-  const docResource = (id: number) => docs.find((d) => d.id === id)?.resource || ''
-  const matchSource = (resource: string) =>
-    sourceFilter === '全部' || resource.startsWith(sourceFilter)
-  // AI 生成元数据：行内 loading + 提示
   const [genningId, setGenningId] = useState<number | null>(null)
   const [metaNote, setMetaNote] = useState<string | null>(null)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
-  const [ingestPreview, setIngestPreview] = useState<BatchIngestPreview | null>(null)
-  const [ingestResult, setIngestResult] = useState<BatchIngestImport | null>(null)
-  const [ingesting, setIngesting] = useState(false)
-  // 真实数据源（单一已配置工作区根；未配置 → 空态）
   const [ws, setWs] = useState<{ workspace_path: string; accessible: boolean } | null>(null)
 
-  // 可复用资产：按知识文档真实 tags 聚合（无标签 → 空态，不塞 mock）
+  // 一键整理:结构(preview.projects) + 数量/类型/大文件(scan) 合成的整理报告;接入结果落 ingestResult。
+  const [report, setReport] = useState<{ scan: WorkspaceScan; preview: BatchIngestPreview } | null>(null)
+  const [organizing, setOrganizing] = useState(false)
+  const [ingesting, setIngesting] = useState(false)
+  const [ingestResult, setIngestResult] = useState<BatchIngestImport | null>(null)
+
+  // 可复用资产:按知识文档真实 tags 聚合(无标签 → 空态,不塞 mock)
   const assetGroups = useMemo(() => {
     const m = new Map<string, string[]>()
     for (const d of docs) {
@@ -65,27 +50,14 @@ export default function KnowledgePage() {
     return [...m.entries()]
   }, [docs])
 
-  // 可折叠分区开合态（对齐 HTML 默认：数据源/知识文档 展开，库存/文件浏览/可复用资产 收起）
-  const [open, setOpen] = useState<Record<string, boolean>>({
-    src: true,
-    health: false,
-    docs: true,
-    files: false,
-    assets: false,
-  })
+  // 可折叠分区(库存与健康除外——它默认展开且不可折叠)
+  const [open, setOpen] = useState<Record<string, boolean>>({ src: true, docs: true, files: false, assets: false })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
-
-  // 新增表单
-  const [showAdd, setShowAdd] = useState(false)
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [tags, setTags] = useState('')
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
     try {
-      const d = await api.listKnowledgeDocs()
-      setDocs(d.items)
+      setDocs((await api.listKnowledgeDocs()).items)
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -93,45 +65,15 @@ export default function KnowledgePage() {
     }
   }, [])
 
+  const loadStats = useCallback(() => {
+    api.getKnowledgeStats().then(setStats).catch(() => setStats(null))
+  }, [])
+
   useEffect(() => {
     loadDocs()
     api.workspaceStatus().then(setWs).catch(() => setWs(null))
-    api.getKnowledgeStats().then(setStats).catch(() => setStats(null))
-  }, [loadDocs])
-
-  const doSearch = async () => {
-    const q = query.trim()
-    if (!q) {
-      setHits(null)
-      return
-    }
-    setSearching(true)
-    setErr(null)
-    try {
-      const r = await api.searchKnowledge(q, 8)
-      setHits(r.hits)
-      setEngine(r.engine)
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  const addDoc = async () => {
-    if (!title.trim()) return
-    setErr(null)
-    try {
-      await api.createKnowledgeDoc({ title: title.trim(), content_text: content, tags })
-      setTitle('')
-      setContent('')
-      setTags('')
-      setShowAdd(false)
-      loadDocs()
-    } catch (e) {
-      setErr((e as Error).message)
-    }
-  }
+    loadStats()
+  }, [loadDocs, loadStats])
 
   const del = async (id: number) => {
     setErr(null)
@@ -139,6 +81,7 @@ export default function KnowledgePage() {
       await api.deleteKnowledgeDoc(id)
       if (detail?.id === id) setDetail(null)
       loadDocs()
+      loadStats()
     } catch (e) {
       setErr((e as Error).message)
     }
@@ -152,7 +95,6 @@ export default function KnowledgePage() {
     }
   }
 
-  // AI 按需生成元数据（description + refine type）。三态：not_configured/no_material/error/ok。
   const genMeta = async (id: number) => {
     if (genningId) return
     setGenningId(id)
@@ -177,30 +119,56 @@ export default function KnowledgePage() {
     }
   }
 
-  const previewBatch = async () => {
-    const root = ws?.workspace_path
-    if (!root) return
+  /** 主入口:选择本地文件夹(用现有 workspace 根机制,输入绝对路径) → 扫描结构 + 预览可接入(只读,未改任何数据)。 */
+  const organize = async () => {
+    if (organizing) return
     setErr(null)
+    let root = ws?.workspace_path
+    if (!root || !ws?.accessible) {
+      const p = window.prompt('输入要整理的本地文件夹绝对路径（如 C:\\Users\\你\\项目资料）：', root || '')
+      if (!p || !p.trim()) return
+      try {
+        const w = await api.workspaceConfig(p.trim())
+        setWs(w)
+        root = w.workspace_path
+        if (!w.accessible) {
+          setErr(`路径不可达：${root}（请确认是本机真实存在的文件夹绝对路径）`)
+          return
+        }
+      } catch (e) {
+        setErr((e as Error).message)
+        return
+      }
+    }
+    setOrganizing(true)
+    setReport(null)
     setIngestResult(null)
     try {
-      setIngestPreview(await api.previewBatchIngest(root))
+      const [scan, preview] = await Promise.all([api.workspaceScan(), api.previewBatchIngest(root)])
+      if (!scan.accessible) {
+        setErr(`目录不可访问：${scan.error || root}`)
+        return
+      }
+      setReport({ scan, preview })
     } catch (e) {
       setErr((e as Error).message)
+    } finally {
+      setOrganizing(false)
     }
   }
 
-  const importBatch = async () => {
-    const root = ingestPreview?.root || ws?.workspace_path
-    if (!root) return
-    const ok = window.confirm('确认批量接入可解析文件？原始目录不会被移动，系统会复制文件并写入项目中心与知识库。')
-    if (!ok) return
+  /** 接入并建立索引:复制可解析文件 + 写项目中心 + 入本地索引(真实写库,需确认)。 */
+  const ingest = async () => {
+    const root = report?.preview.root || ws?.workspace_path
+    if (!root || ingesting) return
+    if (!window.confirm('确认接入可解析文件并建立索引？原始目录不动，系统复制文件并写入项目中心 + 本地索引。')) return
     setIngesting(true)
     setErr(null)
     try {
       const r = await api.importBatchIngest(root)
       setIngestResult(r)
       await loadDocs()
-      api.getKnowledgeStats().then(setStats).catch(() => {})
+      loadStats()
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -208,333 +176,182 @@ export default function KnowledgePage() {
     }
   }
 
+  const topTypes = report ? Object.entries(report.scan.type_stats).sort((a, b) => b[1] - a[1]).slice(0, 10) : []
+
   return (
     <>
       <div className="ptitle">
         <h1>数据基地</h1>
-        <div className="projsel">
-          <div className="pick">
-            ▾ 类型 · <b>全知识库</b>
-          </div>
-        </div>
-        <span className="statpill live" style={{ marginLeft: 8 }}>
-          已接入
-        </span>
+        <span className="statpill live" style={{ marginLeft: 8 }}>本地索引 · 已接入</span>
       </div>
 
-      {/* 检索 */}
-      <div className="searchwrap">
-        <div className="searchbar">
-          <span style={{ color: 'var(--mut)', cursor: 'pointer' }} onClick={doSearch}>
-            🔎
-          </span>
-          <input
-            placeholder="输入关键词，如：立面、退台、高级感、宋式、展示区"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-          />
-          <span className="eng mono" title="全文检索(FTS5/BM25)，命中时显示实际引擎">
-            FTS5 · BM25
-          </span>
-        </div>
-        <div className="scopebar">
-          <span className="lab">类型</span>
-          {TYPE_OPTIONS.map((x) => (
-            <button
-              className={'scope' + (typeFilter === x ? ' on' : '')}
-              key={x}
-              onClick={() => setTypeFilter(x)}
-            >
-              {x}
-            </button>
-          ))}
-          <span className="lab" style={{ marginLeft: 8 }}>来源</span>
-          {/* 来源筛选：按 resource 的来源项目名（resource = "项目名 / 路径"）。
-              无 source_mode(复制/引用) 字段，故按来源项目筛选——利用 resource 真实数据，不伪造。 */}
-          {['全部', ...sourceProjects].map((x) => (
-            <button
-              className={'scope' + (sourceFilter === x ? ' on' : '')}
-              key={x}
-              onClick={() => setSourceFilter(x)}
-            >
-              {x}
-            </button>
-          ))}
-          {sourceProjects.length === 0 && (
-            <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 4 }}>（暂无来源项目）</span>
-          )}
-        </div>
-        {hits !== null && (
-          <>
-            {(() => {
-              const shown = hits.filter(
-                (h) => matchType(docType(h.document_id)) && matchSource(docResource(h.document_id)),
-              )
-              return (
-                <>
-                  <div id="kb-hits-meta" style={{ fontSize: 11.5, color: 'var(--mut)', margin: '9px 0 2px' }}>
-                    {searching
-                      ? '检索中…'
-                      : `命中 ${shown.length} 条${typeFilter !== '全部' ? `（已按类型「${typeFilter}」筛选，共 ${hits.length}）` : ''} · 引擎 ${engine}`}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    {shown.length === 0 && !searching && (
-                      <div className="hit">
-                        <span className="tx" style={{ color: 'var(--mut)' }}>
-                          {hits.length === 0 ? '无命中。' : `无「${typeFilter}」类型命中。`}
-                        </span>
-                      </div>
-                    )}
-                    {shown.map((h) => (
-                      <div className="hit" key={h.document_id} style={{ cursor: 'pointer' }} onClick={() => openDetail(h.document_id)}>
-                        <span className="score">{h.score}</span>
-                        <span className="tx">
-                          <b>{h.title}</b>：{h.snippet}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            })()}
-          </>
-        )}
-      </div>
-
+      {/* 数据源:单一主入口「选择文件夹并整理」+ 整理报告(只读预览) */}
       <section className="sec" data-open={open.src ? '1' : '0'}>
         <button className="sechead" type="button" onClick={() => toggle('src')}>
           <span className="chev">▸</span>
-          <span className="stitle">数据源</span>
-          <span className="scount">{ws?.workspace_path ? '1 来源' : '未配置'}</span>
-          <span className="shint">授权台账 · 一键整理 · 重建索引</span>
+          <span className="stitle">数据源 · 一键整理</span>
+          <span className="scount">{ws?.workspace_path ? (ws.accessible ? '已授权' : '路径不可达') : '未选择'}</span>
+          <span className="shint">选择本地文件夹 → 整理结构 → 接入索引</span>
         </button>
         <div className="secbody">
-          {ws?.workspace_path ? (
+          {ws?.workspace_path && (
             <div className="kbrow">
               <span className="pth mono">{ws.workspace_path}</span>
-              <span className="kbseg">
-                <button className="on">本地目录</button>
-              </span>
               <span className="meta mono">{ws.accessible ? '可访问' : '路径不可达'}</span>
-              <span className="act" onClick={() => api.workspaceScan().catch(() => {})}>扫描</span>
-            </div>
-          ) : (
-            <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 2px' }}>
-              未配置数据源。点「添加来源」配置项目工作区目录后纳管。
             </div>
           )}
           <div className="btnrow">
-            <button
-              className="btn ghost"
-              onClick={() => {
-                const p = window.prompt('输入要纳管的工作区目录绝对路径：')
-                if (p) api.workspaceConfig(p).then(setWs).catch((e: Error) => setErr(e.message))
-              }}
-            >
-              ＋ 添加来源
-            </button>
-            <button className="btn ghost" onClick={() => api.reindexKnowledge().then(loadDocs)}>⟳ 重建索引</button>
-            <button className="btn ghost" onClick={previewBatch} disabled={!ws?.workspace_path}>
-              批量接入预览
+            <button className="btn" onClick={organize} disabled={organizing}>
+              {organizing ? '整理中…' : '📂 选择文件夹并整理'}
             </button>
           </div>
-          {ingestPreview && (
+          <div style={{ fontSize: 11.5, color: 'var(--mut)', margin: '6px 2px 0' }}>
+            读取本地文件夹（输入绝对路径授权），扫描结构与文件类型、预览可解析/不可解析，只读不改动；确认后再复制接入并建立本地索引。
+          </div>
+
+          {report && (
             <div className="card" style={{ marginTop: 12, background: 'var(--panel2)' }}>
-              <div className="ct">项目目录批量接入预览</div>
-              <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
-                识别项目 <b>{ingestPreview.total_projects}</b> 个 · 可接入{' '}
-                <b>{ingestPreview.total_supported}</b> 个 · 暂不支持{' '}
-                <b>{ingestPreview.total_unsupported}</b> 个
+              <div className="ct">整理报告（只读预览，未移动/未写入任何文件）</div>
+              {/* 数量与类型 */}
+              <div className="grid3" style={{ marginTop: 6 }}>
+                <div className="metric"><div className="l">📄 文件总数</div><div className="v">{report.scan.total_files}</div></div>
+                <div className="metric"><div className="l">📁 文件夹</div><div className="v">{report.scan.total_dirs}</div></div>
+                <div className="metric"><div className="l">💾 总大小</div><div className="v" style={{ fontSize: 20 }}>{fmtSize(report.scan.total_size)}</div></div>
               </div>
-              <div style={{ marginTop: 8 }}>
-                {ingestPreview.projects.map((p) => (
-                  <div className="kbrow" key={p.path}>
-                    <span className="pth">{p.project_name}</span>
-                    <span className="meta">{p.supported_count} 可接入 / {p.unsupported_count} 不支持</span>
+              {/* 可解析 / 大文件 / 不可解析 状态 */}
+              <div className="grid3" style={{ marginTop: 8 }}>
+                <div className="metric"><div className="l">✅ 可解析(待接入)</div><div className="v t">{report.preview.total_supported}</div></div>
+                <div className="metric"><div className="l">⚠ 大文件</div><div className="v">{report.scan.large_files.length}</div></div>
+                <div className="metric"><div className="l">⛔ 不可解析</div><div className="v">{report.preview.total_unsupported}</div></div>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--mut)', margin: '6px 2px' }}>
+                当前数据基地已入库 <b>{stats?.documents ?? docs.length}</b> 条 · 本次扫描可接入 <b>{report.preview.total_supported}</b> 条（待处理）
+              </div>
+
+              {/* 识别到的项目/文件夹结构 */}
+              {report.preview.projects.length > 0 && (
+                <>
+                  <div className="ct" style={{ marginTop: 8 }}>识别到的项目/文件夹结构（{report.preview.total_projects}）</div>
+                  {report.preview.projects.map((p) => (
+                    <div className="kbrow" key={p.path}>
+                      <span className="pth">📁 {p.project_name}</span>
+                      <span className="meta">{p.supported_count} 可解析 / {p.unsupported_count} 不支持</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* 文件类型分布 */}
+              {topTypes.length > 0 && (
+                <>
+                  <div className="ct" style={{ marginTop: 8 }}>文件类型分布</div>
+                  <div className="tags">
+                    {topTypes.map(([ext, n]) => (
+                      <span className="tg" key={ext}><span className="k">{ext}</span>{n}</span>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="btnrow">
-                <button className="btn" onClick={importBatch} disabled={ingesting || ingestPreview.total_supported === 0}>
-                  {ingesting ? '接入中…' : '确认导入项目中心 + 知识库'}
+                </>
+              )}
+
+              {/* 大文件(秒级元数据登记,不强解析) */}
+              {report.scan.large_files.length > 0 && (
+                <>
+                  <div className="ct" style={{ marginTop: 8 }}>大文件（登记元数据，不阻塞）</div>
+                  {report.scan.large_files.slice(0, 5).map((f) => (
+                    <div className="kbrow" key={f.abs_path}>
+                      <span className="pth">{f.path}</span>
+                      <span className="meta" style={{ color: 'var(--terra)' }}>{fmtSize(f.size)}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              <div className="btnrow" style={{ marginTop: 10 }}>
+                <button className="btn" onClick={ingest} disabled={ingesting || report.preview.total_supported === 0}
+                        style={{ background: 'var(--terra)', color: '#fff' }}>
+                  {ingesting ? '接入中…' : `确认接入并建立索引（${report.preview.total_supported} 条）`}
                 </button>
               </div>
             </div>
           )}
-          {ingestResult && (
-            <div className="card" style={{ marginTop: 12, background: 'var(--panel2)' }}>
-              <div className="ct">批量接入结果</div>
-              <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
-                已复制 <b>{ingestResult.copied}</b> 个 · 已入库 <b>{ingestResult.indexed}</b> 个 · 跳过重复{' '}
-                <b>{ingestResult.skipped_existing}</b> 个 · 失败 <b>{ingestResult.failed}</b> 个
-              </div>
-              <div style={{ marginTop: 8 }}>
-                {ingestResult.projects.map((p) => (
-                  <div className="kbrow" key={p.project_id}>
-                    <span className="pth">{p.project_name}</span>
-                    <span className="meta">{p.copied} 复制 / {p.indexed} 入库 / {p.failed} 失败</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
-      <section className="sec" data-open={open.health ? '1' : '0'}>
-        <button className="sechead" type="button" onClick={() => toggle('health')}>
-          <span className="chev">▸</span>
+      {/* 库存与健康:不可折叠,默认展开——承担整理结果 / 索引状态 / 文件健康 展示 */}
+      <section className="sec nocollapse" data-open="1">
+        <div className="sechead" style={{ cursor: 'default' }}>
+          <span className="chev" style={{ visibility: 'hidden' }}>▸</span>
           <span className="stitle">库存与健康</span>
-          <span className="scount">{docs.length} 文档</span>
-          <span className="shint">FTS5 / BM25 · 本地索引</span>
-        </button>
+          <span className="scount">{stats ? stats.documents : docs.length} 文档</span>
+          <span className="shint">本地索引 · FTS5 / BM25</span>
+        </div>
         <div className="secbody">
           <div className="grid3">
             <div className="metric"><div className="l">受管文件</div><div className="v">{stats ? stats.documents : docs.length}</div></div>
             <div className="metric"><div className="l">已索引</div><div className="v t">{stats ? stats.indexed : docs.length}</div></div>
-            <div className="metric">
-              <div className="l">索引块 · CJK</div>
-              <div className="v">{stats ? stats.cjk_chunks : '…'}</div>
-            </div>
+            <div className="metric"><div className="l">索引块 · CJK</div><div className="v">{stats ? stats.cjk_chunks : '…'}</div></div>
           </div>
           <div className="health">
             <div className="hrow"><span className="hb" style={{ background: 'var(--ok)' }}></span>索引状态 正常 · {stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}<span className="r">当前本地库</span></div>
-            <div className="hrow"><span className="hb" style={{ background: 'var(--mut)' }}></span>二进制图纸与图片暂不入全文检索<span className="r">资产登记</span></div>
+            <div className="hrow"><span className="hb" style={{ background: 'var(--mut)' }}></span>二进制图纸与图片登记元数据，暂不入全文检索<span className="r">资产登记</span></div>
           </div>
+
+          {/* 最近一次接入结果(整理→接入后的真实落库统计) */}
+          {ingestResult && (
+            <div className="card" style={{ marginTop: 10, background: 'var(--panel2)' }}>
+              <div className="ct">最近一次接入结果</div>
+              <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
+                已复制 <b>{ingestResult.copied}</b> · 已入库索引 <b>{ingestResult.indexed}</b> · 跳过重复{' '}
+                <b>{ingestResult.skipped_existing}</b> · 失败 <b>{ingestResult.failed}</b>
+              </div>
+              {ingestResult.projects.map((p) => (
+                <div className="kbrow" key={p.project_id}>
+                  <span className="pth">{p.project_name}</span>
+                  <span className="meta">{p.copied} 复制 / {p.indexed} 入库 / {p.failed} 失败</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* 文档库 */}
+      {/* 已入库文档:列表 + 单条 AI 元数据 / 删除(核心动作) */}
       <section className="sec" data-open={open.docs ? '1' : '0'}>
         <button className="sechead" type="button" onClick={() => toggle('docs')}>
           <span className="chev">▸</span>
-          <span className="stitle">知识文档</span>
+          <span className="stitle">已入库文档</span>
           <span className="scount">{docs.length}</span>
-          <span className="shint">手动录入文本 / Markdown · SQLite 落库</span>
+          <span className="shint">整理接入的文件 · SQLite 落库</span>
         </button>
         <div className="secbody" style={{ display: 'block' }}>
-          <div className="btnrow" style={{ marginTop: 0, marginBottom: 12 }}>
-            <button className="btn" onClick={() => setShowAdd((v) => !v)}>
-              {showAdd ? '收起' : '＋ 新增文本知识'}
-            </button>
-            <button className="btn ghost" onClick={() => api.reindexKnowledge().then(loadDocs)}>
-              ⟳ 重建索引
-            </button>
-          </div>
-
-          {showAdd && (
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <input
-                  className="pathin"
-                  style={{ padding: '8px 11px' }}
-                  placeholder="标题（必填）"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-                <textarea
-                  placeholder="正文（文本 / Markdown）"
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  style={{
-                    border: '1px solid var(--line2)',
-                    background: 'var(--panel2)',
-                    borderRadius: 9,
-                    padding: '10px 12px',
-                    fontFamily: 'inherit',
-                    fontSize: 13.5,
-                    minHeight: 90,
-                    resize: 'vertical',
-                    color: 'var(--ink)',
-                  }}
-                />
-                <input
-                  className="pathin"
-                  style={{ padding: '8px 11px' }}
-                  placeholder="标签，逗号分隔，如：立面,材料"
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                />
-                <div>
-                  <button className="btn" onClick={addDoc} disabled={!title.trim()}>
-                    保存到知识库
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {loading && <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>加载中…</div>}
           {!loading && docs.length === 0 && (
             <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>
-              暂无知识文档。点「新增文本知识」录入第一条。
+              暂无已入库文档。用上方「选择文件夹并整理」接入本地文件夹后会出现在这里。
             </div>
           )}
           {docs.map((d) => (
             <div className="kbrow" key={d.id} style={{ flexWrap: 'wrap' }}>
               <span className="pth" style={{ cursor: 'pointer' }} onClick={() => openDetail(d.id)}>
-                {d.type && (
-                  <span className="chip" style={{ marginRight: 6, fontSize: 10 }}>{d.type}</span>
-                )}
+                {d.type && <span className="chip" style={{ marginRight: 6, fontSize: 10 }}>{d.type}</span>}
                 <b>{d.title}</b>
                 {d.tags && <span style={{ color: 'var(--mut)', marginLeft: 8 }}>#{d.tags}</span>}
               </span>
               <span className="meta">{d.file_type}</span>
-              <span
-                className="act"
-                onClick={() => genMeta(d.id)}
-                style={{ color: 'var(--terra)', opacity: genningId === d.id ? 0.5 : 1 }}
-              >
+              <span className="act" onClick={() => genMeta(d.id)} style={{ color: 'var(--terra)', opacity: genningId === d.id ? 0.5 : 1 }}>
                 {genningId === d.id ? '生成中…' : 'AI 生成元数据'}
               </span>
-              <span className="act" onClick={() => del(d.id)} style={{ color: 'var(--red)' }}>
-                删除
-              </span>
+              <span className="act" onClick={() => del(d.id)} style={{ color: 'var(--red)' }}>删除</span>
               {d.description && (
-                <div style={{ width: '100%', fontSize: 12, color: 'var(--mut)', marginTop: 4 }}>
-                  {d.description}
-                </div>
+                <div style={{ width: '100%', fontSize: 12, color: 'var(--mut)', marginTop: 4 }}>{d.description}</div>
               )}
             </div>
           ))}
-          {metaNote && (
-            <div style={{ fontSize: 12, color: 'var(--mut)', padding: '6px 2px' }}>{metaNote}</div>
-          )}
+          {metaNote && <div style={{ fontSize: 12, color: 'var(--mut)', padding: '6px 2px' }}>{metaNote}</div>}
         </div>
       </section>
 
-      <section className="sec" data-open={open.files ? '1' : '0'}>
-        <button className="sechead" type="button" onClick={() => toggle('files')}>
-          <span className="chev">▸</span>
-          <span className="stitle">文件浏览</span>
-          <span className="scount">{docs.length} 文件</span>
-          <span className="shint">目录树 · 按文件夹</span>
-        </button>
-        <div className="secbody">
-          <div className="tree">
-            <div className="tfolder" data-open="1">
-              <button className="tfhead" type="button">
-                <span className="tchev">▸</span>
-                <span className="tname">📁 知识文档</span>
-                <span className="tcnt">{docs.length} 文件</span>
-              </button>
-              <div className="tfiles">
-                {docs.slice(0, 8).map((d) => (
-                  <div className="tfile" key={d.id}>
-                    <span className="ext mono">{d.file_type || 'TXT'}</span>
-                    {d.title}
-                    <span className="sz mono">本地</span>
-                    <span className="idx in">已索引</span>
-                  </div>
-                ))}
-                {!docs.length && <div className="gempty">暂无文件。上传或录入知识后会出现在这里。</div>}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      {/* 可复用资产:按真实标签聚合(无标签→空态) */}
       <section className="sec" data-open={open.assets ? '1' : '0'}>
         <button className="sechead" type="button" onClick={() => toggle('assets')}>
           <span className="chev">▸</span>
@@ -545,71 +362,49 @@ export default function KnowledgePage() {
         <div className="secbody">
           {assetGroups.length === 0 ? (
             <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 2px' }}>
-              暂无可复用资产。给知识文档打标签后，会在此按标签自动聚合。
+              暂无可复用资产。给文档打标签后，会在此按标签自动聚合。
             </div>
           ) : (
             assetGroups.map(([group, items]) => (
               <div className="rgroup" key={group}>
                 <div className="gh">{group} · {items.length}</div>
-                <div className="tags">
-                  {items.map((x, i) => <span className="tg" key={group + i}>{x}</span>)}
-                </div>
+                <div className="tags">{items.map((x, i) => <span className="tg" key={group + i}>{x}</span>)}</div>
               </div>
             ))
           )}
         </div>
       </section>
 
+      {/* 项目效果图:未接生图时保持空态(不伪造) */}
       <section className="sec nocollapse" data-open="1">
-        <button className="sechead" type="button">
-          <span className="chev">▸</span>
+        <div className="sechead" style={{ cursor: 'default' }}>
+          <span className="chev" style={{ visibility: 'hidden' }}>▸</span>
           <span className="stitle">项目效果图</span>
           <span className="scount">0 张</span>
           <span className="shint">{cur ? `当前项目 · ${cur.name}` : '未选择项目'} · 未接生图</span>
-        </button>
+        </div>
         <div className="secbody">
-          <div className="matwrap">
-            <div className="matlabel">生图素材 · AI 代理生图来源</div>
-            <div className="matgrid">
-              {['任务书', '参考图', '材料表'].map((x) => (
-                <div className="matcard" key={x}><span className="mname">{x}</span></div>
-              ))}
-            </div>
-            <div className="modebar">
-              <span className="mode t2i">Text to Image</span>
-              <span className="sep">/</span>
-              <span className="mode i2i">Image to Image</span>
-              <span style={{ color: 'var(--mut)' }}>生图未配置时保持空态，不伪造图。</span>
-            </div>
-          </div>
           <div className="gallery">
-            <div className="gempty">暂无效果图成果。</div>
+            <div className="gempty">暂无效果图成果。生图未配置时保持空态，不伪造图。</div>
           </div>
         </div>
       </section>
 
       {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
 
-      {/* 详情弹窗（复用原 modal 样式） */}
       {detail && (
         <div className="modal show" onClick={() => setDetail(null)}>
           <div className="panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
             <div className="mh">
               <span className="ic">📄</span>
               <h3>{detail.title}</h3>
-              <button className="mclose" onClick={() => setDetail(null)}>
-                ×
-              </button>
+              <button className="mclose" onClick={() => setDetail(null)}>×</button>
             </div>
             <div className="mto" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {detail.type && <span className="chip">{detail.type}</span>}
               {detail.tags && <span>#{detail.tags}</span>}
               <span className="cspacer" style={{ flex: 1 }}></span>
-              <button
-                className="anbtn"
-                disabled={genningId === detail.id}
-                onClick={() => genMeta(detail.id)}
-              >
+              <button className="anbtn" disabled={genningId === detail.id} onClick={() => genMeta(detail.id)}>
                 {genningId === detail.id ? '生成中…' : 'AI 生成元数据'}
               </button>
             </div>
@@ -621,9 +416,7 @@ export default function KnowledgePage() {
             {detail.resource && (
               <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 6 }}>来源：{detail.resource}</div>
             )}
-            <div className="mbody" style={{ whiteSpace: 'pre-wrap' }}>
-              {detail.content_text || '（无正文）'}
-            </div>
+            <div className="mbody" style={{ whiteSpace: 'pre-wrap' }}>{detail.content_text || '（无正文）'}</div>
           </div>
         </div>
       )}

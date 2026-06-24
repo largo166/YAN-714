@@ -206,3 +206,27 @@ def test_batch_ingest_preview_and_import(client, tmp_path):
     finally:
         for pid in project_ids:
             _cleanup_project_dir(pid)
+
+
+def test_batch_ingest_flat_folder_root_as_project(client, tmp_path):
+    """扁平文件夹(散落文件、无子目录)→ 把根目录本身当作一个项目,可解析文件能被接入。
+    (数据基地「选文件夹整理」的常见场景:用户直接指向一个装满文件的文件夹。)"""
+    root = tmp_path / "投标资料平铺"
+    root.mkdir()
+    (root / "任务书.md").write_text("# 任务书\n退台立面", encoding="utf-8")
+    (root / "纪要.txt").write_text("甲方要求：展示区品质", encoding="utf-8")
+    (root / "效果图.png").write_bytes(b"png")  # 图片资产,也算 supported(登记)
+
+    pv = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(root)}).json()
+    assert pv["total_projects"] == 1                 # 根目录本身=1 个项目
+    assert pv["projects"][0]["project_name"] == "投标资料平铺"
+    assert pv["total_supported"] >= 2                 # 至少 md + txt 可解析
+
+    imp = client.post("/api/projects/batch-ingest/import", json={"root_path": str(root)}).json()
+    pids = [p["project_id"] for p in imp["projects"]]
+    try:
+        assert imp["copied"] >= 2 and imp["failed"] == 0
+        assert any(p["name"] == "投标资料平铺" for p in client.get("/api/projects").json()["items"])
+    finally:
+        for pid in pids:
+            _cleanup_project_dir(pid)
