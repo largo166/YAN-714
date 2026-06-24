@@ -573,15 +573,102 @@ class ProjectAnalysisListOut(BaseModel):
     total: int
 
 
-# ── 项目结构化认知（P2 脊椎）──
-# 任务书 canonical 16 字段（对齐《建筑方案前期认知系统》任务书解读模板）
-BRIEF_FIELDS = (
-    "建筑类型", "项目阶段", "基地位置", "建筑规模", "用地条件",
-    "容积率/建筑密度/限高", "功能构成", "业主显性目标", "业主隐性目标",
-    "使用者需求", "场地限制", "设计矛盾", "必须解决的问题",
-    "可创造价值的问题", "前期需追问的问题", "方案切入点",
+# ── 项目结构化认知（ProjectCognition Schema 规格 v1.0）──
+SCHEMA_VERSION = "1.0"
+
+# 范围约束（规格 1.4，写入每个 module 的 scope_constraint，防跑偏）
+SCOPE_CONSTRAINT = (
+    "仅建筑方案前期。排除：城市规划/控规/修详规/施工图/结构/给排水/暖通/强弱电/"
+    "幕墙深化/景观深化/室内深化/造价招采/施工组织/BIM深化。"
+    "若内容跨前后期，只保留对方案前期判断有帮助的部分。"
 )
-COGNITION_MODULES = ("brief",)  # 本期只做任务书;后续横向扩 site/program/case/concept
+
+# 任务书 A1 字段描述表（规格 A1，17 字段）。每项：key/label/type/required/nullable/extractable/source_type
+# extractable 四档（规格 1.3）：high=明文事实 / medium=事实需归类 / low=判断只给草案 / manual_only=核心判断不填值给引导问题
+BRIEF_FIELD_SPECS = [
+    {"key": "project_name", "label": "项目名称", "type": "string", "required": True, "nullable": False, "extractable": "high", "source_type": "doc"},
+    {"key": "building_type", "label": "建筑类型", "type": "string", "required": True, "nullable": False, "extractable": "high", "source_type": "doc"},
+    {"key": "project_phase", "label": "项目阶段", "type": "string", "required": True, "nullable": False, "extractable": "high", "source_type": "doc"},
+    {"key": "site_location", "label": "基地位置", "type": "string", "required": True, "nullable": False, "extractable": "high", "source_type": "doc"},
+    {"key": "building_scale", "label": "建筑规模", "type": "string", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "land_conditions", "label": "用地条件", "type": "string", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "key_indicators", "label": "容积率/建筑密度/限高/绿地率", "type": "object", "required": False, "nullable": True, "extractable": "high", "source_type": "doc"},
+    {"key": "program_composition", "label": "功能构成", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "client_explicit_goals", "label": "业主显性目标", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "client_implicit_goals", "label": "业主隐性目标", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "user_needs", "label": "使用者需求", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "site_constraints", "label": "场地限制", "type": "array", "required": False, "nullable": True, "extractable": "medium", "source_type": "doc"},
+    {"key": "design_conflicts", "label": "设计矛盾", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "must_solve_problems", "label": "必须解决的问题", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "value_creation_problems", "label": "可创造价值的问题", "type": "array", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+    {"key": "questions_to_clarify", "label": "前期需追问的问题", "type": "array", "required": False, "nullable": True, "extractable": "low", "source_type": "inference"},
+    {"key": "design_entry_point", "label": "方案切入点", "type": "string", "required": False, "nullable": True, "extractable": "manual_only", "source_type": "manual"},
+]
+
+# manual_only 字段的人工引导问题（规格 1.3：不填值，只输出引导问题）
+MANUAL_GUIDE = {
+    "value_creation_problems": "在满足任务书之外，这个项目最值得设计去创造价值的点是什么？（请人工判断填写）",
+    "design_entry_point": "你打算从哪个角度切入这个方案？（核心设计立场，请人工填写）",
+}
+
+# A 类项目认知 module（规格 A1-A8）。brief 本刀实现，其余只占位 schema、不实现抽取。
+COGNITION_MODULES = {
+    "brief": {"label": "任务书", "implemented": True},
+    "site_research": {"label": "场地研究", "implemented": False},
+    "user_program": {"label": "使用者与功能", "implemented": False},
+    "design_concept": {"label": "概念生成", "implemented": False},
+    "circulation_experience": {"label": "动线与体验", "implemented": False},
+    "plan_section_facade": {"label": "平剖立方向", "implemented": False},
+    "scheme_comparison": {"label": "方案比选", "implemented": False},
+    "project_review": {"label": "项目复盘", "implemented": False},
+}
+
+# B 类跨项目复用库（规格 B1-B6，落 KnowledgeDocument，本刀不实现，仅登记名）
+CROSS_PROJECT_TYPES = (
+    "case_study", "spatial_strategy", "massing_operation",
+    "representation", "typology", "design_method",
+)
+
+# 工作流状态机节点（规格 D，16 节点）。本刀只定义不驱动。
+STAGE_NODES = [
+    {"stage": "brief", "label": "任务书", "cognition_module": "brief", "upstream_required": []},
+    {"stage": "conditions", "label": "条件梳理", "cognition_module": "", "upstream_required": ["brief"]},
+    {"stage": "site", "label": "场地研究", "cognition_module": "site_research", "upstream_required": ["brief"]},
+    {"stage": "user_program", "label": "使用者功能", "cognition_module": "user_program", "upstream_required": ["brief"]},
+    {"stage": "cases", "label": "案例研究", "cognition_module": "", "upstream_required": []},
+    {"stage": "core_problem", "label": "核心问题", "cognition_module": "", "upstream_required": ["brief", "site_research"]},
+    {"stage": "concept", "label": "概念生成", "cognition_module": "design_concept", "upstream_required": ["core_problem"]},
+    {"stage": "spatial", "label": "空间策略", "cognition_module": "", "upstream_required": ["concept"]},
+    {"stage": "massing", "label": "体量推演", "cognition_module": "", "upstream_required": ["concept"]},
+    {"stage": "circulation", "label": "动线组织", "cognition_module": "circulation_experience", "upstream_required": ["concept"]},
+    {"stage": "psf", "label": "平剖立方向", "cognition_module": "plan_section_facade", "upstream_required": ["concept"]},
+    {"stage": "comparison", "label": "方案比选", "cognition_module": "scheme_comparison", "upstream_required": ["psf"]},
+    {"stage": "representation", "label": "图面表达", "cognition_module": "", "upstream_required": ["comparison"]},
+    {"stage": "narrative", "label": "汇报叙事", "cognition_module": "", "upstream_required": ["comparison"]},
+    {"stage": "review", "label": "评图反馈", "cognition_module": "", "upstream_required": []},
+    {"stage": "archive", "label": "复盘入库", "cognition_module": "project_review", "upstream_required": []},
+]
+
+
+class CognitionFieldSource(BaseModel):
+    """单字段出处（规格 1.2）。"""
+    type: str = "manual"           # doc | inference | manual
+    doc_ids: List[int] = []
+    based_on: List[str] = []       # type=inference 时引用的字段 key
+    doc_location: str = ""
+
+
+class CognitionField(BaseModel):
+    """单字段记录（规格 1.2）。"""
+    key: str
+    label: str
+    type: str
+    extractable: str
+    value: object = None
+    status: str = "draft"          # draft | confirmed | empty
+    source: CognitionFieldSource = CognitionFieldSource()
+    confidence: Optional[float] = None  # manual_only 恒为 null
+    guide: str = ""                # manual_only 的引导问题
 
 
 class CognitionSourceOut(BaseModel):
@@ -598,9 +685,12 @@ class ProjectCognitionOut(BaseModel):
     id: int
     project_id: int
     module: str
-    fields: dict = {}        # fields_json 解析后
+    module_label: str = ""
+    schema_version: str = SCHEMA_VERSION
+    fields: List[CognitionField] = []   # 字段记录数组（规格 1.2）
     summary_md: str = ""
-    status: str              # draft|confirmed
+    status: str                          # 记录态 draft|confirmed
+    module_status: str = "draft"         # draft|confirmed|partial|empty
     version: int = 1
     sources: List[CognitionSourceOut] = []
     model: str = ""

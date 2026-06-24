@@ -54,7 +54,7 @@ def test_current_stage_default_brief(client):
 
 
 def test_confirmed_cognition_injected_into_gather_material():
-    """已确认认知被 gather_material 置顶注入(共创营地/研判推演据此分析)——修最致命断点。"""
+    """已确认字段被 gather_material 注入(规格1.5: 仅 status=confirmed 字段)；draft/empty 不注入——修最致命断点。"""
     from app.database import SessionLocal
     from app import models, analysis, safe_json
 
@@ -64,25 +64,60 @@ def test_confirmed_cognition_injected_into_gather_material():
         db.add(proj)
         db.commit()
         db.refresh(proj)
+        confirmed_field = {
+            "key": "design_conflicts", "label": "设计矛盾", "type": "array", "extractable": "low",
+            "value": ["高容积率与居住品质"], "status": "confirmed",
+            "source": {"type": "manual", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": None, "guide": "",
+        }
+        draft_field = {
+            "key": "building_scale", "label": "建筑规模", "type": "string", "extractable": "high",
+            "value": "用地3公顷", "status": "draft",
+            "source": {"type": "doc", "doc_ids": [], "based_on": [], "doc_location": ""},
+            "confidence": 0.8, "guide": "",
+        }
         cog = models.ProjectCognition(
-            project_id=proj.id, module="brief",
-            fields_json=safe_json.dumps_safe({"设计矛盾": "高容积率与居住品质"}),
-            summary_md="测试摘要", status="confirmed", version=1,
+            project_id=proj.id, module="brief", module_label="任务书",
+            fields_json=safe_json.dumps_safe([confirmed_field, draft_field]),
+            summary_md="测试摘要", status="confirmed", module_status="partial", version=1,
         )
         db.add(cog)
         db.commit()
         m = analysis.gather_material(db, proj.id, query="设计要点", top_k=5)
-        assert not m.empty  # 认知即材料
+        assert not m.empty
         assert any(s.kind == "cognition" for s in m.sources)
-        assert "已确认的结构化认知" in m.context
-        assert "高容积率与居住品质" in m.context
-        # draft 不应注入
-        cog.status = "draft"
-        db.commit()
-        m2 = analysis.gather_material(db, proj.id, query="设计要点", top_k=5)
-        assert not any(s.kind == "cognition" for s in m2.sources)
+        assert "已确认认知" in m.context
+        assert "高容积率与居住品质" in m.context  # confirmed 字段注入
+        assert "用地3公顷" not in m.context        # draft 字段不注入
     finally:
         db.query(models.ProjectCognition).filter_by(project_id=proj.id).delete()
         db.query(models.Project).filter_by(id=proj.id).delete()
         db.commit()
         db.close()
+
+
+def test_extract_brief_field_grading_offline():
+    """离线验证字段分档装配(_build_field_records)：manual_only 留空带引导、low draft 不 confirmed、high 带出处。"""
+    from app.routers.cognition import _build_field_records
+
+    recs = _build_field_records(
+        {"project_name": "测试项目", "building_type": "住宅", "design_conflicts": ["矛盾A"]},
+        doc_ids=[7],
+    )
+    by_key = {r["key"]: r for r in recs}
+    assert len(recs) == 17
+    # high 字段有值 → draft + doc 出处
+    assert by_key["building_type"]["status"] == "draft"
+    assert by_key["building_type"]["source"]["type"] == "doc"
+    assert by_key["building_type"]["source"]["doc_ids"] == [7]
+    # low 字段 → draft + inference，绝不 confirmed
+    assert by_key["design_conflicts"]["status"] == "draft"
+    assert by_key["design_conflicts"]["source"]["type"] == "inference"
+    # manual_only → empty + 引导问题，不填值
+    assert by_key["value_creation_problems"]["status"] == "empty"
+    assert by_key["value_creation_problems"]["value"] is None
+    assert by_key["value_creation_problems"]["guide"]
+    assert by_key["design_entry_point"]["status"] == "empty"
+    # 未抽到的 high 字段 → empty
+    assert by_key["site_location"]["status"] == "empty"
+

@@ -196,9 +196,13 @@ class ProjectCognition(Base):
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     module: Mapped[str] = mapped_column(String(40), nullable=False)  # brief/site/program/case/concept...
-    fields_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)  # 受控字段(safe_json)
+    module_label: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 任务书/场地研究...
+    schema_version: Mapped[str] = mapped_column(String(10), default="1.0", nullable=False)
+    scope_constraint: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 范围约束(防跑偏)
+    fields_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # 字段记录数组(规格1.2)
     summary_md: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 一句话/段摘要
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)  # draft|confirmed
+    module_status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)  # draft|confirmed|partial|empty
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     sources_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # 结构化出处
     model: Mapped[str] = mapped_column(String(100), default="", nullable=False)

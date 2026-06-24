@@ -71,13 +71,10 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
     sources: List[Source] = []
     lines: List[str] = []
 
-    # 路0：本项目已确认(confirmed)的结构化认知——最高优先，让推演基于"项目已认知到什么"
+    # 路0：本项目结构化认知——只注入 status=confirmed 的字段（规格 1.5），让推演基于"已审定认知"
     cogs = (
         db.query(models.ProjectCognition)
-        .filter(
-            models.ProjectCognition.project_id == project_id,
-            models.ProjectCognition.status == "confirmed",
-        )
+        .filter(models.ProjectCognition.project_id == project_id)
         .order_by(models.ProjectCognition.updated_at.desc())
         .all()
     )
@@ -85,18 +82,23 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
     import json as _json
     for c in cogs:
         try:
-            fields = _json.loads(c.fields_json) if c.fields_json else {}
+            raw = _json.loads(c.fields_json) if c.fields_json else []
         except (ValueError, TypeError):
-            fields = {}
-        nonempty = {k: v for k, v in fields.items() if isinstance(v, str) and v.strip()}
-        if not nonempty and not c.summary_md.strip():
+            raw = []
+        fields = raw if isinstance(raw, list) else []
+        # 只取已确认字段（draft/empty 不注入，规格 1.5）
+        confirmed = [f for f in fields if isinstance(f, dict) and f.get("status") == "confirmed" and f.get("value") not in (None, "", [], {})]
+        if not confirmed:
             continue
-        cog_block.append(f"【已确认认知·{c.module}】" + (f" 摘要：{c.summary_md}" if c.summary_md else ""))
-        for k, v in nonempty.items():
-            cog_block.append(f"  - {k}：{v}")
+        label = c.module_label or c.module
+        cog_block.append(f"【已确认认知·{label}】" + (f" 摘要：{c.summary_md}" if c.summary_md else ""))
+        for f in confirmed:
+            v = f.get("value")
+            vs = "、".join(map(str, v)) if isinstance(v, list) else str(v)
+            cog_block.append(f"  - {f.get('label', f.get('key'))}：{vs}")
         sources.append(
-            Source(kind="cognition", ref_id=c.id, title=f"{c.module}结构化认知",
-                   snippet=(c.summary_md or "; ".join(f"{k}:{v}" for k, v in list(nonempty.items())[:3]))[:200],
+            Source(kind="cognition", ref_id=c.id, title=f"{label}结构化认知",
+                   snippet=(c.summary_md or "; ".join(f"{f.get('label')}:{f.get('value')}" for f in confirmed[:3]))[:200],
                    engine="cognition")
         )
 
