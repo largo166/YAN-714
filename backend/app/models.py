@@ -79,6 +79,9 @@ class AppSetting(Base):
     deepseek_model: Mapped[str] = mapped_column(String(100), default="deepseek-chat", nullable=False)
     theme: Mapped[str] = mapped_column(String(20), default="light", nullable=False)
     workspace_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    # 受管资料库(仓库)根:用户新建的本地文件夹。空=未配置→一键整理回退程序内部 uploads。
+    # 配置后整理文件落 {仓库}/{项目名}/{原名},知识库索引指向仓库。
+    repository_root_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )
@@ -147,7 +150,10 @@ class ProjectFile(Base):
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)  # 净化后文件名
-    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对 uploads 根
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对受管根的路径
+    # 落盘时的绝对受管根(normcase+abspath)。""=历史/回退行→还原视作 uploads 根。
+    # 自带根使 stored_path 自包含:用户日后改/清仓库设置,老文件仍能正确删除/恢复。
+    storage_root: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     file_type: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 扩展名
     size: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # 解析状态(见 parsing.py)：pending / ok / ok_truncated(截断但真实正文) /
