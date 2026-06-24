@@ -13,17 +13,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [curId, setCurId] = useState<number | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
-  const reload = useCallback(() => {
-    api
-      .listProjects()
-      .then((d) => {
-        setProjects(d.items)
-        // 仅在尚未选中（或选中项已不存在）时回落到首个项目，避免覆盖用户选择
-        setCurId((prev) =>
-          prev != null && d.items.some((p) => p.id === prev) ? prev : (d.items[0]?.id ?? null),
-        )
-      })
-      .catch((e: Error) => setErr(e.message))
+  const reload = useCallback(async (): Promise<void> => {
+    try {
+      const d = await api.listProjects()
+      setProjects(d.items)
+      // 仅在尚未选中（或选中项已不存在）时回落到首个项目，避免覆盖用户选择
+      setCurId((prev) =>
+        prev != null && d.items.some((p) => p.id === prev) ? prev : (d.items[0]?.id ?? null),
+      )
+    } catch (e) {
+      setErr((e as Error).message)
+    }
   }, [])
 
   useEffect(() => {

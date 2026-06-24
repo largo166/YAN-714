@@ -8,7 +8,7 @@ export interface ProjectCtx {
   setCurId: (id: number | null) => void
   cur: Project | null
   err: string | null
-  reload: () => void
+  reload: () => Promise<void>
 }
 
 export const ProjectContext = createContext<ProjectCtx | null>(null)

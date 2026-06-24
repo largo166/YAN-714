@@ -3,6 +3,7 @@
 落盘走 uploads.py（硬编码 data/uploads + validate_path），解析走 parsing.py（分级状态不伪造）。
 删除为软删（移 _trash + manifest），永不硬删。
 """
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -61,9 +62,18 @@ def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPrevi
     )
 
 
+def _norm_source(p) -> str:
+    """规范化源路径作去重键:绝对化 + 按平台大小写规则归一(Windows 不区分大小写,避免同夹两路径形式漏判)。"""
+    try:
+        return os.path.normcase(os.path.abspath(str(p)))
+    except Exception:  # noqa: BLE001
+        return str(p)
+
+
 def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> models.Project:
     """按【源文件夹路径】去重(可靠键,支持重新整理):同 source_path 已存在→复用(不改名,
     保留用户在项目中心可能做过的手动改名);否则用文件夹原名新建并记录来源路径。"""
+    source_path = _norm_source(source_path) if source_path else source_path
     if source_path:
         row = db.query(models.Project).filter(models.Project.source_path == source_path).first()
         if row is not None:

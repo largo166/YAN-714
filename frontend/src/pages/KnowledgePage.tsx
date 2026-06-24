@@ -167,11 +167,12 @@ export default function KnowledgePage() {
     setErr(null)
     try {
       const r = await api.importBatchIngest(root)
+      // 先把新项目灌入共享上下文,再渲染结果卡——这样卡上「设为当前项目」点击不会被 reload 回落覆盖(消除竞态)
+      await reloadProjects()
       setIngestResult(r)
+      setSwitchNote(`本次整理识别并接入 ${r.total_projects} 个项目，已在「项目中心」下拉出现。`)
       await loadDocs()
       loadStats()
-      reloadProjects() // 刷新项目中心「当前项目」下拉:本次识别的项目随即出现、可切换
-      setSwitchNote(`本次整理识别并接入 ${r.total_projects} 个项目，已在「项目中心」下拉出现。`)
     } catch (e) {
       setErr((e as Error).message)
     } finally {
