@@ -31,25 +31,43 @@ def _unit_files(pdir: Path) -> list[Path]:
     return [p for p in sorted(pdir.rglob("*"), key=lambda x: str(x)) if p.is_file()]
 
 
-def _project_dirs(root_path: str) -> tuple[Path, list[Path]]:
+def _project_dirs(root_path: str, mode: str = "collection") -> tuple[Path, list[Path]]:
     root = Path(root_path)
-    # 单个文件:把它自己当作唯一项目单元,父目录作 root(rel 路径据此计算)。
-    # 支持"选择来源"既可选文件夹也可选单个文件(与前端两动作拆分配套)。
+    # 单个文件:把它自己当作唯一项目单元,父目录作 root(rel 路径据此计算)。与 mode 无关。
     if root.is_file():
         return root.parent, [root]
     if not root.exists() or not root.is_dir():
         raise HTTPException(400, "路径不存在或不可访问")
+    # 单项目模式:整个所选文件夹 = 1 个项目(子文件夹只是它的资料分类,_unit_files 已 rglob 全收)。
+    # 用户明确"这个文件夹本身是一个项目"时选此,避免把分类子文件夹误建成独立项目。
+    if mode == "single":
+        return root, [root]
+    # 项目集合模式(默认):一级子文件夹各=一个项目。
     # 排除清理隔离区(_ROMAI_CLEANUP_QUARANTINE)——它是 workspace 安全清理的隔离目录,
     # 不是项目,否则会把已隔离文件当项目误接入(与 workspace.scan 的过滤口径一致)。
     subdirs = sorted(
         [p for p in root.iterdir() if p.is_dir() and p.name != "_ROMAI_CLEANUP_QUARANTINE"],
         key=lambda p: p.name,
     )
-    # 子文件夹=各自一个项目;若根目录是【扁平文件夹】(无子目录、仅散落文件)→ 把根目录本身当作一个项目,
+    # 若根目录是【扁平文件夹】(无子目录、仅散落文件)→ 把根目录本身当作一个项目,
     # 否则散落在根的文件永远不会被接入(数据基地"选文件夹整理"对扁平文件夹就成了空操作)。
     if not subdirs:
         return root, [root]
     return root, subdirs
+
+
+def _mode_hint(root: Path) -> str:
+    """是否值得提示用户考虑"单个项目"解读。零猜测原则:不看子文件夹名,
+    只要目录【有子文件夹】(即集合解读会拆成多个项目),就提示用户确认是集合还是单项目——
+    因为只有用户知道这个文件夹是"装着多个项目"还是"本身一个项目、子文件夹是资料分类"。"""
+    try:
+        if root.is_file():
+            return ""
+        subs = [p for p in root.iterdir() if p.is_dir() and p.name != "_ROMAI_CLEANUP_QUARANTINE"]
+    except OSError:
+        return ""
+    # 有子文件夹 → 两种解读都成立,提示用户选(单文件/扁平文件夹无歧义,不提示)
+    return "choose_mode" if subs else ""
 
 
 def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPreviewOut:
@@ -168,13 +186,11 @@ def _index_project_file(db: Session, f: models.ProjectFile) -> int:
     return doc.id
 
 
-@router.post("/batch-ingest/preview", response_model=schemas.BatchIngestPreviewOut)
-def batch_ingest_preview(payload: schemas.BatchIngestRequest) -> schemas.BatchIngestPreviewOut:
-    root, project_dirs = _project_dirs(payload.root_path)
+def _mode_summary(root_path: str, mode: str) -> schemas.BatchIngestModeSummaryOut:
+    root, project_dirs = _project_dirs(root_path, mode)
     projects = [_scan_project_dir(root, pdir) for pdir in project_dirs]
-    return schemas.BatchIngestPreviewOut(
-        accessible=True,
-        root=str(root),
+    return schemas.BatchIngestModeSummaryOut(
+        mode=mode,
         total_projects=len(projects),
         total_supported=sum(p.supported_count for p in projects),
         total_unsupported=sum(p.unsupported_count for p in projects),
@@ -182,11 +198,33 @@ def batch_ingest_preview(payload: schemas.BatchIngestRequest) -> schemas.BatchIn
     )
 
 
+@router.post("/batch-ingest/preview", response_model=schemas.BatchIngestPreviewOut)
+def batch_ingest_preview(payload: schemas.BatchIngestRequest) -> schemas.BatchIngestPreviewOut:
+    root = Path(payload.root_path)
+    is_file = root.is_file()
+    collection = _mode_summary(payload.root_path, "collection")
+    # 单文件无"集合/单项目"之分;目录才算两种解读
+    single = None if is_file else _mode_summary(payload.root_path, "single")
+    return schemas.BatchIngestPreviewOut(
+        accessible=True,
+        root=str(root if is_file else _project_dirs(payload.root_path, "collection")[0]),
+        # 顶层沿用 collection 解读(向后兼容旧前端)
+        total_projects=collection.total_projects,
+        total_supported=collection.total_supported,
+        total_unsupported=collection.total_unsupported,
+        projects=collection.projects,
+        is_single_file=is_file,
+        collection=collection,
+        single_project=single,
+        mode_hint=_mode_hint(root),
+    )
+
+
 @router.post("/batch-ingest/import", response_model=schemas.BatchIngestImportOut)
 def batch_ingest_import(
     payload: schemas.BatchIngestImportRequest, db: Session = Depends(get_db)
 ) -> schemas.BatchIngestImportOut:
-    root, project_dirs = _project_dirs(payload.root_path)
+    root, project_dirs = _project_dirs(payload.root_path, payload.mode)
     allowed = set(payload.project_names or [])
     results: list[schemas.BatchIngestProjectImportOut] = []
 

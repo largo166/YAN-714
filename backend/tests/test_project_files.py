@@ -379,6 +379,43 @@ def test_batch_ingest_into_repository(client, tmp_path):
             _cleanup_project_dir(pid)
 
 
+def test_batch_ingest_single_project_mode(client, tmp_path):
+    """单个项目目录(内含资料分类子文件夹):mode=single 整夹作 1 个项目,
+    不把子文件夹各建成项目。preview 同时给两种解读 + maybe_single 提示。"""
+    proj = tmp_path / "石家庄长安天曜项目"
+    (proj / "原始资料").mkdir(parents=True)
+    (proj / "项目笔记").mkdir(parents=True)
+    (proj / "原始资料" / "任务书.md").write_text("# 任务书\n退台立面", encoding="utf-8")
+    (proj / "原始资料" / "图.png").write_bytes(b"png")
+    (proj / "项目笔记" / "纪要.txt").write_text("甲方诉求", encoding="utf-8")
+
+    pv = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(proj)}).json()
+    # 集合解读=2(原始资料/项目笔记 各一个);单项目解读=1(整夹)
+    assert pv["collection"]["total_projects"] == 2
+    assert pv["single_project"]["total_projects"] == 1
+    assert pv["single_project"]["projects"][0]["project_name"] == "石家庄长安天曜项目"
+    assert pv["mode_hint"] == "choose_mode"    # 有子文件夹 → 提示用户选集合/单项目
+    assert pv["is_single_file"] is False
+    # 顶层向后兼容=collection
+    assert pv["total_projects"] == 2
+
+    imp = client.post(
+        "/api/projects/batch-ingest/import",
+        json={"root_path": str(proj), "mode": "single"},
+    ).json()
+    pids = [p["project_id"] for p in imp["projects"]]
+    try:
+        assert imp["total_projects"] == 1               # 整夹 1 个项目,不是 2
+        assert imp["projects"][0]["project_name"] == "石家庄长安天曜项目"
+        assert imp["copied"] == 3                        # 整树可解析文件(md+png+txt)归一个项目
+        # 项目下文件齐全(跨子文件夹收齐)
+        files = client.get(f"/api/projects/{pids[0]}/files").json()["items"]
+        assert len(files) == 3
+    finally:
+        for pid in pids:
+            _cleanup_project_dir(pid)
+
+
 def test_batch_ingest_excludes_quarantine_and_empty_dirs(client, tmp_path):
     """清理隔离区不当项目接入;无可解析文件的子目录不创建空项目(对抗复核坐实点)。"""
     root = tmp_path / "资料根"
