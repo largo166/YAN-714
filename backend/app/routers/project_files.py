@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import models, parsing, retrieval, schemas, uploads
+from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads
 from ..database import get_db
 from ..safe_paths import sanitize_filename
 
@@ -73,6 +73,21 @@ def _already_imported(db: Session, project_id: int, filename: str, size: int) ->
     )
 
 
+def _doc_from_file(db: Session, f: models.ProjectFile, tags: str) -> models.KnowledgeDocument:
+    """从项目文件构造知识文档，规则填充 type/resource（零 LLM，description 留空待 AI 生成）。"""
+    proj = db.get(models.Project, f.project_id)
+    resource = f"{proj.name} / {f.stored_path}" if proj else f.stored_path
+    return models.KnowledgeDocument(
+        title=f.filename,
+        source_path=f.stored_path,
+        content_text=f.content_text,
+        file_type=f.file_type or "text",
+        tags=tags,
+        type=knowledge_meta.infer_type(f.filename, f.file_type, tags, f.content_text[:200]),
+        resource=resource,
+    )
+
+
 def _index_project_file(db: Session, f: models.ProjectFile) -> int:
     if f.parse_status != "ok" or not f.content_text.strip():
         return 0
@@ -80,17 +95,11 @@ def _index_project_file(db: Session, f: models.ProjectFile) -> int:
         existing = db.get(models.KnowledgeDocument, f.indexed_doc_id)
         if existing is not None:
             return existing.id
-    doc = models.KnowledgeDocument(
-        title=f.filename,
-        source_path=f.stored_path,
-        content_text=f.content_text,
-        file_type=f.file_type or "text",
-        tags="项目文件,批量接入",
-    )
+    doc = _doc_from_file(db, f, "项目文件,批量接入")
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    retrieval.index_one(db, doc.id, doc.title, doc.content_text, doc.tags)
+    retrieval.index_one(db, doc.id, doc.title, doc.content_text, retrieval.fts_tags(doc))
     f.indexed_doc_id = doc.id
     db.commit()
     return doc.id
@@ -283,17 +292,11 @@ def index_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
         if existing is not None:
             return schemas.IndexFileOut(file_id=f.id, document_id=existing.id, title=existing.title)
 
-    doc = models.KnowledgeDocument(
-        title=f.filename,
-        source_path=f.stored_path,  # 我方副本相对路径（已净化）
-        content_text=f.content_text,
-        file_type=f.file_type or "text",
-        tags="项目文件",
-    )
+    doc = _doc_from_file(db, f, "项目文件")
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    retrieval.index_one(db, doc.id, doc.title, doc.content_text, doc.tags)
+    retrieval.index_one(db, doc.id, doc.title, doc.content_text, retrieval.fts_tags(doc))
 
     f.indexed_doc_id = doc.id
     db.commit()

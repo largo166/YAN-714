@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .. import models, retrieval, schemas
+from .. import knowledge_meta, models, retrieval, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
@@ -59,10 +59,12 @@ def knowledge_stats(db: Session = Depends(get_db)) -> schemas.KnowledgeStatsOut:
 @router.post("/documents", response_model=schemas.KnowledgeDocOut, status_code=201)
 def create_document(payload: schemas.KnowledgeDocCreate, db: Session = Depends(get_db)):
     doc = models.KnowledgeDocument(**payload.model_dump())
+    if not doc.type:  # 手动录入未指定时规则推断类型（零 LLM）
+        doc.type = knowledge_meta.infer_type(doc.title, doc.file_type, doc.tags, doc.content_text[:200])
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    retrieval.index_one(db, doc.id, doc.title, doc.content_text, doc.tags)
+    retrieval.index_one(db, doc.id, doc.title, doc.content_text, retrieval.fts_tags(doc))
     return doc
 
 

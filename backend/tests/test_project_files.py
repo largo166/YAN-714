@@ -84,6 +84,21 @@ def test_index_to_knowledge(client):
         _cleanup_project_dir(pid)
 
 
+def test_index_fills_metadata(client):
+    """入库时规则填充 type/resource(零 LLM);description 留空待 AI 生成。"""
+    pid = _new_project(client, name="元数据测试项目")
+    try:
+        files = {"file": ("项目评审会纪要.txt", "参会人员：严硕。会议结论：出3版比选。".encode("utf-8"), "text/plain")}
+        fid = client.post(f"/api/projects/{pid}/files", files=files).json()["id"]
+        did = client.post(f"/api/projects/{pid}/files/{fid}/index").json()["document_id"]
+        doc = client.get(f"/api/knowledge/documents/{did}").json()
+        assert doc["type"] == "会议纪要"
+        assert "元数据测试项目" in doc["resource"]
+        assert doc["description"] == ""
+    finally:
+        _cleanup_project_dir(pid)
+
+
 def test_index_empty_rejected(client):
     """空文本文件不能入库（不伪造来源）。"""
     pid = _new_project(client)
