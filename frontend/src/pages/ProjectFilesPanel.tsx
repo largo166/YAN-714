@@ -6,7 +6,8 @@ import type { ProjectFile } from '@/types/schemas'
 const ACCEPT = '.txt,.md,.pdf,.docx,.pptx'
 const PARSE_LABEL: Record<string, { text: string; cls: string }> = {
   ok: { text: '已解析', cls: 'live' },
-  metadata_only: { text: '已登记·未全文解析', cls: 'demo' },
+  metadata_only: { text: '未提取到正文·见说明', cls: 'demo' }, // 扫描件/加密/损坏:真提不出内容(与大小无关)
+  extraction_timeout: { text: '提取超时·待人工', cls: 'demo' },
   pending: { text: '待解析', cls: 'demo' },
   empty: { text: '空内容', cls: 'demo' },
   unsupported: { text: '不支持', cls: 'fail' },
@@ -197,7 +198,7 @@ export default function ProjectFilesPanel({
                     onClick={() => onIndex(f.id)}
                     title={
                       f.parse_status === 'metadata_only'
-                        ? '大文件已登记，可入库（仅元数据，未全文解析）'
+                        ? '未提取到正文（扫描件/加密/损坏），已登记，可入库靠文件名/类型检索'
                         : f.parse_status !== 'ok'
                           ? '仅可解析文件可入库'
                           : '索引到知识库'

@@ -135,3 +135,50 @@ def test_unknown_task_rejected(client):
         assert r.status_code == 400
     finally:
         _cleanup(pid)
+
+
+def test_gather_material_only_injects_ok_files_not_registration_notes():
+    """红线(不伪造)：metadata_only / extraction_timeout 的「登记说明」绝不能当真实材料注入研判。
+    只有 parse_status==ok 的真正文进 gather_material；登记说明既不进 context 也不进 sources。"""
+    from app import analysis
+
+    db = SessionLocal()
+    try:
+        proj = models.Project(name="注入红线回归", status="active")
+        db.add(proj)
+        db.commit()
+        db.refresh(proj)
+        ok_file = models.ProjectFile(
+            project_id=proj.id, filename="真任务书.txt", stored_path="x/真任务书.txt",
+            file_type="txt", size=10, parse_status="ok", content_text="退台立面与展示区品质要求。",
+            status="active",
+        )
+        meta_file = models.ProjectFile(
+            project_id=proj.id, filename="扫描件.pdf", stored_path="x/扫描件.pdf",
+            file_type="pdf", size=99, parse_status="metadata_only",
+            content_text="扫描件.pdf 状态：需OCR 说明：未检测到文字层，需 OCR；不伪造正文。",
+            status="active",
+        )
+        timeout_file = models.ProjectFile(
+            project_id=proj.id, filename="超大.pdf", stored_path="x/超大.pdf",
+            file_type="pdf", size=99, parse_status="extraction_timeout",
+            content_text="超大.pdf 状态：提取超时 说明：内容层提取超过 30s，待人工。",
+            status="active",
+        )
+        db.add_all([ok_file, meta_file, timeout_file])
+        db.commit()
+        m = analysis.gather_material(db, proj.id, query="设计要点", top_k=5)
+        # 只注入了 ok 文件的真实正文
+        assert "退台立面与展示区品质要求" in m.context
+        titles = {s.title for s in m.sources}
+        assert "真任务书.txt" in titles
+        # 登记说明的文件既不进 sources，其说明文本也不进 context（不伪造）
+        assert "扫描件.pdf" not in titles
+        assert "超大.pdf" not in titles
+        assert "需OCR" not in m.context
+        assert "提取超时" not in m.context
+    finally:
+        db.query(models.ProjectFile).filter_by(project_id=proj.id).delete()
+        db.query(models.Project).filter_by(id=proj.id).delete()
+        db.commit()
+        db.close()

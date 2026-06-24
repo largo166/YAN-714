@@ -148,7 +148,8 @@ class ProjectFile(Base):
     stored_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对 uploads 根
     file_type: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 扩展名
     size: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    # 解析状态：pending / ok / empty / unsupported / failed
+    # 解析状态(见 parsing.py)：pending / ok / metadata_only(需OCR|加密|损坏) /
+    # extraction_timeout(提取超时待人工) / empty / unsupported / failed。注:不再按文件大小降级。
     parse_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     parse_error: Mapped[str] = mapped_column(Text, default="", nullable=False)
     content_text: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 抽取文本

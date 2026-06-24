@@ -99,16 +99,22 @@ def test_index_fills_metadata(client):
         _cleanup_project_dir(pid)
 
 
-def test_large_file_metadata_only_indexes_and_searchable(client, monkeypatch):
-    """超大文件降级 metadata_only,仍能入库且靠文件名/类型被检索到(不卡死导入)。"""
-    import app.parsing as parsing
+def test_metadata_only_file_indexes_and_searchable(client):
+    """无文字层 PDF(扫描件)→ metadata_only(需OCR),仍能入库且靠文件名/类型被检索到。
+    注:触发 metadata_only 的是「真提不出内容」而非文件大小(大小开关已移除)。"""
+    from io import BytesIO
 
-    monkeypatch.setattr(parsing, "MAX_PARSE_BYTES", 50)  # 调小阈值,小文件即触发降级
-    pid = _new_project(client, name="大资料包测试项目")
+    from pypdf import PdfWriter
+
+    buf = BytesIO()
+    w = PdfWriter()
+    w.add_blank_page(width=300, height=300)  # 有效 PDF 但无文字层
+    w.write(buf)
+    pid = _new_project(client, name="扫描件资料测试项目")
     try:
-        files = {"file": ("投标文本汇编.pdf", b"%PDF-1.4" + b"z" * 200, "application/pdf")}
+        files = {"file": ("投标文本汇编.pdf", buf.getvalue(), "application/pdf")}
         up = client.post(f"/api/projects/{pid}/files", files=files).json()
-        assert up["parse_status"] == "metadata_only"  # 降级,未全文解析
+        assert up["parse_status"] == "metadata_only"  # 真提不出内容,如实登记(不是按大小降级)
         fid = up["id"]
         # 仍能入知识库
         did = client.post(f"/api/projects/{pid}/files/{fid}/index").json()["document_id"]
