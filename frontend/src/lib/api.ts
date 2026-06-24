@@ -5,6 +5,7 @@ import {
   IndexFileOutSchema,
   KnowledgeDocListSchema,
   KnowledgeDocSchema,
+  GenerateMetadataOutSchema,
   KnowledgeSearchOutSchema,
   MeetingDetailSchema,
   MeetingListSchema,
@@ -46,6 +47,7 @@ import {
   type ChatSession,
   type ChatSessionDetail,
   type KnowledgeDoc,
+  type GenerateMetadataOut,
   type KnowledgeSearchOut,
   type MeetingDetail,
   type MeetingMinute,
@@ -304,6 +306,11 @@ export const api = {
   },
   async deleteKnowledgeDoc(id: number): Promise<void> {
     await request(`/api/knowledge/documents/${id}`, { method: 'DELETE' })
+  },
+  async generateDocMetadata(id: number): Promise<GenerateMetadataOut> {
+    return GenerateMetadataOutSchema.parse(
+      await request(`/api/knowledge/documents/${id}/generate-metadata`, { method: 'POST' }),
+    )
   },
   async searchKnowledge(query: string, topK = 5): Promise<KnowledgeSearchOut> {
     return KnowledgeSearchOutSchema.parse(

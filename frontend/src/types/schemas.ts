@@ -301,6 +301,17 @@ export const KnowledgeDocListItemSchema = z.object({
 })
 export type KnowledgeDocListItem = z.infer<typeof KnowledgeDocListItemSchema>
 
+export const GenerateMetadataOutSchema = z.object({
+  status: z.string(),
+  document_id: z.number(),
+  description: z.string().default(''),
+  type: z.string().default(''),
+  model: z.string().default(''),
+  message: z.string().default(''),
+  error_message: z.string().default(''),
+})
+export type GenerateMetadataOut = z.infer<typeof GenerateMetadataOutSchema>
+
 export const KnowledgeDocListSchema = z.object({
   items: z.array(KnowledgeDocListItemSchema),
   total: z.number(),
