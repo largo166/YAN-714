@@ -127,6 +127,53 @@ def test_analyze_ok_with_sources(client, monkeypatch):
         _cleanup(pid)
 
 
+def test_analyze_structured_judgment(client, monkeypatch):
+    """配 key + 模型返回 JSON:研判产出结构化 output_json + 核心判断优先的 markdown content。"""
+    import json as _json
+    from app import llm
+
+    fake = {
+        "core": "项目核心是寒地城市更新与多地块协同,而非风格堆砌。",
+        "points": [
+            {"label": "项目定位", "text": "片区更新的锚点"},
+            {"label": "关键约束", "text": "寒地气候与多地块运营"},
+        ],
+        "actions": ["补齐用地规模与业态组合", "把寒地策略转译为空间与材料动作"],
+        "questions": ["各地块是否有统一运营关系?"],
+        "detail": "## 展开\n详细分析正文...",
+    }
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: _json.dumps(fake, ensure_ascii=False))
+    pid = _new_project(client)
+    _set_key()
+    try:
+        client.post(f"/api/projects/{pid}/files", files={"file": ("任务书.md", "# 任务书\n退台立面".encode("utf-8"), "text/markdown")})
+        r = client.post(f"/api/projects/{pid}/analyze", json={"task": "overview"}).json()
+        assert r["status"] == "ok"
+        assert r["output_json"], "结构化判断应落 output_json"
+        result = _json.loads(r["output_json"])
+        assert result["core"] and len(result["points"]) >= 2 and result["actions"]
+        assert "核心判断" in r["content"] and "关键要点" in r["content"]  # 核心判断优先的可读 markdown
+    finally:
+        _cleanup(pid)
+
+
+def test_analyze_plaintext_fallback_not_faked(client, monkeypatch):
+    """模型没按 JSON 返回(纯文本)→ 回落纯文本(仍 ok),output_json 为空,不硬塞空壳结构(不伪造)。"""
+    from app import llm
+
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: "这是一段没有 JSON 结构的研判结论。")
+    pid = _new_project(client)
+    _set_key()
+    try:
+        client.post(f"/api/projects/{pid}/files", files={"file": ("任务书.md", "# 任务书\n退台立面".encode("utf-8"), "text/markdown")})
+        r = client.post(f"/api/projects/{pid}/analyze", json={"task": "difficulty"}).json()
+        assert r["status"] == "ok"
+        assert r["output_json"] == ""  # 回落纯文本,不伪造结构
+        assert "没有 JSON 结构" in r["content"]
+    finally:
+        _cleanup(pid)
+
+
 def test_analyze_cache_hit_no_rerun(client, monkeypatch):
     """缓存快路:同 task 第二次 POST 不再调 LLM,返回同一条记录(修卡顿核心)。"""
     from app import llm

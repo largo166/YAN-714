@@ -9,7 +9,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas, skill_structured, safe_json, image_gen, uploads
+from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -226,16 +226,27 @@ def _run_skill_inner(
             content=NO_MATERIAL_MSG, sources=[],
         )
 
-    msgs = []
-    if material.context:
-        msgs.append({"role": "system", "content": material.context})
-    user = f"项目：{project.name}\n\n技能：{title}\n指令：{instruction}"
-    if payload.input.strip():
-        user += f"\n\n用户补充：{payload.input.strip()}"
-    user += "\n\n要求：条理清晰、可执行；如材料不足请明确指出，不要臆测。"
-    msgs.append({"role": "user", "content": user})
-
     try:
+        # 判断类技能(方案评审/任务安排/竞品)走结构化:core/points/actions/questions/detail
+        # +文风内嵌;解析无效→回落纯文本(仍 ok,不伪造)。其余技能走普通文本。
+        if skill_id in ("review", "task", "compete"):
+            content, output_json = structured_judgment.run_structured(
+                project_name=project.name, instruction=instruction,
+                context=material.context, user_extra=payload.input,
+                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+            )
+            return schemas.SkillRunOut(
+                skill_id=skill_id, status="ok", title=title, content=content,
+                output_json=output_json, sources=sources if needs_rag else [], model=cfg.deepseek_model,
+            )
+        msgs = []
+        if material.context:
+            msgs.append({"role": "system", "content": material.context})
+        user = f"项目：{project.name}\n\n技能：{title}\n指令：{instruction}"
+        if payload.input.strip():
+            user += f"\n\n用户补充：{payload.input.strip()}"
+        user += "\n\n要求：条理清晰、可执行；如材料不足请明确指出，不要臆测。"
+        msgs.append({"role": "user", "content": user})
         answer = llm.chat_completion(
             msgs, api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url,
             model=cfg.deepseek_model,

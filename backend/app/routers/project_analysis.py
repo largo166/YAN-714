@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, safe_json, schemas
+from .. import analysis, llm, models, safe_json, schemas, structured_judgment
 from ..database import get_db
 
 router = APIRouter(prefix="/api/projects", tags=["project-analysis"])
@@ -44,6 +44,7 @@ def _to_out(row: models.ProjectAnalysis) -> schemas.ProjectAnalysisOut:
         task=row.task,
         status=row.status,
         content=row.content,
+        output_json=getattr(row, "output_json", "") or "",
         sources=[schemas.AnalysisSourceOut(**s) for s in sources] if isinstance(sources, list) else [],
         model=row.model,
         error_message=row.error_message,
@@ -75,9 +76,10 @@ def analyze(project_id: int, payload: schemas.AnalyzeIn, db: Session = Depends(g
     cfg = _settings(db)
     configured = bool(cfg.deepseek_api_key)
 
-    task_cn, _ = analysis.TASKS[payload.task]
+    task_cn, instruction = analysis.TASKS[payload.task]
     material = analysis.gather_material(db, project_id, query=f"{project.name} {task_cn}", top_k=payload.top_k)
     sources_dicts = analysis.sources_as_dicts(material.sources)
+    output_json = ""
 
     # 三态判断（均不伪造）
     if not configured:
@@ -86,15 +88,14 @@ def analyze(project_id: int, payload: schemas.AnalyzeIn, db: Session = Depends(g
     elif material.empty:
         status, content, model, err = "no_material", NO_MATERIAL_MSG, "", ""
     else:
-        messages = analysis.build_messages(payload.task, project.name, material)
+        # 结构化判断(core/points/actions/questions/detail);文风内嵌。解析无效→回落纯文本(仍 ok,不伪造)。
         try:
-            answer = llm.chat_completion(
-                messages,
-                api_key=cfg.deepseek_api_key,
-                base_url=cfg.deepseek_base_url,
-                model=cfg.deepseek_model,
+            content, output_json = structured_judgment.run_structured(
+                project_name=project.name, instruction=instruction,
+                context=material.context, user_extra="",
+                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
             )
-            status, content, model, err = "ok", answer, cfg.deepseek_model, ""
+            status, model, err = "ok", cfg.deepseek_model, ""
         except llm.NotConfigured:
             status, content, model, err = "not_configured", NOT_CONFIGURED_MSG, "", ""
             sources_dicts = []
@@ -106,6 +107,7 @@ def analyze(project_id: int, payload: schemas.AnalyzeIn, db: Session = Depends(g
         task=payload.task,
         status=status,
         content=content,
+        output_json=output_json,
         sources_json=safe_json.dumps_safe(sources_dicts),
         model=model,
         error_message=err,

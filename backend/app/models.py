@@ -214,7 +214,9 @@ class ProjectAnalysis(Base):
     task: Mapped[str] = mapped_column(String(30), nullable=False)
     # ok / not_configured / no_material / error
     status: Mapped[str] = mapped_column(String(20), default="ok", nullable=False)
-    content: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 研判正文
+    content: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 研判正文(markdown)
+    # 结构化判断 JSON 字符串(core/points/actions/questions/detail);回落纯文本时为空。
+    output_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     sources_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # 结构化出处
     model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)

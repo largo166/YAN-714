@@ -668,6 +668,7 @@ class ProjectAnalysisOut(BaseModel):
     task: str
     status: str
     content: str
+    output_json: str = ""   # 结构化判断 JSON(core/points/actions/questions/detail);回落纯文本时为空
     sources: List[AnalysisSourceOut] = []
     model: str
     error_message: str
