@@ -148,6 +148,31 @@ class AgentListOut(BaseModel):
     items: List[AgentOut] = []
 
 
+class AgentRunIn(BaseModel):
+    project_id: int
+    input: str = ""
+
+
+class SkillSourceOut(BaseModel):
+    """RAG 结构化出处（技能/Agent 执行共用）。"""
+
+    kind: str
+    ref_id: int
+    title: str
+    snippet: str
+    engine: str = ""
+
+
+class AgentRunOut(BaseModel):
+    agent_id: str
+    status: str  # ok|plan|not_configured|no_material|error
+    title: str = ""
+    content: str = ""
+    sources: List[SkillSourceOut] = []
+    model: str = ""
+    error_message: str = ""
+
+
 class BroadcastCreate(BaseModel):
     text: str = Field(min_length=1)
 
@@ -255,14 +280,6 @@ class SkillListOut(BaseModel):
 
 class SkillRunIn(BaseModel):
     input: str = ""  # 可选用户补充指令
-
-
-class SkillSourceOut(BaseModel):
-    kind: str
-    ref_id: int
-    title: str
-    snippet: str
-    engine: str = ""
 
 
 class SkillRunOut(BaseModel):

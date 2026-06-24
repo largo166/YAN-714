@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
-import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill, SkillRun } from '@/types/schemas'
+import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill, SkillRun, Agent } from '@/types/schemas'
 
 const EXAMPLES = [
   '帮我做一版方案汇报 PPT',
@@ -34,6 +34,8 @@ export default function AgentPage() {
   const [results, setResults] = useState<SkillRun[]>([])
   const [runningSkill, setRunningSkill] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [showAllSkills, setShowAllSkills] = useState(false)
   const logRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -89,6 +91,7 @@ export default function AgentPage() {
       .catch(() => setAiConfigured(false))
     api.listSkills().then((d) => setSkills(d.items)).catch(() => setSkills([]))
     api.getResultSendChannels().then(setChannels).catch(() => setChannels([]))
+    api.listAgents().then(setAgents).catch(() => setAgents([]))
     loadSessions().then((items) => {
       if (items.length) openSession(items[0].id)
     })
@@ -111,6 +114,12 @@ export default function AgentPage() {
   }
 
   const send = async (msg?: string) => {
+    // 模式路由：选了某个智能助手 → 执行该 Agent（出成果卡），不走普通对话
+    const agentForMode = agents.find((a) => a.name === mode)
+    if (agentForMode) {
+      await runAgentMode(agentForMode.id)
+      return
+    }
     const content = (msg ?? text).trim()
     if (!content || sending) return
     setErr(null)
@@ -173,6 +182,25 @@ export default function AgentPage() {
     try {
       const r = await api.runSkill(cur.id, skillId, text.trim())
       setResults((prev) => [r, ...prev]) // 新成果卡置顶
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setRunningSkill(null)
+    }
+  }
+
+  // 模式路由：Auto→普通对话；选中 Agent 模式→点发送时执行该 Agent → 成果卡。
+  const runAgentMode = async (agentId: string) => {
+    if (!cur) {
+      setErr('请先选择作用项目，再用智能助手模式。')
+      return
+    }
+    setErr(null)
+    setRunningSkill(agentId)
+    try {
+      const r = await api.runAgent(agentId, cur.id, text.trim())
+      // 复用成果卡渲染：AgentRun 形状与 SkillRun 一致（agent_id→skill_id 作展示 id）
+      setResults((prev) => [{ ...r, skill_id: r.agent_id }, ...prev])
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -332,15 +360,19 @@ export default function AgentPage() {
             <div className="engpick">
               ▾ <b>{mode}</b>
               <div className="engmenu agentmenu">
-                {['Auto', '找图小雷达', '材料小帮手', '审图老法师', '翻模小王子', '专家团'].map((m) => (
+                <button className={mode === 'Auto' ? 'on' : ''} onClick={() => setMode('Auto')}>
+                  Auto · 自动调度<span className="cost">低耗</span>
+                </button>
+                {agents.map((a) => (
                   <button
-                    key={m}
-                    className={mode === m ? 'on' : ''}
-                    onClick={() => setMode(m)}
+                    key={a.id}
+                    className={mode === a.name ? 'on' : ''}
+                    onClick={() => setMode(a.name)}
+                    title={a.status === 'ok' ? a.duty : '规划中 · 执行能力暂未接入'}
                   >
-                    {m === 'Auto' ? 'Auto · 自动调度' : m}
-                    <span className={'cost' + (m === '专家团' ? ' hot' : '')}>
-                      {m === '专家团' ? '高耗' : '低耗'}
+                    {a.name}
+                    <span className={'cost' + (a.status === 'ok' ? '' : ' soon')}>
+                      {a.status === 'ok' ? '可用' : '规划中'}
                     </span>
                   </button>
                 ))}
@@ -387,7 +419,7 @@ export default function AgentPage() {
 
       <div className="ct mt" style={{ paddingLeft: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>可调度技能 · 后台运作</span>
-        <button className="anbtn">＋ 全部技能</button>
+        <button className="anbtn" onClick={() => setShowAllSkills(true)}>＋ 全部技能</button>
       </div>
       <div className="grid3">
         {skills.map((s) => (
@@ -488,7 +520,9 @@ export default function AgentPage() {
                       ? '未配置 AI'
                       : r.status === 'no_material'
                         ? '无材料'
-                        : '失败'}
+                        : r.status === 'plan'
+                          ? '规划中'
+                          : '失败'}
                 </span>
               </div>
               {r.status === 'ok' ? (
@@ -514,6 +548,44 @@ export default function AgentPage() {
           ))
         )}
       </div>
+
+      {/* 全部技能弹窗：列 /api/skills 六技能完整描述 + 示例，可直接执行 */}
+      {showAllSkills && (
+        <div className="modal show" onClick={() => setShowAllSkills(false)}>
+          <div className="panel" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mh">
+              <span className="ic">▤</span>
+              <h3>全部技能（{skills.length}）</h3>
+              <button className="mclose" onClick={() => setShowAllSkills(false)}>×</button>
+            </div>
+            <div className="mbody" style={{ display: 'grid', gap: 10 }}>
+              {skills.map((s) => (
+                <div key={s.id} style={{ border: '1px solid var(--line2)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>{s.icon}</span>
+                    <b style={{ fontSize: 14 }}>{s.title}</b>
+                    <span className="cspacer" style={{ flex: 1 }}></span>
+                    <button
+                      className="anbtn"
+                      disabled={!!runningSkill || !cur}
+                      title={cur ? '基于当前项目执行' : '请先选择作用项目'}
+                      onClick={() => {
+                        setShowAllSkills(false)
+                        runSkill(s.id)
+                      }}
+                    >
+                      执行
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 4 }}>{s.source}</div>
+                  <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 2 }}>示例：{s.example}</div>
+                </div>
+              ))}
+              {skills.length === 0 && <div style={{ color: 'var(--mut)' }}>技能目录加载中…</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

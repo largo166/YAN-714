@@ -27,6 +27,7 @@ import {
   SkillListSchema,
   SkillRunSchema,
   AgentListSchema,
+  AgentRunSchema,
   TeamMemberListSchema,
   TeamMemberSchema,
   TickerListSchema,
@@ -62,6 +63,7 @@ import {
   type SkillList,
   type SkillRun,
   type Agent,
+  type AgentRun,
   type TeamMember,
   type TickerItem,
   type Broadcast,
@@ -174,6 +176,14 @@ export const api = {
   // ── 协作平台（C4）──
   async listAgents(): Promise<Agent[]> {
     return AgentListSchema.parse(await request('/api/agents')).items
+  },
+  async runAgent(agentId: string, projectId: number, input = ''): Promise<AgentRun> {
+    return AgentRunSchema.parse(
+      await request(`/api/agents/${agentId}/run`, {
+        method: 'POST',
+        body: JSON.stringify({ project_id: projectId, input }),
+      }),
+    )
   },
   async listTeamMembers(): Promise<TeamMember[]> {
     return TeamMemberListSchema.parse(await request('/api/team/members')).items

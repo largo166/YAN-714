@@ -116,6 +116,17 @@ export const AgentSchema = z.object({
 export type Agent = z.infer<typeof AgentSchema>
 export const AgentListSchema = z.object({ items: z.array(AgentSchema) })
 
+export const AgentRunSchema = z.object({
+  agent_id: z.string(),
+  status: z.string(),
+  title: z.string().default(''),
+  content: z.string().default(''),
+  sources: z.array(SkillSourceSchema).default([]),
+  model: z.string().default(''),
+  error_message: z.string().default(''),
+})
+export type AgentRun = z.infer<typeof AgentRunSchema>
+
 export const TeamAssignmentSchema = z.object({
   task_title: z.string(),
   due: z.string().default(''),

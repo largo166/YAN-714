@@ -43,6 +43,31 @@ def test_agents_catalog(client):
     assert {item["status"] for item in body["items"]} == {"ok", "plan"}
 
 
+def test_agent_run_unknown_404(client):
+    pid = client.post("/api/projects", json={"name": "Agent执行测试"}).json()["id"]
+    r = client.post("/api/agents/nope/run", json={"project_id": pid, "input": ""})
+    assert r.status_code == 404
+
+
+def test_agent_run_plan_agent_is_honest(client):
+    """规划中 Agent(审图老法师)执行返回 status=plan,不伪造能力(红线)。"""
+    pid = client.post("/api/projects", json={"name": "Agent执行测试2"}).json()["id"]
+    r = client.post("/api/agents/review-master/run", json={"project_id": pid, "input": ""})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "plan"
+    assert body["sources"] == []
+
+
+def test_agent_run_ok_agent_empty_project(client):
+    """可用 Agent 在空项目上:有 key→no_material;无 key→not_configured。均不伪造结果。"""
+    pid = client.post("/api/projects", json={"name": "Agent执行测试3"}).json()["id"]
+    r = client.post("/api/agents/material-helper/run", json={"project_id": pid, "input": ""})
+    assert r.status_code == 200
+    assert r.json()["status"] in {"no_material", "not_configured"}
+    assert r.json()["sources"] == []
+
+
 def test_broadcasts_and_ticker(client):
     created = client.post("/api/broadcast/broadcasts", json={"text": "今天 17:00 前同步项目风险"})
     assert created.status_code == 201
