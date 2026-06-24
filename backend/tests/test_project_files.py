@@ -284,6 +284,53 @@ def test_batch_ingest_collection_root_three_projects(client, tmp_path):
             _cleanup_project_dir(pid)
 
 
+def test_batch_ingest_single_file(client, tmp_path):
+    """选择来源支持「单个文件」:把该文件当作 1 个项目单元(名=文件名去扩展),
+    复制+解析+入库;重抽按 source_path 去重不重复。"""
+    f = tmp_path / "三亚海棠湾共创思考.md"
+    f.write_text("# 共创思考\n退台立面与展示区品质", encoding="utf-8")
+
+    pv = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(f)}).json()
+    assert pv["total_projects"] == 1
+    assert pv["total_supported"] == 1 and pv["total_unsupported"] == 0
+    assert pv["projects"][0]["project_name"] == "三亚海棠湾共创思考"   # 去扩展名,不切分
+
+    imp = client.post("/api/projects/batch-ingest/import", json={"root_path": str(f)}).json()
+    pids = [p["project_id"] for p in imp["projects"]]
+    try:
+        assert imp["total_projects"] == 1
+        assert imp["copied"] == 1 and imp["failed"] == 0 and imp["indexed"] == 1
+        assert imp["projects"][0]["project_name"] == "三亚海棠湾共创思考"
+
+        # 项目中心下拉出现该项目;其下恰好 1 个文件
+        names = [p["name"] for p in client.get("/api/projects").json()["items"]]
+        assert "三亚海棠湾共创思考" in names
+        files = client.get(f"/api/projects/{pids[0]}/files").json()["items"]
+        assert len(files) == 1 and files[0]["filename"] == "三亚海棠湾共创思考.md"
+
+        # 重抽同一文件:source_path 去重,不新增项目、不重复复制
+        before = len(client.get("/api/projects").json()["items"])
+        again = client.post("/api/projects/batch-ingest/import", json={"root_path": str(f)}).json()
+        assert again["copied"] == 0 and again["skipped_existing"] == 1
+        assert len(client.get("/api/projects").json()["items"]) == before
+    finally:
+        for pid in pids:
+            _cleanup_project_dir(pid)
+
+
+def test_batch_ingest_single_unsupported_file(client, tmp_path):
+    """单个不可解析文件:预览 0 可接入;import 不创建空项目(total_projects=0)。"""
+    f = tmp_path / "图纸.zip"
+    f.write_bytes(b"PK\x03\x04zip")
+
+    pv = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(f)}).json()
+    assert pv["total_projects"] == 1 and pv["total_supported"] == 0
+    assert pv["total_unsupported"] == 1
+
+    imp = client.post("/api/projects/batch-ingest/import", json={"root_path": str(f)}).json()
+    assert imp["total_projects"] == 0 and imp["copied"] == 0   # 无可解析文件 → 不建空项目
+
+
 def test_batch_ingest_excludes_quarantine_and_empty_dirs(client, tmp_path):
     """清理隔离区不当项目接入;无可解析文件的子目录不创建空项目(对抗复核坐实点)。"""
     root = tmp_path / "资料根"

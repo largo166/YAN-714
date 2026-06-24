@@ -348,6 +348,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 .rgroup{padding:10px 0;border-bottom:1px solid var(--line)}
 .rgroup:last-child{border:0}
 .rgroup .gh{font-size:11px;color:var(--mut);margin-bottom:8px}
+/* 已入库文档内联展开:键值行(标签固定宽,值左对齐) */
+.kvline{display:flex;gap:8px;align-items:center;padding:2px 0}
+.kvk{flex:0 0 64px;color:var(--mut);font-size:11px}
 .matwrap{margin-bottom:18px}
 .matlabel{font-size:11px;color:var(--mut);margin-bottom:9px}
 .matgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}

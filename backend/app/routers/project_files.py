@@ -19,10 +19,26 @@ router = APIRouter(prefix="/api/projects", tags=["project-files"])
 # 取名是人的判断不是匹配题。建项目后由用户在项目中心手动改名(PUT /projects/{id})。
 
 
+def _project_name(pdir: Path) -> str:
+    """项目单元显示名:单文件→去扩展名(如 任务书.pdf→任务书);目录→文件夹原名。"""
+    return pdir.stem if pdir.is_file() else pdir.name
+
+
+def _unit_files(pdir: Path) -> list[Path]:
+    """一个项目单元包含的文件:单文件单元就是它自己;目录单元则递归取其下所有文件。"""
+    if pdir.is_file():
+        return [pdir]
+    return [p for p in sorted(pdir.rglob("*"), key=lambda x: str(x)) if p.is_file()]
+
+
 def _project_dirs(root_path: str) -> tuple[Path, list[Path]]:
     root = Path(root_path)
+    # 单个文件:把它自己当作唯一项目单元,父目录作 root(rel 路径据此计算)。
+    # 支持"选择来源"既可选文件夹也可选单个文件(与前端两动作拆分配套)。
+    if root.is_file():
+        return root.parent, [root]
     if not root.exists() or not root.is_dir():
-        raise HTTPException(400, "目录不存在或不可访问")
+        raise HTTPException(400, "路径不存在或不可访问")
     # 排除清理隔离区(_ROMAI_CLEANUP_QUARANTINE)——它是 workspace 安全清理的隔离目录,
     # 不是项目,否则会把已隔离文件当项目误接入(与 workspace.scan 的过滤口径一致)。
     subdirs = sorted(
@@ -39,9 +55,7 @@ def _project_dirs(root_path: str) -> tuple[Path, list[Path]]:
 def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPreviewOut:
     supported: list[schemas.BatchIngestFileOut] = []
     unsupported: list[schemas.BatchIngestFileOut] = []
-    for path in sorted(pdir.rglob("*"), key=lambda x: str(x)):
-        if not path.is_file():
-            continue
+    for path in _unit_files(pdir):
         rel = str(path.relative_to(root))
         item = schemas.BatchIngestFileOut(
             path=rel,
@@ -53,7 +67,7 @@ def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPrevi
         else:
             unsupported.append(item)
     return schemas.BatchIngestProjectPreviewOut(
-        project_name=pdir.name,  # 文件夹原名,不自动切分(用户后续可手动改名)
+        project_name=_project_name(pdir),  # 文件夹原名/文件去扩展名,不自动切分(用户后续可手动改名)
         path=str(pdir),
         supported_count=len(supported),
         unsupported_count=len(unsupported),
@@ -156,16 +170,17 @@ def batch_ingest_import(
     results: list[schemas.BatchIngestProjectImportOut] = []
 
     for pdir in project_dirs:
-        if allowed and pdir.name not in allowed:
+        if allowed and _project_name(pdir) not in allowed:
             continue
-        # 预检:无任何可解析文件的目录直接跳过,不创建空项目(避免污染项目列表)
-        if not any(p.is_file() and parsing.is_supported(p.name) for p in pdir.rglob("*")):
+        unit_files = _unit_files(pdir)
+        # 预检:无任何可解析文件的单元直接跳过,不创建空项目(避免污染项目列表)
+        if not any(parsing.is_supported(p.name) for p in unit_files):
             continue
-        project = _find_or_create_project(db, pdir.name, str(pdir))
+        project = _find_or_create_project(db, _project_name(pdir), str(pdir))
         copied = indexed = failed = skipped = 0
 
-        for path in sorted(pdir.rglob("*"), key=lambda x: str(x)):
-            if not path.is_file() or not parsing.is_supported(path.name):
+        for path in unit_files:
+            if not parsing.is_supported(path.name):
                 continue
             size = path.stat().st_size
             if _already_imported(db, project.id, path.name, size):
