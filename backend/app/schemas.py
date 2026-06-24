@@ -414,6 +414,18 @@ class KnowledgeDocListItem(BaseModel):
     updated_at: datetime
 
 
+class GenerateMetadataOut(BaseModel):
+    """AI 按需生成元数据结果（不伪造：无 key/无正文不写库）。"""
+
+    status: str  # ok|not_configured|no_material|error
+    document_id: int
+    description: str = ""
+    type: str = ""
+    model: str = ""
+    message: str = ""
+    error_message: str = ""
+
+
 class KnowledgeDocListOut(BaseModel):
     items: List[KnowledgeDocListItem]
     total: int
