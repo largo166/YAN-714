@@ -12,6 +12,7 @@ import type {
 
 import ProjectAnalysisPanel from './ProjectAnalysisPanel'
 import ProjectFilesPanel from './ProjectFilesPanel'
+import BriefCognitionCard from './BriefCognitionCard'
 import MeetingPanel from './MeetingPanel'
 import TencentMeetingCard from './TencentMeetingCard'
 import WorkspacePanel from './WorkspacePanel'
@@ -155,6 +156,8 @@ export default function ProjectCenterPage() {
           <div className="v">{overview ? overview.assets : '—'}</div>
         </div>
       </div>
+
+      <BriefCognitionCard projectId={curId} />
 
       <ProjectFilesPanel projectId={curId} />
 

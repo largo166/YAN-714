@@ -9,6 +9,7 @@ export const ProjectSchema = z.object({
   status: z.string(),
   city: z.string().default(''),
   client: z.string().default(''),
+  current_stage: z.string().default('brief'),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -311,6 +312,44 @@ export const GenerateMetadataOutSchema = z.object({
   error_message: z.string().default(''),
 })
 export type GenerateMetadataOut = z.infer<typeof GenerateMetadataOutSchema>
+
+// ── 项目结构化认知（P2 脊椎）──
+export const BRIEF_FIELDS = [
+  '建筑类型', '项目阶段', '基地位置', '建筑规模', '用地条件',
+  '容积率/建筑密度/限高', '功能构成', '业主显性目标', '业主隐性目标',
+  '使用者需求', '场地限制', '设计矛盾', '必须解决的问题',
+  '可创造价值的问题', '前期需追问的问题', '方案切入点',
+] as const
+
+export const CognitionSourceSchema = z.object({
+  kind: z.string(),
+  ref_id: z.number(),
+  title: z.string(),
+  snippet: z.string(),
+  engine: z.string().default(''),
+})
+export const ProjectCognitionSchema = z.object({
+  id: z.number(),
+  project_id: z.number(),
+  module: z.string(),
+  fields: z.record(z.string(), z.string()).default({}),
+  summary_md: z.string().default(''),
+  status: z.string(),
+  version: z.number().default(1),
+  sources: z.array(CognitionSourceSchema).default([]),
+  model: z.string().default(''),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+export type ProjectCognition = z.infer<typeof ProjectCognitionSchema>
+
+export const CognitionExtractOutSchema = z.object({
+  status: z.string(),
+  cognition: ProjectCognitionSchema.nullable().default(null),
+  message: z.string().default(''),
+  error_message: z.string().default(''),
+})
+export type CognitionExtractOut = z.infer<typeof CognitionExtractOutSchema>
 
 export const KnowledgeDocListSchema = z.object({
   items: z.array(KnowledgeDocListItemSchema),

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import {
   ChatSessionDetailSchema,
   ChatSessionListSchema,
@@ -6,6 +7,8 @@ import {
   KnowledgeDocListSchema,
   KnowledgeDocSchema,
   GenerateMetadataOutSchema,
+  ProjectCognitionSchema,
+  CognitionExtractOutSchema,
   KnowledgeSearchOutSchema,
   MeetingDetailSchema,
   MeetingListSchema,
@@ -48,6 +51,8 @@ import {
   type ChatSessionDetail,
   type KnowledgeDoc,
   type GenerateMetadataOut,
+  type ProjectCognition,
+  type CognitionExtractOut,
   type KnowledgeSearchOut,
   type MeetingDetail,
   type MeetingMinute,
@@ -310,6 +315,29 @@ export const api = {
   async generateDocMetadata(id: number): Promise<GenerateMetadataOut> {
     return GenerateMetadataOutSchema.parse(
       await request(`/api/knowledge/documents/${id}/generate-metadata`, { method: 'POST' }),
+    )
+  },
+
+  // ── 项目结构化认知（P2 脊椎）──
+  async listCognition(projectId: number): Promise<ProjectCognition[]> {
+    return z.array(ProjectCognitionSchema).parse(await request(`/api/projects/${projectId}/cognition`))
+  },
+  async extractBrief(projectId: number): Promise<CognitionExtractOut> {
+    return CognitionExtractOutSchema.parse(
+      await request(`/api/projects/${projectId}/cognition/brief/extract`, { method: 'POST' }),
+    )
+  },
+  async confirmCognition(projectId: number, cogId: number): Promise<ProjectCognition> {
+    return ProjectCognitionSchema.parse(
+      await request(`/api/projects/${projectId}/cognition/${cogId}/confirm`, { method: 'POST' }),
+    )
+  },
+  async updateCognition(projectId: number, cogId: number, fields: Record<string, string>): Promise<ProjectCognition> {
+    return ProjectCognitionSchema.parse(
+      await request(`/api/projects/${projectId}/cognition/${cogId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ fields }),
+      }),
     )
   },
   async searchKnowledge(query: string, topK = 5): Promise<KnowledgeSearchOut> {
