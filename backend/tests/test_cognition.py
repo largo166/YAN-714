@@ -51,3 +51,38 @@ def test_current_stage_default_brief(client):
     pid = _new_project(client)
     p = client.get(f"/api/projects/{pid}").json()
     assert p.get("current_stage", "brief") == "brief"
+
+
+def test_confirmed_cognition_injected_into_gather_material():
+    """已确认认知被 gather_material 置顶注入(共创营地/研判推演据此分析)——修最致命断点。"""
+    from app.database import SessionLocal
+    from app import models, analysis, safe_json
+
+    db = SessionLocal()
+    try:
+        proj = models.Project(name="认知注入回归测试", status="active")
+        db.add(proj)
+        db.commit()
+        db.refresh(proj)
+        cog = models.ProjectCognition(
+            project_id=proj.id, module="brief",
+            fields_json=safe_json.dumps_safe({"设计矛盾": "高容积率与居住品质"}),
+            summary_md="测试摘要", status="confirmed", version=1,
+        )
+        db.add(cog)
+        db.commit()
+        m = analysis.gather_material(db, proj.id, query="设计要点", top_k=5)
+        assert not m.empty  # 认知即材料
+        assert any(s.kind == "cognition" for s in m.sources)
+        assert "已确认的结构化认知" in m.context
+        assert "高容积率与居住品质" in m.context
+        # draft 不应注入
+        cog.status = "draft"
+        db.commit()
+        m2 = analysis.gather_material(db, proj.id, query="设计要点", top_k=5)
+        assert not any(s.kind == "cognition" for s in m2.sources)
+    finally:
+        db.query(models.ProjectCognition).filter_by(project_id=proj.id).delete()
+        db.query(models.Project).filter_by(id=proj.id).delete()
+        db.commit()
+        db.close()

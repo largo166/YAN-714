@@ -67,9 +67,38 @@ def _file_snippet(text: str, width: int = 200) -> str:
 
 
 def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5) -> Material:
-    """两路取材：本项目已解析文件(parse_status=ok) + 全局知识库检索。结构化为 sources。"""
+    """三路取材：本项目已确认结构化认知(最高优先) + 已解析文件 + 全局知识库检索。结构化为 sources。"""
     sources: List[Source] = []
     lines: List[str] = []
+
+    # 路0：本项目已确认(confirmed)的结构化认知——最高优先，让推演基于"项目已认知到什么"
+    cogs = (
+        db.query(models.ProjectCognition)
+        .filter(
+            models.ProjectCognition.project_id == project_id,
+            models.ProjectCognition.status == "confirmed",
+        )
+        .order_by(models.ProjectCognition.updated_at.desc())
+        .all()
+    )
+    cog_block: List[str] = []
+    import json as _json
+    for c in cogs:
+        try:
+            fields = _json.loads(c.fields_json) if c.fields_json else {}
+        except (ValueError, TypeError):
+            fields = {}
+        nonempty = {k: v for k, v in fields.items() if isinstance(v, str) and v.strip()}
+        if not nonempty and not c.summary_md.strip():
+            continue
+        cog_block.append(f"【已确认认知·{c.module}】" + (f" 摘要：{c.summary_md}" if c.summary_md else ""))
+        for k, v in nonempty.items():
+            cog_block.append(f"  - {k}：{v}")
+        sources.append(
+            Source(kind="cognition", ref_id=c.id, title=f"{c.module}结构化认知",
+                   snippet=(c.summary_md or "; ".join(f"{k}:{v}" for k, v in list(nonempty.items())[:3]))[:200],
+                   engine="cognition")
+        )
 
     # 路1：本项目已解析文件（取前若干，作为项目现场材料）
     files = (
@@ -99,12 +128,16 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
                    snippet=h.snippet, engine=h.engine)
         )
 
-    # 装配喂模型的上下文（带编号引用）
+    # 装配喂模型的上下文（已确认认知置顶，带编号引用）
     if sources:
+        if cog_block:
+            lines.append("以下是本项目【已确认的结构化认知】，请优先据此分析：")
+            lines.extend(cog_block)
+            lines.append("")
         lines.append("以下是检索到的项目材料与知识库资料，请仅基于这些材料分析，并在结论中引用来源标题：")
         lines.append("")
         for i, s in enumerate(sources, 1):
-            tag = "项目文件" if s.kind == "project_file" else "知识库"
+            tag = {"cognition": "已确认认知", "project_file": "项目文件"}.get(s.kind, "知识库")
             lines.append(f"[{i}]（{tag}）《{s.title}》: {s.snippet}")
     return Material(context="\n".join(lines), sources=sources)
 
