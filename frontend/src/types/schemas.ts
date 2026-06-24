@@ -313,13 +313,25 @@ export const GenerateMetadataOutSchema = z.object({
 })
 export type GenerateMetadataOut = z.infer<typeof GenerateMetadataOutSchema>
 
-// ── 项目结构化认知（P2 脊椎）──
-export const BRIEF_FIELDS = [
-  '建筑类型', '项目阶段', '基地位置', '建筑规模', '用地条件',
-  '容积率/建筑密度/限高', '功能构成', '业主显性目标', '业主隐性目标',
-  '使用者需求', '场地限制', '设计矛盾', '必须解决的问题',
-  '可创造价值的问题', '前期需追问的问题', '方案切入点',
-] as const
+// ── 项目结构化认知（ProjectCognition Schema 规格 v1.0）──
+export const CognitionFieldSourceSchema = z.object({
+  type: z.string().default('manual'),
+  doc_ids: z.array(z.number()).default([]),
+  based_on: z.array(z.string()).default([]),
+  doc_location: z.string().default(''),
+})
+export const CognitionFieldSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  type: z.string(),
+  extractable: z.string(),
+  value: z.unknown().nullable().default(null),
+  status: z.string().default('draft'),       // draft|confirmed|empty
+  source: CognitionFieldSourceSchema.default({ type: 'manual', doc_ids: [], based_on: [], doc_location: '' }),
+  confidence: z.number().nullable().default(null),
+  guide: z.string().default(''),
+})
+export type CognitionField = z.infer<typeof CognitionFieldSchema>
 
 export const CognitionSourceSchema = z.object({
   kind: z.string(),
@@ -332,9 +344,12 @@ export const ProjectCognitionSchema = z.object({
   id: z.number(),
   project_id: z.number(),
   module: z.string(),
-  fields: z.record(z.string(), z.string()).default({}),
+  module_label: z.string().default(''),
+  schema_version: z.string().default('1.0'),
+  fields: z.array(CognitionFieldSchema).default([]),   // 字段记录数组
   summary_md: z.string().default(''),
   status: z.string(),
+  module_status: z.string().default('draft'),          // draft|confirmed|partial|empty
   version: z.number().default(1),
   sources: z.array(CognitionSourceSchema).default([]),
   model: z.string().default(''),

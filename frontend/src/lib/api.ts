@@ -332,11 +332,15 @@ export const api = {
       await request(`/api/projects/${projectId}/cognition/${cogId}/confirm`, { method: 'POST' }),
     )
   },
-  async updateCognition(projectId: number, cogId: number, fields: Record<string, string>): Promise<ProjectCognition> {
+  async updateCognition(
+    projectId: number,
+    cogId: number,
+    updates: Record<string, { value: unknown; status?: string }>,
+  ): Promise<ProjectCognition> {
     return ProjectCognitionSchema.parse(
       await request(`/api/projects/${projectId}/cognition/${cogId}`, {
         method: 'PUT',
-        body: JSON.stringify({ fields }),
+        body: JSON.stringify({ updates }),
       }),
     )
   },
