@@ -20,6 +20,8 @@ class Project(Base):
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     city: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     client: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    # 受管来源:批量整理时该项目对应的源文件夹绝对路径(空=手动建/seed)。用于去重 + 重新整理。
+    source_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     # 方案前期工作流当前阶段（认知系统脊椎；默认起点=任务书）
     current_stage: Mapped[str] = mapped_column(String(40), default="brief", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)

@@ -232,6 +232,58 @@ def test_batch_ingest_flat_folder_root_as_project(client, tmp_path):
             _cleanup_project_dir(pid)
 
 
+def test_batch_ingest_collection_root_three_projects(client, tmp_path):
+    """项目集合目录:一级子文件夹=独立项目(用文件夹原名,不自动切分),文件按 project_id 隔离,
+    重抽按 source_path 去重不重复;用户可手动改名且重抽不被覆盖。"""
+    root = tmp_path / "YAN-项目数据"
+    specs = {
+        "石家庄长安天曜项目": ("天曜任务书.md", "天曜立面退台"),
+        "石家庄市庄项目": ("市庄纪要.txt", "市庄甲方诉求"),
+        "石家庄振三街项目": ("振三街方案.md", "振三街概念定位"),
+    }
+    for folder, (fn, body) in specs.items():
+        (root / folder).mkdir(parents=True)
+        (root / folder / fn).write_text(body, encoding="utf-8")
+
+    pv = client.post("/api/projects/batch-ingest/preview", json={"root_path": str(root)}).json()
+    assert pv["total_projects"] == 3                       # 根目录识别为集合,3 个一级项目
+    assert {p["project_name"] for p in pv["projects"]} == set(specs)  # 文件夹原名
+
+    imp = client.post("/api/projects/batch-ingest/import", json={"root_path": str(root)}).json()
+    pids = [p["project_id"] for p in imp["projects"]]
+    try:
+        assert {p["project_name"] for p in imp["projects"]} == set(specs)
+        assert imp["copied"] == 3 and imp["failed"] == 0
+
+        # 项目中心下拉(listProjects)出现这三个项目(文件夹原名)
+        all_names = [p["name"] for p in client.get("/api/projects").json()["items"]]
+        for n in specs:
+            assert n in all_names
+
+        # 数据隔离:每个项目只含自己的文件
+        by_name = {p["project_name"]: p["project_id"] for p in imp["projects"]}
+        for folder, (fn, _b) in specs.items():
+            files = client.get(f"/api/projects/{by_name[folder]}/files").json()["items"]
+            assert len(files) == 1 and files[0]["filename"] == fn
+        shizhuang_files = [f["filename"] for f in client.get(f"/api/projects/{by_name['石家庄市庄项目']}/files").json()["items"]]
+        assert "天曜任务书.md" not in shizhuang_files   # 市庄看不到长安天曜文件
+
+        # 用户手动改名(项目中心 PUT) → 短名
+        tianyao = by_name["石家庄长安天曜项目"]
+        renamed = client.put(f"/api/projects/{tianyao}", json={"name": "长安天曜"}).json()
+        assert renamed["name"] == "长安天曜"
+
+        # 重抽同一根目录:按 source_path 去重,不新增项目,且不覆盖用户改名
+        before = len(client.get("/api/projects").json()["items"])
+        again = client.post("/api/projects/batch-ingest/import", json={"root_path": str(root)}).json()
+        assert again["skipped_existing"] == 3 and again["copied"] == 0
+        assert len(client.get("/api/projects").json()["items"]) == before       # 无重复项目
+        assert client.get(f"/api/projects/{tianyao}").json()["name"] == "长安天曜"  # 改名被保留
+    finally:
+        for pid in pids:
+            _cleanup_project_dir(pid)
+
+
 def test_batch_ingest_excludes_quarantine_and_empty_dirs(client, tmp_path):
     """清理隔离区不当项目接入;无可解析文件的子目录不创建空项目(对抗复核坐实点)。"""
     root = tmp_path / "资料根"
@@ -250,7 +302,7 @@ def test_batch_ingest_excludes_quarantine_and_empty_dirs(client, tmp_path):
     pids = [p["project_id"] for p in imp["projects"]]
     try:
         created = [p["project_name"] for p in imp["projects"]]
-        assert created == ["真项目"]                   # 空目录/纯不可解析目录不创建项目
+        assert created == ["真项目"]                   # 文件夹原名;空/纯不可解析目录不创建项目
         assert "垃圾.md" not in [d["title"] for d in client.get("/api/knowledge/documents").json()["items"]]
     finally:
         for pid in pids:

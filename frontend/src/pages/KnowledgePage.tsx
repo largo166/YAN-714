@@ -22,7 +22,8 @@ function fmtSize(n: number): string {
  *  核心动作:选择/授权本地文件夹、一键整理、看整理结构与索引状态、看已入库文件、对单文件生成 AI 元数据、删错误条目。
  *  技术说明:全文检索走本地 FTS5 / BM25(SQLite)。所有按钮都接真实 API、不伪造、不留无效占位。 */
 export default function KnowledgePage() {
-  const { cur } = useProject()
+  const { cur, reload: reloadProjects, setCurId } = useProject()
+  const [switchNote, setSwitchNote] = useState<string | null>(null)
   const [docs, setDocs] = useState<KnowledgeDocListItem[]>([])
   const [detail, setDetail] = useState<KnowledgeDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -169,6 +170,8 @@ export default function KnowledgePage() {
       setIngestResult(r)
       await loadDocs()
       loadStats()
+      reloadProjects() // 刷新项目中心「当前项目」下拉:本次识别的项目随即出现、可切换
+      setSwitchNote(`本次整理识别并接入 ${r.total_projects} 个项目，已在「项目中心」下拉出现。`)
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -301,20 +304,28 @@ export default function KnowledgePage() {
             <div className="hrow"><span className="hb" style={{ background: 'var(--mut)' }}></span>二进制图纸与图片登记元数据，暂不入全文检索<span className="r">资产登记</span></div>
           </div>
 
-          {/* 最近一次接入结果(整理→接入后的真实落库统计) */}
+          {/* 最近一次接入结果(整理→接入后的真实落库统计 + 切换到对应项目) */}
           {ingestResult && (
             <div className="card" style={{ marginTop: 10, background: 'var(--panel2)' }}>
-              <div className="ct">最近一次接入结果</div>
+              <div className="ct">最近一次整理结果 · 识别 {ingestResult.total_projects} 个项目</div>
               <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
                 已复制 <b>{ingestResult.copied}</b> · 已入库索引 <b>{ingestResult.indexed}</b> · 跳过重复{' '}
                 <b>{ingestResult.skipped_existing}</b> · 失败 <b>{ingestResult.failed}</b>
               </div>
               {ingestResult.projects.map((p) => (
-                <div className="kbrow" key={p.project_id}>
-                  <span className="pth">{p.project_name}</span>
-                  <span className="meta">{p.copied} 复制 / {p.indexed} 入库 / {p.failed} 失败</span>
+                <div className="kbrow" key={p.project_id} style={{ flexWrap: 'wrap' }}>
+                  <span className="pth"><b>{p.project_name}</b></span>
+                  <span className="meta">{p.copied} 文件 · {p.indexed > 0 ? `已入库 ${p.indexed}` : '未入库'} · 失败 {p.failed}</span>
+                  <span
+                    className="act"
+                    style={{ color: 'var(--terra)' }}
+                    onClick={() => { setCurId(p.project_id); setSwitchNote(`已设为当前项目「${p.project_name}」，切到「项目中心」即可看到它的文件 / 认知（按 project_id 隔离）。`) }}
+                  >
+                    设为当前项目
+                  </span>
                 </div>
               ))}
+              {switchNote && <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>{switchNote}</div>}
             </div>
           )}
         </div>

@@ -14,6 +14,9 @@ from ..safe_paths import sanitize_filename
 
 router = APIRouter(prefix="/api/projects", tags=["project-files"])
 
+# 项目名直接用一级文件夹原名,不做自动切分——中文地名(如"石家庄市庄")用规则无法消歧,
+# 取名是人的判断不是匹配题。建项目后由用户在项目中心手动改名(PUT /projects/{id})。
+
 
 def _project_dirs(root_path: str) -> tuple[Path, list[Path]]:
     root = Path(root_path)
@@ -49,7 +52,7 @@ def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPrevi
         else:
             unsupported.append(item)
     return schemas.BatchIngestProjectPreviewOut(
-        project_name=pdir.name,
+        project_name=pdir.name,  # 文件夹原名,不自动切分(用户后续可手动改名)
         path=str(pdir),
         supported_count=len(supported),
         unsupported_count=len(unsupported),
@@ -58,11 +61,14 @@ def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPrevi
     )
 
 
-def _find_or_create_project(db: Session, name: str) -> models.Project:
-    row = db.query(models.Project).filter(models.Project.name == name).first()
-    if row is not None:
-        return row
-    project = models.Project(name=name, status="active")
+def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> models.Project:
+    """按【源文件夹路径】去重(可靠键,支持重新整理):同 source_path 已存在→复用(不改名,
+    保留用户在项目中心可能做过的手动改名);否则用文件夹原名新建并记录来源路径。"""
+    if source_path:
+        row = db.query(models.Project).filter(models.Project.source_path == source_path).first()
+        if row is not None:
+            return row
+    project = models.Project(name=folder_name, status="active", source_path=source_path)
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -145,7 +151,7 @@ def batch_ingest_import(
         # 预检:无任何可解析文件的目录直接跳过,不创建空项目(避免污染项目列表)
         if not any(p.is_file() and parsing.is_supported(p.name) for p in pdir.rglob("*")):
             continue
-        project = _find_or_create_project(db, pdir.name)
+        project = _find_or_create_project(db, pdir.name, str(pdir))
         copied = indexed = failed = skipped = 0
 
         for path in sorted(pdir.rglob("*"), key=lambda x: str(x)):

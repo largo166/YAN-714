@@ -28,8 +28,23 @@ const STAGE_CHIP: Record<string, string> = {
 /** 项目中心：原 ROM-AI 五段布局。项目下拉 / KPI 接新后端真实数据。
  *  当前项目走共享上下文（useProject）→ 共创营地/数据基地随之联动。 */
 export default function ProjectCenterPage() {
-  const { projects, curId, setCurId, cur, err } = useProject()
+  const { projects, curId, setCurId, cur, err, reload } = useProject()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameVal, setRenameVal] = useState('')
+  const [renameErr, setRenameErr] = useState<string | null>(null)
+
+  const doRename = async () => {
+    if (curId == null || !renameVal.trim()) return
+    setRenameErr(null)
+    try {
+      await api.updateProject(curId, { name: renameVal.trim() })
+      reload() // 刷新共享上下文 → 下拉/标题随即显示新名
+      setRenaming(false)
+    } catch (e) {
+      setRenameErr((e as Error).message)
+    }
+  }
   const [overview, setOverview] = useState<ProjectOverview | null>(null)
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([])
   const [risks, setRisks] = useState<ProjectRisk[]>([])
@@ -99,6 +114,31 @@ export default function ProjectCenterPage() {
             )}
           </div>
         </div>
+        {/* 手动改名:文件夹原名太长时,用户自己精简(取名是人的判断,不靠规则猜) */}
+        {cur && !renaming && (
+          <span
+            className="act"
+            style={{ marginLeft: 6, color: 'var(--terra)', cursor: 'pointer', fontSize: 12 }}
+            title="重命名当前项目"
+            onClick={() => { setRenameVal(cur.name); setRenaming(true) }}
+          >
+            ✎ 改名
+          </span>
+        )}
+        {cur && renaming && (
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 6 }}>
+            <input
+              value={renameVal}
+              autoFocus
+              onChange={(e) => setRenameVal(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') setRenaming(false) }}
+              style={{ fontSize: 13, padding: '2px 6px', border: '1px solid var(--line2)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--ink)' }}
+            />
+            <button className="anbtn" disabled={!renameVal.trim()} onClick={doRename}>存</button>
+            <button className="anbtn" onClick={() => setRenaming(false)}>取消</button>
+            {renameErr && <span style={{ fontSize: 11, color: 'var(--red)' }}>{renameErr}</span>}
+          </span>
+        )}
         <div style={{ display: 'flex', gap: 5, marginLeft: 6 }}>
           {cur?.city && <span className="chip">{cur.city}</span>}
           {cur && <span className="chip on">{STAGE_CHIP[cur.status] ?? cur.status}</span>}
