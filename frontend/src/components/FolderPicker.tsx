@@ -7,6 +7,8 @@ interface Props {
   open: boolean
   /** 初始落点(如上次工作区路径);取其父目录起步,空则从盘符层起步。 */
   initialPath?: string
+  /** true=只能选文件夹(仓库根场景),隐藏选文件、文件置灰不可选。 */
+  foldersOnly?: boolean
   /** 选定一个文件夹或文件后回调真实绝对路径。 */
   onPick: (absPath: string) => void
   onClose: () => void
@@ -14,7 +16,7 @@ interface Props {
 
 /** 目录选择弹窗:本应用非 Electron,浏览器拿不到文件夹绝对路径,
  *  改用后端只读「列目录」接口逐层浏览,选定文件夹或文件后返回真实绝对路径。 */
-export default function FolderPicker({ open, initialPath = '', onPick, onClose }: Props) {
+export default function FolderPicker({ open, initialPath = '', foldersOnly = false, onPick, onClose }: Props) {
   const [cwd, setCwd] = useState('')          // 当前目录(''=盘符层)
   const [parent, setParent] = useState<string | null>(null)
   const [level, setLevel] = useState<'drives' | 'dir'>('drives')
@@ -120,11 +122,20 @@ export default function FolderPicker({ open, initialPath = '', onPick, onClose }
             return (
               <div
                 key={it.abs_path}
-                style={{ ...rowStyle, background: isSel ? 'var(--terra)' : 'transparent', color: isSel ? '#fff' : 'var(--ink)' }}
-                onClick={() => (it.is_dir ? load(it.abs_path) : setSelectedFile(isSel ? null : it))}
+                style={{
+                  ...rowStyle,
+                  background: isSel ? 'var(--terra)' : 'transparent',
+                  color: isSel ? '#fff' : 'var(--ink)',
+                  opacity: foldersOnly && !it.is_dir ? 0.4 : 1,
+                  cursor: foldersOnly && !it.is_dir ? 'default' : 'pointer',
+                }}
+                onClick={() => {
+                  if (it.is_dir) load(it.abs_path)
+                  else if (!foldersOnly) setSelectedFile(isSel ? null : it)
+                }}
                 onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = 'var(--panel2)' }}
                 onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = 'transparent' }}
-                title={it.is_dir ? '双击进入' : (it.supported ? '可接入文件' : '不可解析(整理时会跳过)')}
+                title={it.is_dir ? '双击进入' : (foldersOnly ? '仓库根只能选文件夹' : (it.supported ? '可接入文件' : '不可解析(整理时会跳过)'))}
               >
                 <span>{it.is_dir ? '📁' : it.supported ? '📄' : '📦'}</span>
                 <span style={{ flex: 1, wordBreak: 'break-all' }}>{it.name}</span>
@@ -146,9 +157,11 @@ export default function FolderPicker({ open, initialPath = '', onPick, onClose }
           >
             ✓ 选定当前文件夹
           </button>
-          <button className="btn" disabled={!selectedFile} onClick={() => selectedFile && onPick(selectedFile.abs_path)}>
-            选定此文件{selectedFile ? `（${selectedFile.name}）` : ''}
-          </button>
+          {!foldersOnly && (
+            <button className="btn" disabled={!selectedFile} onClick={() => selectedFile && onPick(selectedFile.abs_path)}>
+              选定此文件{selectedFile ? `（${selectedFile.name}）` : ''}
+            </button>
+          )}
           <span style={{ flex: 1 }} />
           <button className="anbtn" onClick={onClose}>取消</button>
         </div>

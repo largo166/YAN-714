@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
+import FolderPicker from '@/components/FolderPicker'
 
 /** 受控开关（复刻原 .sw / .sw.on） */
 function Switch({ on, onToggle }: { on: boolean; onToggle?: () => void }) {
@@ -82,6 +83,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [repoRoot, setRepoRoot] = useState('')
   const [repoMsg, setRepoMsg] = useState<string | null>(null)
   const [repoErr, setRepoErr] = useState<string | null>(null)
+  const [repoPickerOpen, setRepoPickerOpen] = useState(false)
 
   // 本地 UI 态（未接后端，仅保真交互）
   const [autoIndex, setAutoIndex] = useState(true)
@@ -105,17 +107,12 @@ export default function SettingsDrawer({ open, onClose }: Props) {
       .catch((e: Error) => setErr(e.message))
   }, [open])
 
-  /** 配置/解除仓库根:prompt 输入绝对路径 → 保存(后端校验:存在/可写/非嵌套 uploads…)。 */
-  const setRepository = async () => {
+  /** 保存仓库根(由目录弹窗选定后回调,或解除时传空)。后端校验:存在/可写/非嵌套 uploads…。 */
+  const saveRepository = async (path: string) => {
     setRepoMsg(null)
     setRepoErr(null)
-    const p = window.prompt(
-      '输入「资料仓库」文件夹的绝对路径（先在资源管理器里新建好，如 D:\\ROM-AI-仓库）：\n留空并确定 = 解除配置，整理回退程序内部目录。',
-      repoRoot || '',
-    )
-    if (p === null) return // 取消
     try {
-      const saved = await api.updateSettings({ repository_root_path: p.trim() })
+      const saved = await api.updateSettings({ repository_root_path: path.trim() })
       setRepoRoot(saved.repository_root_path || '')
       setRepoMsg(saved.repository_configured ? '仓库已配置，之后「一键整理」将整理进此文件夹' : '已解除仓库，整理回退程序内部目录')
     } catch (e) {
@@ -282,7 +279,14 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                 {repoMsg && <div className="d" style={{ color: 'var(--ok)' }}>{repoMsg}</div>}
                 {repoErr && <div className="d" style={{ color: 'var(--red)' }}>{repoErr}</div>}
               </div>
-              <button className="btn" onClick={setRepository}>{repoRoot ? '更改 / 解除' : '配置仓库'}</button>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button className="btn" onClick={() => setRepoPickerOpen(true)}>
+                  {repoRoot ? '更改仓库' : '选择仓库文件夹'}
+                </button>
+                {repoRoot && (
+                  <button className="anbtn" onClick={() => saveRepository('')} title="解除配置,整理回退程序内部目录">解除</button>
+                )}
+              </div>
             </div>
             <PathRow t="Obsidian Vault（引用模式）" placeholder="待配置" d="引用模式" />
             <PathRow t="数据库 / 索引" placeholder="后端默认 backend/data/rom_ai.db" d="SQLite" />
@@ -456,6 +460,14 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           </div>
         </div>
       </aside>
+
+      <FolderPicker
+        open={repoPickerOpen}
+        foldersOnly
+        initialPath={repoRoot}
+        onPick={(p) => { setRepoPickerOpen(false); saveRepository(p) }}
+        onClose={() => setRepoPickerOpen(false)}
+      />
     </>
   )
 
