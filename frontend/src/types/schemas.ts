@@ -508,6 +508,28 @@ export const BatchIngestPreviewSchema = z.object({
 })
 export type BatchIngestPreview = z.infer<typeof BatchIngestPreviewSchema>
 
+// ── 文件系统:只读列目录(目录选择弹窗) ──
+export const DirEntrySchema = z.object({
+  name: z.string(),
+  abs_path: z.string(),
+  is_dir: z.boolean(),
+  ext: z.string().default(''),
+  supported: z.boolean().default(false),
+  is_symlink: z.boolean().default(false),
+})
+export type DirEntry = z.infer<typeof DirEntrySchema>
+
+export const DirListSchema = z.object({
+  accessible: z.boolean(),
+  level: z.string().default('dir'),
+  path: z.string().default(''),
+  parent: z.string().nullable().default(null),
+  drives: z.array(z.string()).default([]),
+  items: z.array(DirEntrySchema).default([]),
+  error: z.string().default(''),
+})
+export type DirList = z.infer<typeof DirListSchema>
+
 export const BatchIngestProjectImportSchema = z.object({
   project_id: z.number(),
   project_name: z.string(),

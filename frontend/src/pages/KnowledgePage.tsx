@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type WorkspaceScan } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import CrossProjectLibrary from './CrossProjectLibrary'
+import FolderPicker from '@/components/FolderPicker'
 import type {
   BatchIngestImport,
   BatchIngestPreview,
@@ -37,6 +38,7 @@ export default function KnowledgePage() {
   const [scan, setScan] = useState<WorkspaceScan | null>(null) // 仅文件夹有意义的富指标,单文件为 null
   const [lastWsPath, setLastWsPath] = useState('') // prompt 默认值(便利,非"已选择")
   const [selecting, setSelecting] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false) // 目录选择弹窗开关
 
   // 一键整理:真实落库结果 + 失败标记 + 最近整理时间(用于状态机与结果卡)。
   const [ingesting, setIngesting] = useState(false)
@@ -145,16 +147,18 @@ export default function KnowledgePage() {
     }
   }
 
-  /** 动作一·选择来源:输入文件或文件夹绝对路径 → 只读预览(不落库、不建项目)。 */
-  const selectSource = async () => {
+  /** 动作一·选择来源:打开目录选择弹窗(后端列目录,点选文件夹或文件,不再手输路径)。 */
+  const selectSource = () => {
     if (selecting || ingesting) return
+    setPickerOpen(true)
+  }
+
+  /** 弹窗选定路径后:只读预览(不落库、不建项目)。原"拿到 path 之后"流程逐字保留。 */
+  const onPickSource = async (path: string) => {
+    setPickerOpen(false)
+    if (!path || !path.trim()) return
+    path = path.trim()
     setErr(null)
-    const p = window.prompt(
-      '输入要接入的本地文件夹或单个文件的绝对路径\n（如 C:\\YAN-项目数据 或 C:\\YAN-项目数据\\任务书.pdf）：',
-      lastWsPath || '',
-    )
-    if (!p || !p.trim()) return
-    const path = p.trim()
     setSelecting(true)
     // 选新来源:清掉上次预览/整理结果与失败态(已入库列表不动)
     setPreview(null)
@@ -512,6 +516,13 @@ export default function KnowledgePage() {
       {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
 
       <CrossProjectLibrary />
+
+      <FolderPicker
+        open={pickerOpen}
+        initialPath={lastWsPath}
+        onPick={onPickSource}
+        onClose={() => setPickerOpen(false)}
+      />
     </>
   )
 }

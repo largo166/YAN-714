@@ -47,6 +47,8 @@ import {
   AiUsageListSchema,
   BatchIngestImportSchema,
   BatchIngestPreviewSchema,
+  DirListSchema,
+  type DirList,
   NotConfiguredListSchema,
   KnowledgeStatsSchema,
   SendMessageOutSchema,
@@ -541,6 +543,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ root_path: rootPath, index_to_knowledge: true }),
       }),
+    )
+  },
+  /** 只读列目录:path 为空 → 盘符列表;否则该目录直接子级。供目录选择弹窗用。 */
+  async listDir(path = ''): Promise<DirList> {
+    return DirListSchema.parse(
+      await request(`/api/filesystem/list-dir?path=${encodeURIComponent(path)}`),
     )
   },
 
