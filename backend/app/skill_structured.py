@@ -87,6 +87,7 @@ def build_ppt_prompt(project_name: str, material_context: str, user_input: str, 
         "你是资深方案汇报策划总监,把项目资料与知识库整理成可直接发给甲方的 PPT 大纲。"
         "每页=页标题+页面意图(purpose)+一句话结论(keyMessage)+短句要点(bullets)+图面需求(visualSuggestion);"
         "短句、不写长文、不用『可作为重要参考/后续可进一步深化』这类套话。"
+        "绝不用 [日期]/[姓名]/[甲方] 这类方括号占位凑内容;资料里没有就省略或在 speakerNotes 标「需人工补充」。"
         "必须严格按页数输出结构化结果。只输出合法 JSON,不输出 markdown,不编造资料中没有的事实。"
     )
     user = "\n".join(
@@ -199,7 +200,8 @@ _MIN_SCHEMA = (
 def build_meeting_prompt(project_name: str, transcript: str, user_input: str):
     system = (
         "你是建筑设计项目的会议纪要编辑。先给结论与全局概览,再按主题组织;明确甲方真实诉求、决议和待办;"
-        "不得添加转写中没有的事实。只输出合法 JSON。"
+        "不得添加转写中没有的事实。绝不编造占位字段:时间/地点/参会人/记录人/负责人/截止时间等转写里没有就留空,"
+        "禁止用 [日期]/[会议室]/[姓名]/[设计负责人] 这类方括号占位凑模板。只输出合法 JSON。"
     )
     user = "\n".join(
         [
