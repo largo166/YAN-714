@@ -4,16 +4,17 @@ import type { ChangeEvent } from 'react'
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import RichText, { Foldable, JudgmentView, coreLine, parseJudgment, renderInline } from '@/components/RichText'
-import type { ChatMessage, ChatSession, KnowledgeHit, ResultSendChannel, Skill, SkillRun, SkillResult, Agent } from '@/types/schemas'
+import type { ChatMessage, ChatSession, KnowledgeHit, ProjectFile, ResultSendChannel, Skill, SkillRun, SkillResult, Agent } from '@/types/schemas'
 
 /** 统一对话流条目:聊天气泡 + 技能成果卡按时间混排(成果进对话流,不再分两区)。 */
 type FlowItem = { kind: 'msg'; key: string; msg: ChatMessage } | { kind: 'result'; key: string; run: SkillRun }
 
-const EXAMPLES = [
-  '帮我做一版方案汇报 PPT',
-  '把会议录音转成纪要并排好待办',
-  '生成几张退台立面意向图',
-  '对这版方案做评审，再对标一个类比项目',
+// 示例=真技能入口:点了直接走对应斜杠命令(不再走通用闲聊)
+const EXAMPLES: { label: string; cmd: string }[] = [
+  { label: '/ppt 做一版方案汇报', cmd: '/ppt 做一版方案汇报 PPT' },
+  { label: '/评审 这版方案', cmd: '/评审 这版方案' },
+  { label: '/出图 退台立面意向图', cmd: '/出图 退台立面意向图' },
+  { label: '/会议纪要 整理待办', cmd: '/会议纪要' },
 ]
 
 /** 生图成果正文拆成「结果说明」+「英文提示词」(提示词默认折叠 + 可复制)。 */
@@ -208,7 +209,14 @@ export default function AgentPage() {
   const [showCmdMenu, setShowCmdMenu] = useState(false)
   const [archive, setArchive] = useState<SkillResult[]>([])
   const [showArchive, setShowArchive] = useState(false)
-  const [imgConfirm, setImgConfirm] = useState<{ prompt: string; model: string } | null>(null)
+  const [imgConfirm, setImgConfirm] = useState<{ prompt: string; model: string; message?: string } | null>(null)
+  // 本项目文件 + 上传可见反馈(修复上传成功无提示)
+  const [projFiles, setProjFiles] = useState<ProjectFile[]>([])
+  const [uploadNote, setUploadNote] = useState<string | null>(null)
+  // 技能/命令运行进度(可见 + 可取消,消除「看着卡死」)
+  const [pending, setPending] = useState<{ label: string; startedAt: number } | null>(null)
+  const [, setTick] = useState(0)
+  const abortRef = useRef<AbortController | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultSeq = useRef(0)
@@ -225,6 +233,14 @@ export default function AgentPage() {
       setArchive([])
     }
   }, [])
+  const refreshFiles = useCallback(async (pid: number) => {
+    try {
+      const d = await api.listProjectFiles(pid)
+      setProjFiles(d.items.filter((f) => f.status === 'active'))
+    } catch {
+      setProjFiles([])
+    }
+  }, [])
 
   // composer「+」添加文件：上传到当前项目（落项目文件，解析后可经知识库被检索/技能调用）
   const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -236,12 +252,15 @@ export default function AgentPage() {
       return
     }
     setErr(null)
+    setUploadNote(null)
     setUploading(true)
     try {
       const f = await api.uploadProjectFile(cur.id, file)
-      setSendNote(`已添加「${f.filename}」到项目「${cur.name}」（解析状态：${f.parse_status}）`)
+      const okParse = f.parse_status === 'ok' || f.parse_status === 'ok_truncated'
+      setUploadNote(`✓ 已上传「${f.filename}」到「${cur.name}」 · 解析：${okParse ? '成功，可被技能/研判调用' : f.parse_status}`)
+      await refreshFiles(cur.id)
     } catch (e) {
-      setErr((e as Error).message)
+      setUploadNote(`✕ 上传失败：${(e as Error).message}`)
     } finally {
       setUploading(false)
     }
@@ -285,15 +304,31 @@ export default function AgentPage() {
     })
   }, [loadSessions, openSession])
 
-  // 切换作用项目 → 拉该项目历史成果(归档回查)
+  // 切换作用项目 → 拉该项目历史成果(归档回查)+ 已传文件列表
   useEffect(() => {
-    if (cur) refreshArchive(cur.id)
-    else setArchive([])
-  }, [cur, refreshArchive])
+    if (cur) {
+      refreshArchive(cur.id)
+      refreshFiles(cur.id)
+    } else {
+      setArchive([])
+      setProjFiles([])
+    }
+    setUploadNote(null)
+  }, [cur, refreshArchive, refreshFiles])
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
   }, [flow])
+
+  // 运行中每秒刷新「已等 Xs」
+  useEffect(() => {
+    if (!pending) return
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [pending])
+
+  const cancelPending = () => abortRef.current?.abort()
+  const isAbort = (e: unknown) => e instanceof Error && e.name === 'AbortError'
 
   const newSession = async () => {
     setErr(null)
@@ -385,16 +420,22 @@ export default function AgentPage() {
     setShowCmdMenu(false)
     setErr(null)
     setSending(true)
+    const head = content.split(/\s/)[0]
+    const cmdLabel = commands.find((c) => c.command === head)?.label
+    setPending({ label: cmdLabel ? `${cmdLabel} · 生成中` : '执行命令 · 生成中', startedAt: Date.now() })
+    const ac = new AbortController()
+    abortRef.current = ac
     try {
-      const res = await api.runCommand(cur.id, content, curSid ?? 0, imgModel)
+      const res = await api.runCommand(cur.id, content, curSid ?? 0, imgModel, ac.signal)
       if (res.status === 'not_command') {
         setSending(false)
+        setPending(null)
         await doChat(content)
         return
       }
       if (res.status === 'confirm_image') {
-        // /出图：不直接生图，弹轻确认(将用[模型]生成[prompt])，防打错字白烧钱白等。
-        setImgConfirm({ prompt: res.prompt, model: res.model || imgModel })
+        // /出图：不直接生图，弹轻确认显示「真正要用的英文提示词」(可改)，防打错字/跑偏白烧钱。
+        setImgConfirm({ prompt: res.prompt, model: res.model || imgModel, message: res.message })
         setText('')
         return
       }
@@ -404,28 +445,37 @@ export default function AgentPage() {
         refreshArchive(cur.id)
       }
     } catch (e) {
-      setErr((e as Error).message)
+      if (!isAbort(e)) setErr((e as Error).message)
     } finally {
       setSending(false)
+      setPending(null)
+      abortRef.current = null
     }
   }
 
-  // /出图 轻确认后真出图：确认框拿到的 prompt 占位(以 '(' 开头)则传空让后端据材料自动生成。
+  // /出图 轻确认后真出图：把用户在弹窗里看到/改过的「最终英文提示词」原样送去出图(不再二次扩写)。
+  // 占位草案(以 '(' 开头/空)则传空,让后端据用户输入+材料生成。
   const confirmImage = async () => {
     const c = imgConfirm
     setImgConfirm(null)
     if (!c || !cur) return
-    const input = c.prompt.startsWith('(') ? '' : c.prompt
+    const finalPrompt = c.prompt.trim()
+    const usePlaceholder = !finalPrompt || finalPrompt.startsWith('(')
     setErr(null)
     setRunningSkill('img')
+    setPending({ label: `AI 生图（${c.model}）· 出图中`, startedAt: Date.now() })
+    const ac = new AbortController()
+    abortRef.current = ac
     try {
-      const r = await api.runSkill(cur.id, 'img', input, c.model, curSid ?? 0)
+      const r = await api.runSkill(cur.id, 'img', '', c.model, curSid ?? 0, usePlaceholder ? '' : finalPrompt, ac.signal)
       appendResult(r)
       refreshArchive(cur.id)
     } catch (e) {
-      setErr((e as Error).message)
+      if (!isAbort(e)) setErr((e as Error).message)
     } finally {
       setRunningSkill(null)
+      setPending(null)
+      abortRef.current = null
     }
   }
 
@@ -438,16 +488,22 @@ export default function AgentPage() {
     if (runningSkill) return
     setErr(null)
     setRunningSkill(skillId)
+    const label = skills.find((s) => s.id === skillId)?.title || '技能'
+    setPending({ label: `${label} · 生成中`, startedAt: Date.now() })
+    const ac = new AbortController()
+    abortRef.current = ac
     try {
       // 生图技能带所选模型(默认 OpenAI gpt-image);其它技能 model 忽略
       const model = skillId === 'img' ? imgModel : ''
-      const r = await api.runSkill(cur.id, skillId, text.trim(), model, curSid ?? 0)
+      const r = await api.runSkill(cur.id, skillId, text.trim(), model, curSid ?? 0, '', ac.signal)
       appendResult(r)
       refreshArchive(cur.id)
     } catch (e) {
-      setErr((e as Error).message)
+      if (!isAbort(e)) setErr((e as Error).message)
     } finally {
       setRunningSkill(null)
+      setPending(null)
+      abortRef.current = null
     }
   }
 
@@ -648,11 +704,8 @@ export default function AgentPage() {
                 ))}
               </div>
             </div>
-            <span className={'ptbadge' + (aiConfigured === false ? ' low' : '')} title="Agent 使用积分 · 每次发送按所选扣减">
-              ⊙ <b>{aiConfigured === false ? 0 : 1000}</b> 分
-            </span>
             <span className="cspacer"></span>
-            <button className="ctool" title="语音对话（暂未接入）">
+            <button className="ctool" title="语音对话（未接入）" disabled style={{ opacity: 0.45, cursor: 'not-allowed' }}>
               🎤
             </button>
             <button className="btn" disabled={sending} onClick={() => send()}>
@@ -661,6 +714,29 @@ export default function AgentPage() {
           </div>
           <div className="dropmask">松开添加文件（任意类型）</div>
         </div>
+
+        {uploadNote && (
+          <div style={{ marginTop: 8, fontSize: 12, color: uploadNote.startsWith('✕') ? 'var(--red)' : 'var(--ok)' }}>
+            {uploadNote}
+          </div>
+        )}
+        {cur && projFiles.length > 0 && (
+          <div className="projfiles" style={{ marginTop: 8 }}>
+            <span style={{ fontSize: 11.5, color: 'var(--mut)', marginRight: 4 }}>本项目文件（{projFiles.length}）</span>
+            {projFiles.slice(0, 12).map((f) => (
+              <span
+                key={f.id}
+                className="chip"
+                style={{ cursor: 'default', fontSize: 11 }}
+                title={`解析状态：${f.parse_status}`}
+              >
+                📄 {f.filename}
+                {(f.parse_status === 'ok' || f.parse_status === 'ok_truncated') ? '' : ` · ${f.parse_status}`}
+              </span>
+            ))}
+            {projFiles.length > 12 && <span style={{ fontSize: 11, color: 'var(--mut)' }}>…+{projFiles.length - 12}</span>}
+          </div>
+        )}
 
         <div className="chatlog" ref={logRef} style={flow.length ? { marginTop: 12 } : { display: 'none' }}>
           {flow.map((it) =>
@@ -693,7 +769,25 @@ export default function AgentPage() {
               </div>
             ),
           )}
-          {sending && <div className="bubble a">…思考中</div>}
+          {pending ? (
+            <div className="rescard" style={{ borderLeftColor: 'var(--blue, #5b8def)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>⏳</span>
+                <b style={{ fontSize: 13 }}>{pending.label}</b>
+                <span style={{ fontSize: 12, color: 'var(--mut)' }}>
+                  已等 {Math.max(0, Math.round((Date.now() - pending.startedAt) / 1000))}s
+                </span>
+                <button className="anbtn" type="button" style={{ marginLeft: 'auto' }} onClick={cancelPending}>
+                  取消
+                </button>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--mut)', marginTop: 4 }}>
+                生成中，通常 10–30 秒（出图更久）。慢是在调 DeepSeek/出图，不是卡死。
+              </div>
+            </div>
+          ) : (
+            sending && <div className="bubble a">…思考中</div>
+          )}
         </div>
 
         {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
@@ -721,8 +815,8 @@ export default function AgentPage() {
 
         <div className="examples">
           {EXAMPLES.map((ex) => (
-            <button key={ex} className="ex" onClick={() => send(ex)}>
-              {ex}
+            <button key={ex.cmd} className="ex" title={`直接触发技能：${ex.cmd}`} onClick={() => send(ex.cmd)}>
+              {ex.label}
             </button>
           ))}
         </div>
@@ -888,19 +982,30 @@ export default function AgentPage() {
               <div style={{ fontSize: 13, marginBottom: 8 }}>
                 将用 <b>{imgConfirm.model}</b> 生成方案意向图。生图较慢且按次计费，确认后开始。
               </div>
-              <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 4 }}>提示词</div>
-              <div
+              <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 4 }}>
+                实际要用的提示词（可直接改，改完即按这条出图）
+              </div>
+              <textarea
+                value={imgConfirm.prompt}
+                onChange={(e) => setImgConfirm({ ...imgConfirm, prompt: e.target.value })}
+                rows={5}
                 style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
                   background: 'var(--panel2)',
+                  border: '1px solid var(--line2)',
                   borderRadius: 8,
                   padding: '8px 10px',
                   fontSize: 12.5,
-                  whiteSpace: 'pre-wrap',
-                  color: imgConfirm.prompt.startsWith('(') ? 'var(--mut)' : 'var(--ink)',
+                  lineHeight: 1.5,
+                  color: 'var(--ink)',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
                 }}
-              >
-                {imgConfirm.prompt || '(将据当前项目材料自动生成提示词)'}
-              </div>
+              />
+              {imgConfirm.message && (
+                <div style={{ fontSize: 11.5, color: 'var(--red)', marginTop: 4 }}>{imgConfirm.message}</div>
+              )}
               <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
                 <button className="anbtn" type="button" onClick={() => setImgConfirm(null)}>
                   取消

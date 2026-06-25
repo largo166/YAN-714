@@ -57,6 +57,28 @@ _COMMANDS = [
 _CMD_MAP = {c: (sid, confirm) for c, sid, _label, confirm in _COMMANDS}
 
 
+def _gen_image_prompt(cfg: models.AppSetting, project_name: str, material_ctx: str, user_ask: str) -> str:
+    """据『用户想要的画面』扩写英文生图提示词;用户意图为主、项目材料兜底。供 /出图 草案 + 直接出图复用。"""
+    user_ask = (user_ask or "").strip()
+    if user_ask:
+        gen_user = (
+            f"用户想要的画面:{user_ask}\n"
+            + (f"项目背景(仅兜底参考,不要喧宾夺主):{material_ctx[:800]}\n" if material_ctx else "")
+            + "把『用户想要的画面』扩写成一条高质量英文 AI 生图提示词,写实建筑效果图;"
+            "以用户意图为主、项目背景只作补充;突出风格/构图/材质/光线/视角;只输出英文提示词,不要解释。"
+        )
+    else:
+        gen_user = (
+            f"{material_ctx or ('项目：' + project_name)}\n\n"
+            "请为本建筑项目生成一条用于 AI 出『方案意向图/效果图』的英文生图提示词,"
+            "突出建筑风格、立面材质、光线氛围、视角,写实风格;只输出英文提示词,不要解释。"
+        )
+    return llm.chat_completion(
+        [{"role": "user", "content": gen_user}],
+        api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+    ).strip()
+
+
 def _settings(db: Session) -> models.AppSetting:
     row = db.get(models.AppSetting, 1)
     if row is None:
@@ -136,7 +158,7 @@ def _run_skill_inner(
             answer = llm.chat_completion(
                 [{"role": "system", "content": sysp}, {"role": "user", "content": userp}],
                 api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
-                response_format=fmt, timeout=120.0,
+                response_format=fmt, timeout=90.0,
             )
         except llm.LLMError as e:
             return schemas.SkillRunOut(skill_id=skill_id, status="error", title=title,
@@ -165,7 +187,7 @@ def _run_skill_inner(
             answer = llm.chat_completion(
                 [{"role": "system", "content": sysp}, {"role": "user", "content": userp}],
                 api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
-                response_format=fmt, timeout=120.0,
+                response_format=fmt, timeout=90.0,
             )
         except llm.LLMError as e:
             return schemas.SkillRunOut(skill_id=skill_id, status="error", title=title,
@@ -184,21 +206,16 @@ def _run_skill_inner(
         if not image_gen.is_configured():
             return schemas.SkillRunOut(skill_id=skill_id, status="not_configured", title="AI 生图",
                                        content=image_gen.NOT_CONFIGURED_MSG)
-        # 1) DeepSeek 据项目材料生成一条生图提示词(无材料也可,基于项目名)
-        ctx = material.context or f"项目：{project.name}"
-        gen_user = (
-            f"{ctx}\n\n请为本建筑项目生成一条用于 AI 出『方案意向图/效果图』的英文生图提示词,"
-            f"突出建筑风格、立面材质、光线氛围、视角,写实风格;只输出一段提示词文本,不要解释。"
-            + (f"\n用户补充:{payload.input.strip()}" if payload.input.strip() else "")
-        )
-        try:
-            prompt = llm.chat_completion(
-                [{"role": "user", "content": gen_user}],
-                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
-            ).strip()
-        except llm.LLMError as e:
-            return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
-                                       content="生成提示词失败。", error_message=str(e))
+        # 1) 提示词:用户已在轻确认里看过/改过的最终 prompt → 直接用(对齐用户,不再二次扩写);
+        #    否则据『用户输入为主、材料兜底』扩写一条。
+        if payload.image_prompt.strip():
+            prompt = payload.image_prompt.strip()
+        else:
+            try:
+                prompt = _gen_image_prompt(cfg, project.name, material.context or "", payload.input)
+            except llm.LLMError as e:
+                return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
+                                           content="生成提示词失败。", error_message=str(e))
         # 2) 真出图(异步制,内部轮询)
         res = image_gen.generate_image(prompt, model=payload.model)
         if res.status == "not_configured":
@@ -314,14 +331,23 @@ def run_command(project_id: int, payload: schemas.SkillCommandIn, db: Session = 
     skill_id, needs_confirm = _CMD_MAP[head]
     rest = rest.strip()
 
-    if needs_confirm:  # /出图:不直接跑,返回提示词草案 + 默认模型让前端轻确认
+    if needs_confirm:  # /出图:不直接跑,先把『真正要用的英文提示词』草案给前端,让用户看/改再确认
         from .. import image_gen
         if not image_gen.is_configured():
             return schemas.SkillCommandOut(status="confirm_image", skill_id=skill_id,
                                            prompt=rest, model=image_gen.DEFAULT_MODEL,
                                            message=image_gen.NOT_CONFIGURED_MSG)
+        cfg = _settings(db)
+        draft = ""
+        if cfg.deepseek_api_key:
+            project = db.get(models.Project, project_id)
+            material = analysis.gather_material(db, project_id, query=f"{project.name if project else ''} 生图 {rest}", top_k=3)
+            try:
+                draft = _gen_image_prompt(cfg, project.name if project else "", material.context or "", rest)
+            except llm.LLMError:
+                draft = rest  # 草案生成失败,回落用户原话,出图时再扩写
         return schemas.SkillCommandOut(status="confirm_image", skill_id=skill_id,
-                                       prompt=rest or "(将据当前项目材料自动生成提示词)",
+                                       prompt=draft or rest or "(将据当前项目材料自动生成提示词)",
                                        model=payload.model or image_gen.DEFAULT_MODEL)
 
     # 文本类命令:直接执行 + 落库

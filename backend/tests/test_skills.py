@@ -181,17 +181,22 @@ def test_command_text_runs_and_archives(client, monkeypatch):
 
 
 def test_command_img_needs_confirm(client, monkeypatch):
-    """/出图:不直接生图,返回 confirm_image(prompt+model)让前端轻确认。"""
-    from app import image_gen
+    """/出图:不直接生图,返回 confirm_image,prompt=『真正要用的英文提示词草案』(用户输入为主)让前端看/改。"""
+    from app import image_gen, llm
     called = {"gen": False}
     def _boom(*a, **k):
         called["gen"] = True
         raise AssertionError("不应直接生图")
     monkeypatch.setattr(image_gen, "generate_image", _boom)
+    # 草案由 DeepSeek 扩写,这里桩掉;断言用户意图(退台立面)被带进草案
+    monkeypatch.setattr(llm, "chat_completion",
+                        lambda messages, **kw: "photorealistic stepped terrace facade, warm light, --ar 16:9")
     pid = _new_project(client, name="出图确认测试")
+    _set_key()  # 配 DeepSeek 让草案生成走桩
     r = client.post(f"/api/projects/{pid}/command", json={"text": "/出图 退台立面"}).json()
     assert r["status"] == "confirm_image" and r["skill_id"] == "img"
     assert called["gen"] is False  # 确认前绝不生图(防白烧钱)
+    assert "terrace" in r["prompt"]  # 确认弹窗给的是真要用的英文提示词,不是用户原中文
 
 
 def test_command_not_a_command(client):

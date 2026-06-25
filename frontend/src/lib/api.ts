@@ -198,20 +198,22 @@ export const api = {
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
   },
-  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0): Promise<SkillRun> {
+  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', signal?: AbortSignal): Promise<SkillRun> {
     return SkillRunSchema.parse(
       await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ input, model, session_id: sessionId }),
+        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt }),
+        signal,
       }),
     )
   },
   /** 斜杠命令:文本类直跑(result)/出图轻确认(confirm_image)/非命令(not_command)。 */
-  async runCommand(projectId: number, text: string, sessionId = 0, model = ''): Promise<SkillCommand> {
+  async runCommand(projectId: number, text: string, sessionId = 0, model = '', signal?: AbortSignal): Promise<SkillCommand> {
     return SkillCommandSchema.parse(
       await request(`/api/projects/${projectId}/command`, {
         method: 'POST',
         body: JSON.stringify({ text, session_id: sessionId, model }),
+        signal,
       }),
     )
   },
