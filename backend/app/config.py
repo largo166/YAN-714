@@ -1,15 +1,52 @@
-"""集中配置。所有路径相对 backend/ 解析，与进程工作目录无关。"""
+"""集中配置。路径解析与进程工作目录无关，且区分「开发态」与「打包冻结态(exe)」。
+
+- 开发态：代码资源与可写数据都在 backend/ 下（BASE_DIR=backend/，DATA_DIR=backend/data）。
+- 冻结态(PyInstaller exe)：代码/前端 dist 在只读解压目录 _MEIPASS；可写数据(DB/上传/.env)
+  绝不能写进只读 bundle，落到用户可写目录 %LOCALAPPDATA%\ROM-AI（可被 ROMAI_DATA_DIR 覆盖）。
+  这是 exe 化最大风险点（__file__ 在冻结态指向临时目录）。
+"""
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# backend/ 目录（config.py 在 backend/app/ 下，parents[1] = backend/）
-BASE_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = BASE_DIR / "data"
-ENV_FILE = BASE_DIR / ".env"
+
+def _is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+# RESOURCE_DIR：代码/前端 dist 等只读资源根。BASE_DIR 保留向后兼容(=RESOURCE_DIR)。
+if _is_frozen():
+    RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+else:
+    RESOURCE_DIR = Path(__file__).resolve().parents[1]  # backend/
+BASE_DIR = RESOURCE_DIR
+
+
+def _resolve_data_dir() -> Path:
+    """可写数据目录。优先 ROMAI_DATA_DIR；冻结态用 %LOCALAPPDATA%\\ROM-AI；开发态用 backend/data。"""
+    override = os.environ.get("ROMAI_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser()
+    if _is_frozen():
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        return Path(base) / "ROM-AI"
+    return BASE_DIR / "data"
+
+
+DATA_DIR = _resolve_data_dir()
+ENV_FILE = DATA_DIR / ".env" if _is_frozen() else (BASE_DIR / ".env")
+
+
+def frontend_dist_dir() -> Path:
+    """前端构建产物 dist 目录：冻结态在 _MEIPASS/frontend_dist；开发态在 <repo>/frontend/dist。"""
+    if _is_frozen():
+        return RESOURCE_DIR / "frontend_dist"
+    return BASE_DIR.parent / "frontend" / "dist"
 
 
 class Settings(BaseSettings):

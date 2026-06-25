@@ -1,0 +1,5 @@
+# ROM-AI 桌面 exe 打包依赖(在装好 backend/requirements.txt 的同一 Python 里再装这两个)
+# 构建: python -m PyInstaller desktop/romai.spec --noconfirm --distpath dist_exe --workpath build_exe
+# 前置: 先 cd frontend && npm run build 生成 dist;Windows 需 WebView2 运行时(Win10/11 多自带)
+pywebview>=5.0
+pyinstaller>=6.0

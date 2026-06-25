@@ -102,7 +102,17 @@ import {
   type TencentSync,
 } from '@/types/schemas'
 
-const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+// API 基址：运行时按页面来源判定，避免构建期 env 缓存坑。
+// - 显式 VITE_API_BASE_URL（非空）优先。
+// - Vite 开发服务器(端口 5173) → 打本地 FastAPI 8000。
+// - 其余(exe / 同源托管 dist，任意端口) → 相对同源('')，请求走 /api。
+function resolveApiBase(): string {
+  const explicit = import.meta.env.VITE_API_BASE_URL as string | undefined
+  if (explicit) return explicit
+  if (typeof window !== 'undefined' && window.location.port === '5173') return 'http://127.0.0.1:8000'
+  return ''
+}
+const BASE_URL: string = resolveApiBase()
 
 async function request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
