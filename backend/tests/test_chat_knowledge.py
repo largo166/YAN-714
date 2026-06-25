@@ -97,7 +97,10 @@ def test_chat_injects_prose_style(client, monkeypatch):
     msgs = captured["messages"]
     assert msgs and msgs[0]["role"] == "system"
     assert msgs[0]["content"] == llm.PROSE_STYLE  # 文风置于最前
-    assert "先给判断结论" in msgs[0]["content"] and "少说套话" in msgs[0]["content"]
+    # 判断卡文风的稳定标记
+    assert "判断卡" in msgs[0]["content"]
+    assert "核心判断" in msgs[0]["content"] and "资料缺口" in msgs[0]["content"] and "下一步" in msgs[0]["content"]
+    assert "基于提供的材料" in msgs[0]["content"]  # 在禁用词清单里出现
 
 
 # ── 知识库 ──

@@ -121,8 +121,8 @@ def generate_metadata(document_id: int, db: Session = Depends(get_db)) -> schema
     msgs = [
         {
             "role": "system",
-            "content": "你是知识库元数据助手。只基于给定正文，生成一句话中文摘要(30-60字，不编造)，"
-            "并从给定枚举里选最贴切的类型。严格只输出 JSON。",
+            "content": "你是知识库元数据助手。只基于给定正文，生成一句话中文摘要(30-60字，直接说这份资料是什么/讲什么，"
+            "不写小作文、不用『本文档』『可作为参考』等套话、不编造)，并从给定枚举里选最贴切的类型。严格只输出 JSON。",
         },
         {
             "role": "user",

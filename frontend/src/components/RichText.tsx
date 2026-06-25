@@ -217,7 +217,7 @@ export function JudgmentView({ j }: { j: Judgment }) {
       {j.core && <div className="rom-core" style={{ marginBottom: 10 }}>{renderInline(j.core)}</div>}
       {j.points.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div className="jhd">关键要点</div>
+          <div className="jhd">关键依据</div>
           {j.points.map((p, i) => (
             <div key={i} className="jpoint">
               {p.label && <span className="jlabel">{p.label}</span>}
@@ -238,7 +238,7 @@ export function JudgmentView({ j }: { j: Judgment }) {
       )}
       {j.questions.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div className="jhd">待确认</div>
+          <div className="jhd">资料缺口</div>
           <ul style={{ margin: '4px 0', paddingLeft: 18 }}>
             {j.questions.map((q, i) => (
               <li key={i} style={{ margin: '2px 0' }}>{renderInline(q)}</li>

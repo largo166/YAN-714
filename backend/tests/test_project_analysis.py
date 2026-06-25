@@ -152,7 +152,7 @@ def test_analyze_structured_judgment(client, monkeypatch):
         assert r["output_json"], "结构化判断应落 output_json"
         result = _json.loads(r["output_json"])
         assert result["core"] and len(result["points"]) >= 2 and result["actions"]
-        assert "核心判断" in r["content"] and "关键要点" in r["content"]  # 核心判断优先的可读 markdown
+        assert "核心判断" in r["content"] and "关键依据" in r["content"]  # 判断卡:核心判断 + 关键依据
     finally:
         _cleanup(pid)
 
