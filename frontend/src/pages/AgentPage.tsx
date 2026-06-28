@@ -688,21 +688,27 @@ export default function AgentPage() {
               ▾ <b>{mode}</b>
               <div className="engmenu agentmenu">
                 <button className={mode === 'Auto' ? 'on' : ''} onClick={() => setMode('Auto')}>
-                  Auto · 自动调度<span className="cost">低耗</span>
+                  Auto · 自动调度<span className="cost">低耗 · 全部技能</span>
                 </button>
-                {agents.map((a) => (
-                  <button
-                    key={a.id}
-                    className={mode === a.name ? 'on' : ''}
-                    onClick={() => setMode(a.name)}
-                    title={a.status === 'ok' ? a.duty : '规划中 · 执行能力暂未接入'}
-                  >
-                    {a.name}
-                    <span className={'cost' + (a.status === 'ok' ? '' : ' soon')}>
-                      {a.status === 'ok' ? '可用' : '规划中'}
-                    </span>
-                  </button>
-                ))}
+                {agents.map((a) => {
+                  // Auto 模式:所有「可用」技能都显示为已选中(表示 Auto 会在它们之间自动调度);
+                  // 选了具体 Agent 时只高亮那一个。纯视觉,不改调度逻辑。
+                  const autoActive = mode === 'Auto' && a.status === 'ok'
+                  const selected = mode === a.name || autoActive
+                  return (
+                    <button
+                      key={a.id}
+                      className={selected ? 'on' : ''}
+                      onClick={() => setMode(a.name)}
+                      title={a.status === 'ok' ? a.duty : '规划中 · 执行能力暂未接入'}
+                    >
+                      {a.name}
+                      <span className={'cost' + (a.status === 'ok' ? '' : ' soon')}>
+                        {a.status === 'ok' ? (autoActive ? '已启用' : '可用') : '规划中'}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
             <span className="cspacer"></span>
