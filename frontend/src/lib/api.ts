@@ -575,6 +575,10 @@ export const api = {
   async listAssets(projectId: number): Promise<{ items: FileAsset[]; total: number }> {
     return request(`/api/projects/${projectId}/assets`)
   },
+  // 改分类(asset_type)或软移除/恢复(status='trashed'|'active')——只改登记,不删图/源文件
+  async updateAsset(projectId: number, assetId: number, body: { asset_type?: string; status?: string }): Promise<{ id: number; asset_type: string; status: string }> {
+    return request(`/api/projects/${projectId}/assets/${assetId}`, { method: 'PATCH', body: JSON.stringify(body) })
+  },
   /** 从某文件抽图为资产(幂等);上传后异步触发,不阻塞。 */
   async extractFileAssets(projectId: number, fileId: number): Promise<{ extracted: number; project_total: number }> {
     return request(`/api/projects/${projectId}/files/${fileId}/extract-assets`, { method: 'POST' })
@@ -814,6 +818,8 @@ export interface FileAsset {
   id: number
   source_file_id: number
   ext: string
+  asset_type: string // render|reference|plan|model|material|logo|extracted|image
+  status?: string
   page_no: number
   slide_no: number
   shape_index: number

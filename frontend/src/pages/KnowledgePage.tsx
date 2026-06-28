@@ -22,6 +22,26 @@ function fmtSize(n: number): string {
   return n + ' B'
 }
 
+// 项目效果图:筛选 tab / 类型中文名 / 生图素材类型 / 可改分类项
+const ASSET_TABS = [
+  { key: 'all', label: '全部' },
+  { key: 'render', label: '效果图' },
+  { key: 'reference', label: '参考图' },
+  { key: 'plan', label: '图纸/平面' },
+  { key: 'model', label: '白模/体块' },
+  { key: 'material', label: '材质' },
+]
+const TYPE_CN: Record<string, string> = {
+  render: '效果图', reference: '参考图', plan: '图纸', model: '白模',
+  material: '材质', logo: 'logo', extracted: '文档图', image: '图片',
+}
+const MAT_TYPES = ['reference', 'model', 'material'] // 生图素材类型
+const RECLASS = [
+  { key: 'render', label: '效果图' }, { key: 'reference', label: '参考图' },
+  { key: 'plan', label: '图纸/平面' }, { key: 'model', label: '白模/体块' },
+  { key: 'material', label: '材质' }, { key: 'logo', label: 'logo/图标' },
+]
+
 /** 数据基地：本地来源接入 → 一键整理 → 索引展示 的主入口。
  *  两个独立动作:「选择来源」只选择/授权/预览(不落库);「一键整理」才扫描+识别项目+入库+索引+刷新下拉。
  *  全文检索走本地 FTS5 / BM25(SQLite)。所有按钮接真实 API、不伪造、不留无效占位。 */
@@ -104,6 +124,17 @@ export default function KnowledgePage() {
   useEffect(() => {
     loadAssets()
   }, [loadAssets])
+
+  // 项目效果图:筛选 tab + 改分类 / 软移除(复用 trashed 语义,可恢复,不删图/源文件)
+  const [assetTab, setAssetTab] = useState('all')
+  const reclassAsset = async (id: number, asset_type: string) => {
+    if (!cur) return
+    try { await api.updateAsset(cur.id, id, { asset_type }); loadAssets() } catch (e) { setErr((e as Error).message) }
+  }
+  const removeAsset = async (id: number) => {
+    if (!cur) return
+    try { await api.updateAsset(cur.id, id, { status: 'trashed' }); loadAssets() } catch (e) { setErr((e as Error).message) }
+  }
 
   const doSearch = async () => {
     const q = searchQ.trim()
@@ -660,59 +691,111 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      {/* 项目图片资产:从 PPT/PDF/Word 抽出的图(+ 直接上传图);有才显示,不伪造 */}
+      {/* 项目效果图(恢复旧版模式):生图素材 + 效果图成果画廊;统一图源(上传/文档抽取/AI生图)。常驻展开。 */}
       <section className="sec nocollapse" data-open="1">
         <div className="sechead" style={{ cursor: 'default' }}>
           <span className="chev" style={{ visibility: 'hidden' }}>▸</span>
-          <span className="stitle">项目图片资产</span>
+          <span className="stitle">项目效果图 / 图片资产</span>
           <span className="scount">{assets.length} 张</span>
-          <span className="shint">{cur ? `当前项目 · ${cur.name}` : '未选择项目'} · 从文件抽取</span>
+          <span className="shint">{cur ? `当前项目 · ${cur.name}` : '未选择项目'} · 上传 / 文档抽取 / AI 生图</span>
         </div>
         <div className="secbody">
-          {assets.length === 0 ? (
-            <div className="gallery">
-              <div className="gempty">
-                {cur
-                  ? '暂无图片资产。上传含图的 PPT/PDF/Word 并「一键整理」后，会自动抽出其中的图。'
-                  : '请先选择项目。'}
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {assets.slice(0, 60).map((a) => (
-                <a
-                  key={a.id}
-                  href={cur ? api.assetImageUrl(cur.id, a.id) : '#'}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={
-                    [
-                      a.slide_no ? `PPT 第 ${a.slide_no} 页` : a.page_no ? `PDF 第 ${a.page_no} 页` : '',
-                      `${a.width}×${a.height}`,
-                      a.caption,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')
-                  }
-                  style={{ display: 'block', width: 120, height: 90, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line2)', background: 'var(--panel2)' }}
-                >
-                  {cur && (
-                    <img
-                      src={api.assetThumbUrl(cur.id, a.id)}
-                      alt={a.caption.slice(0, 20) || '图片资产'}
-                      loading="lazy"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
-                  )}
-                </a>
-              ))}
-              {assets.length > 60 && (
-                <div style={{ alignSelf: 'center', fontSize: 12, color: 'var(--mut)', padding: '0 6px' }}>
-                  …共 {assets.length} 张
+          {!cur ? (
+            <div className="gallery"><div className="gempty">请先选择项目。</div></div>
+          ) : (() => {
+            const mats = assets.filter((a) => MAT_TYPES.includes(a.asset_type))
+            const shown = assetTab === 'all' ? assets : assets.filter((a) => a.asset_type === assetTab)
+            return (
+              <>
+                {/* 上半:生图素材 · AI 代理生图来源 */}
+                <div className="matwrap">
+                  <div className="matlabel">生图素材 · AI 代理生图来源（把下方图标为 参考图 / 白模 / 材质 即成为素材）</div>
+                  <div className="matgrid">
+                    {mats.length === 0 ? (
+                      <div className="matcard"><span className="madd">＋ 暂无素材</span><span className="mhint">空 · 文生图</span></div>
+                    ) : (
+                      mats.map((m) => (
+                        <div key={m.id} className="matcard filled" style={{ backgroundImage: `url("${api.assetThumbUrl(cur.id, m.id)}")` }}>
+                          <span className="mname">{TYPE_CN[m.asset_type]}</span>
+                          <span className="mtag">素材</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="modebar">
+                    <span>生图模式</span><span className="sep">·</span>
+                    {mats.length === 0 ? (
+                      <span className="mode t2i">文生图（素材为空，按描述直接生成）</span>
+                    ) : (
+                      <>
+                        <span className="mode i2i">带入生图（{mats.length} 张素材）</span>
+                        <span className="sep">·</span>
+                        <span style={{ color: 'var(--mut)' }}>将注入提示词</span>
+                        <div className="promptchips">
+                          {['控制视角', '保持构图', ...mats.map((m, i) => `参考图${i + 1}·${TYPE_CN[m.asset_type]}`)].map((c, i) => (
+                            <span className="pchip" key={i}>{c}</span>
+                          ))}
+                        </div>
+                        <span className="sep">·</span>
+                        <span style={{ color: 'var(--mut)', fontSize: 11 }}>真·图生图(传参考图)后续接入</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* 筛选 tab */}
+                <div className="matlabel" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                  <span style={{ alignSelf: 'center' }}>效果图成果</span>
+                  <span style={{ flex: 1 }} />
+                  {ASSET_TABS.map((t) => {
+                    const n = t.key === 'all' ? assets.length : assets.filter((a) => a.asset_type === t.key).length
+                    return (
+                      <button key={t.key} className="anbtn" onClick={() => setAssetTab(t.key)}
+                        style={assetTab === t.key ? { borderColor: 'var(--terra-line)', background: 'var(--terra-soft)', color: 'var(--terra)' } : undefined}>
+                        {t.label}（{n}）
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* 下半:效果图成果画廊 */}
+                {shown.length === 0 ? (
+                  <div className="gallery"><div className="gempty">
+                    {assetTab === 'all'
+                      ? '当前项目暂无效果图。可上传图片 / 从文档抽取 / 由 AI 生图生成后自动归档到这里。'
+                      : `当前项目暂无「${ASSET_TABS.find((t) => t.key === assetTab)?.label}」。可在某张图上「分类…」改成此类。`}
+                  </div></div>
+                ) : (
+                  <div className="gallery">
+                    {shown.slice(0, 60).map((a) => (
+                      <div key={a.id} className="gtile" style={{ backgroundImage: `url("${api.assetThumbUrl(cur.id, a.id)}")` }}>
+                        <span className="glabel">
+                          {TYPE_CN[a.asset_type] || '图片'} · {(a.caption || '').slice(0, 12) || (a.slide_no ? `第${a.slide_no}页` : a.page_no ? `第${a.page_no}页` : '未命名')}
+                        </span>
+                        <div className="gov">
+                          <select
+                            title="改分类"
+                            value=""
+                            onChange={(e) => { if (e.target.value) reclassAsset(a.id, e.target.value) }}
+                            style={{ height: 28, fontSize: 11, border: 0, borderRadius: 8, background: '#fffffff0', color: 'var(--ink)', cursor: 'pointer' }}
+                          >
+                            <option value="">分类…</option>
+                            {RECLASS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+                          </select>
+                          <a href={api.assetImageUrl(cur.id, a.id)} target="_blank" rel="noreferrer" title="查看原图"
+                            style={{ width: 28, height: 28, borderRadius: 8, background: '#fffffff0', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>🔍</a>
+                          <a href={api.assetImageUrl(cur.id, a.id)} download title="下载原图"
+                            style={{ width: 28, height: 28, borderRadius: 8, background: '#fffffff0', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>⬇</a>
+                          <button className="gx" title="移除(软隐藏,可恢复,不删原文件)" onClick={() => removeAsset(a.id)}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                    {shown.length > 60 && <div className="gempty" style={{ gridColumn: '1 / -1' }}>…共 {shown.length} 张，已显示前 60</div>}
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       </section>
 

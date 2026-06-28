@@ -244,7 +244,7 @@ class FileAsset(Base):
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     source_file_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)  # 来源 ProjectFile.id;0=直接上传的图
-    asset_type: Mapped[str] = mapped_column(String(30), default="image", nullable=False)  # image（后续可扩 chart/page_snapshot）
+    asset_type: Mapped[str] = mapped_column(String(30), default="image", nullable=False)  # render/reference/plan/model/material/logo/extracted/image(默认未分类);只 AI生图自动判 render,余手动改
     stored_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对 UPLOADS_ROOT 的原图路径
     thumb_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 缩略图相对路径
     ext: Mapped[str] = mapped_column(String(12), default="", nullable=False)

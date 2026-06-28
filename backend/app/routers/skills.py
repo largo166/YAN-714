@@ -9,7 +9,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters, review_checklist
+from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters, review_checklist, image_assets
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -308,6 +308,20 @@ def _run_skill_inner(
         except Exception as exc:  # noqa: BLE001
             return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
                                        content="图片存盘失败。", error_message=str(exc))
+        # AI 效果图同步登记为图片资产(asset_type=render)——出图那刻分类 100% 确定,不猜。
+        try:
+            w, h = image_assets._dims(res.image_bytes)
+            thumb = image_assets.make_thumb(res.image_bytes)
+            thumb_rel = uploads.save_upload(project_id, f"thumb-AI生图-{res.model}.jpg", thumb).stored_path if thumb else ""
+            db.add(models.FileAsset(
+                project_id=project_id, source_file_id=0, asset_type="render",
+                stored_path=stored.stored_path, thumb_path=thumb_rel, ext=ext,
+                caption=(prompt[:200] if prompt else "AI 效果图"),
+                width=w, height=h, status="active",
+            ))
+            db.commit()
+        except Exception:  # noqa: BLE001  资产登记失败不影响出图成果返回
+            db.rollback()
         return schemas.SkillRunOut(
             skill_id=skill_id, status="ok", title="AI 生图 · 意向图",
             content=f"已生成意向图（{res.model}）。提示词:\n{prompt}",

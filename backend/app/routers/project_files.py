@@ -6,7 +6,7 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads, image_assets, safe_json
@@ -614,12 +614,44 @@ def list_assets(project_id: int, db: Session = Depends(get_db)) -> dict:
     items = [
         {
             "id": r.id, "source_file_id": r.source_file_id, "ext": r.ext,
+            "asset_type": r.asset_type, "status": r.status,
             "page_no": r.page_no, "slide_no": r.slide_no, "shape_index": r.shape_index,
             "caption": r.caption, "width": r.width, "height": r.height,
         }
         for r in rows
     ]
     return {"items": items, "total": len(items)}
+
+
+# 资产分类取值:render(AI效果图)/reference(参考)/plan(平面图纸)/model(白模体块)/
+# material(材质)/logo(logo小图)/extracted(文档抽取)/image(未分类)。
+_ASSET_TYPES = {"render", "reference", "plan", "model", "material", "logo", "extracted", "image"}
+
+
+@router.patch("/{project_id}/assets/{asset_id}")
+def update_asset(
+    project_id: int,
+    asset_id: int,
+    asset_type: str = Body("", embed=True),
+    status: str = Body("", embed=True),
+    db: Session = Depends(get_db),
+) -> dict:
+    """改分类(asset_type)或软移除/恢复(status)。软移除复用文件软删的 'trashed' 语义,可恢复;
+    只改资产登记,绝不删除 _assets 里的图或源文件。"""
+    a = db.get(models.FileAsset, asset_id)  # 不走 _asset_or_404:它拒 trashed,会挡住恢复
+    if a is None or a.project_id != project_id:
+        raise HTTPException(404, "资产不存在")
+    if asset_type:
+        if asset_type not in _ASSET_TYPES:
+            raise HTTPException(400, f"未知分类:{asset_type}")
+        a.asset_type = asset_type
+    if status:
+        if status not in ("active", "trashed"):
+            raise HTTPException(400, "状态非法(只允许 active/trashed)")
+        a.status = status
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "asset_type": a.asset_type, "status": a.status}
 
 
 def _serve_asset(rel_path: str):
