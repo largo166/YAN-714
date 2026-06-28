@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads, image_assets
+from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads, image_assets, safe_json
 from ..database import get_db
 from ..safe_paths import sanitize_filename
 
@@ -306,6 +306,7 @@ def batch_ingest_import(
                     parse_status=pr.status,
                     parse_error=pr.error,
                     content_text=pr.text,
+                    content_chunks_json=safe_json.dumps_safe(pr.chunks) if pr.chunks else "",
                     truncated_at_page=pr.truncated_at_page,
                     total_pages=pr.total_pages,
                     status="active",
@@ -414,6 +415,7 @@ async def upload_file(
         parse_status=pr.status,
         parse_error=pr.error,
         content_text=pr.text,
+        content_chunks_json=safe_json.dumps_safe(pr.chunks) if pr.chunks else "",
         truncated_at_page=pr.truncated_at_page,
         total_pages=pr.total_pages,
         status="active",

@@ -186,6 +186,8 @@ class ProjectFile(Base):
     parse_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     parse_error: Mapped[str] = mapped_column(Text, default="", nullable=False)
     content_text: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 抽取文本
+    # 分块溯源：PDF 按页 / PPTX 按片的 [{"text","page_no","slide_no"}] JSON;供出处精确到页。
+    content_chunks_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     # 截断信息（仅 ok_truncated 有意义）：正文停在第几页 / 共多少页；0/0 表示读完或不适用。
     # 注入 RAG 时据此如实标注「(正文截断,停在第N页/共M页)」,不让 LLM 误以为是全文。
     truncated_at_page: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

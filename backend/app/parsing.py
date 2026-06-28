@@ -27,8 +27,9 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import List
 import re
 import unicodedata
 import zipfile
@@ -54,6 +55,9 @@ class ParseResult:
     # 截断信息（仅 ok_truncated 有意义；如实告知停在哪、共多少页，不把截断值当全文）
     truncated_at_page: int = 0
     total_pages: int = 0
+    # 分块溯源：PDF 按页 / PPTX 按片产出 [{"text":..,"page_no":N,"slide_no":N}]，供出处精确到页。
+    # 其它类型(docx/txt/xlsx)无页概念 → 空列表(出处不带页码)。
+    chunks: List[dict] = field(default_factory=list)
 
 
 def is_supported(filename: str) -> bool:
@@ -124,7 +128,7 @@ def _dispatch(p: Path, ext: str) -> ParseResult:
         elif ext == ".docx":
             text = _read_docx(p)
         elif ext == ".pptx":
-            text = _read_pptx(p)
+            return _read_pptx(p)  # 自带按片 chunk，直接返回 ParseResult
         elif ext == ".xlsx":
             text = _read_xlsx(p)
         else:  # 理论不达（已过 SUPPORTED_EXTS）
@@ -180,6 +184,7 @@ def _read_pdf(p: Path) -> ParseResult:
 
         total_pages = doc.page_count
         parts: list[str] = []
+        chunks: List[dict] = []  # 按页分块溯源
         last_page_read = 0  # 已读到的最后页号（1-based）
         for i in range(total_pages):
             try:
@@ -189,6 +194,7 @@ def _read_pdf(p: Path) -> ParseResult:
             last_page_read = i + 1
             if t:
                 parts.append(t)
+                chunks.append({"text": t, "page_no": i + 1, "slide_no": 0})
                 # 用归一化后的累计长度判截断（与最终返回文本同口径，不靠 raw len 估）
                 if len(unicodedata.normalize("NFKC", "\n".join(parts))) >= MAX_TEXT_CHARS:
                     break
@@ -209,9 +215,9 @@ def _read_pdf(p: Path) -> ParseResult:
         )
     if truncated_at:
         # 如实告知截断：停在第 N 页 / 共 M 页，不把截断值当全文
-        return ParseResult(status="ok_truncated", text=text,
+        return ParseResult(status="ok_truncated", text=text, chunks=chunks,
                            truncated_at_page=truncated_at, total_pages=total_pages)
-    return ParseResult(status="ok", text=text, total_pages=total_pages)
+    return ParseResult(status="ok", text=text, chunks=chunks, total_pages=total_pages)
 
 
 def _read_docx(p: Path) -> str:
@@ -237,32 +243,39 @@ def _read_docx(p: Path) -> str:
     return "\n".join(parts)
 
 
-def _read_pptx(p: Path) -> str:
+def _read_pptx(p: Path) -> ParseResult:
     """抽 PPTX 全部文本框 + 演讲者备注，跳过嵌入图片/视频（python-pptx 不加载媒体二进制）。
-    增量到 MAX_TEXT_CHARS 即停，超大 PPTX 也只读够用的文本。"""
+    按【幻灯片】分块溯源(slide_no);增量到 MAX_TEXT_CHARS 即停，超大 PPTX 也只读够用的文本。"""
     from pptx import Presentation
 
     prs = Presentation(str(p))
     parts: list[str] = []
+    chunks: List[dict] = []
     total = 0
-    for slide in prs.slides:
+    for sidx, slide in enumerate(prs.slides, start=1):
+        slide_lines: list[str] = []
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for para in shape.text_frame.paragraphs:
                     line = "".join(run.text for run in para.runs)
                     if line:
-                        parts.append(line)
-                        total += len(line)
+                        slide_lines.append(line)
         # 演讲者备注（常含关键说明，旧逻辑漏抽）
         if slide.has_notes_slide:
             ntf = slide.notes_slide.notes_text_frame
             if ntf is not None and (ntf.text or "").strip():
-                note = ntf.text.strip()
-                parts.append("【备注】" + note)
-                total += len(note)
+                slide_lines.append("【备注】" + ntf.text.strip())
+        if slide_lines:
+            st = "\n".join(slide_lines)
+            parts.append(st)
+            chunks.append({"text": st, "page_no": 0, "slide_no": sidx})
+            total += len(st)
         if total >= MAX_TEXT_CHARS:
             break
-    return "\n".join(parts)
+    text = unicodedata.normalize("NFKC", "\n".join(parts))[:MAX_TEXT_CHARS].strip()
+    if not text:
+        return ParseResult(status="empty")
+    return ParseResult(status="ok", text=text, chunks=chunks)
 
 
 def _read_xlsx(p: Path) -> str:

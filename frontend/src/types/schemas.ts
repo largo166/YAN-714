@@ -307,6 +307,7 @@ export const KnowledgeHitSchema = z.object({
   score: z.number(),
   matched_text: z.string(),
   engine: z.string(),
+  locator: z.string().default(''), // 出处定位：第N页 / 第N张幻灯片
 })
 export type KnowledgeHit = z.infer<typeof KnowledgeHitSchema>
 

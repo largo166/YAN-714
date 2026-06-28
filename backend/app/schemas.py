@@ -425,6 +425,7 @@ class KnowledgeHitOut(BaseModel):
     score: float
     matched_text: str
     engine: str
+    locator: str = ""  # 出处定位：第N页 / 第N张幻灯片（无则空）
 
 
 class SendMessageOut(BaseModel):

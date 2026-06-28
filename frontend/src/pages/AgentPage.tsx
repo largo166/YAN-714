@@ -910,7 +910,9 @@ export default function AgentPage() {
               <div className="hit" key={h.document_id}>
                 <span className="score">{h.engine}</span>
                 <span className="tx">
-                  <b>{h.title}</b>：{h.snippet}
+                  <b>{h.title}</b>
+                  {h.locator && <span style={{ color: 'var(--terra)', fontSize: 11, marginLeft: 4 }}>· {h.locator}</span>}
+                  ：{h.snippet}
                 </span>
               </div>
             ))}

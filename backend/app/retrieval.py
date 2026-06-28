@@ -150,6 +150,72 @@ class SearchHit:
     score: float
     matched_text: str
     engine: str
+    locator: str = ""  # 出处定位：第N页 / 第N张幻灯片（来自来源文件的分块，无则空）
+
+
+def _locate(chunks: list, terms: List[str], phrase: str = "") -> str:
+    """在来源文件的分块里定位到最相关的页/片。
+
+    打分：含命中词越多越优(整句短语所在页通常命中最多 bigram)；若某块还含【原短语子串】
+    再给大加权(精确短语命中直接胜出，避免被「设计/项目」这类高频词带偏)。并列取靠前块。
+    """
+    if not isinstance(chunks, list) or not chunks:
+        return ""
+    low_terms = [t.lower() for t in terms]
+    ph = (phrase or "").strip().lower()
+    best = None
+    best_score = 0
+    for ch in chunks:
+        if not isinstance(ch, dict):
+            continue
+        t = (ch.get("text") or "").lower()
+        if not t:
+            continue
+        score = sum(1 for term in low_terms if term in t)
+        if ph and len(ph) >= 3 and ph in t:
+            score += 1000  # 原短语精确命中：直接主导
+        if score > best_score:
+            best_score, best = score, ch
+    if best is None:
+        return ""
+    if best.get("page_no"):
+        return f"第{best['page_no']}页"
+    if best.get("slide_no"):
+        return f"第{best['slide_no']}张幻灯片"
+    return ""
+
+
+def _apply_locators(db: Session, hits: List["SearchHit"], terms: List[str], phrase: str = "") -> List["SearchHit"]:
+    """据命中词把每个 hit 定位到来源文件的具体页/片(出处精确到页)。批量取分块，避免逐 hit 查库。"""
+    import json
+
+    from . import models
+
+    if not hits:
+        return hits
+    doc_ids = [h.document_id for h in hits]
+    rows = (
+        db.query(models.ProjectFile.indexed_doc_id, models.ProjectFile.content_chunks_json)
+        .filter(
+            models.ProjectFile.indexed_doc_id.in_(doc_ids),
+            models.ProjectFile.status == "active",
+            models.ProjectFile.content_chunks_json != "",
+        )
+        .all()
+    )
+    chunks_by_doc: dict = {}
+    for did, cj in rows:
+        if did in chunks_by_doc or not cj:
+            continue
+        try:
+            chunks_by_doc[did] = json.loads(cj)
+        except Exception:  # noqa: BLE001
+            pass
+    for h in hits:
+        ch = chunks_by_doc.get(h.document_id)
+        if ch:
+            h.locator = _locate(ch, terms, phrase)
+    return hits
 
 
 def _snippet(content: str, terms, width: int = 120) -> str:
@@ -246,7 +312,7 @@ def search(
                 if len(hits) >= top_k:
                     break
             if hits:
-                return hits
+                return _apply_locators(db, hits, terms, q)
         except Exception:
             db.rollback()  # 落到 LIKE 兜底
 
@@ -263,7 +329,7 @@ def search(
     if scope is not None:
         qy = qy.filter(models.KnowledgeDocument.id.in_(scope))
     docs = qy.limit(top_k).all()
-    return [
+    like_hits = [
         SearchHit(
             document_id=d.id,
             title=d.title,
@@ -274,3 +340,4 @@ def search(
         )
         for d in docs
     ]
+    return _apply_locators(db, like_hits, terms, q)

@@ -182,8 +182,10 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
     # 不混读其它项目的资料）。项目无任何已索引文档时 retrieval.search 返回空（不报错）。
     hits = retrieval.search(db, query, top_k=top_k, project_id=project_id)
     for h in hits:
+        # 出处精确到页：把分块定位(第N页/第N张幻灯片)拼进标题
+        ktitle = h.title + (f" · {h.locator}" if h.locator else "")
         sources.append(
-            Source(kind="knowledge", ref_id=h.document_id, title=h.title,
+            Source(kind="knowledge", ref_id=h.document_id, title=ktitle,
                    snippet=h.snippet, engine=h.engine)
         )
 
