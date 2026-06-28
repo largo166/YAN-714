@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react'
 
 import { api, type ReviewPrecheck } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
+import MoaReviewPanel from './MoaReviewPanel'
 import RichText, { Foldable, JudgmentView, coreLine, parseJudgment, renderInline } from '@/components/RichText'
 import type { ChatMessage, ChatSession, KnowledgeHit, ProjectFile, ResultSendChannel, Skill, SkillRun, SkillResult, Agent } from '@/types/schemas'
 
@@ -1096,6 +1097,9 @@ export default function AgentPage() {
           <div style={{ color: 'var(--mut)', fontSize: 12, padding: 8 }}>技能目录加载中…</div>
         )}
       </div>
+
+      {/* 专家会诊 · MoA 方案评审(第一个真实 MoA 产品能力):基于当前项目认知,多专家会诊出结构化检查清单 */}
+      <MoaReviewPanel projectId={cur ? cur.id : null} />
 
       {/* 成果即时进对话流(上方);此处为「项目成果 · 归档」回查历史——刷新/过几天仍可翻出。默认折叠。 */}
       <div

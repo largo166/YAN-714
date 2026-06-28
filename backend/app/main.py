@@ -22,6 +22,7 @@ from .routers import inbox
 from .routers import workspace
 from .routers import skills
 from .routers import filesystem
+from .routers import review_checklist
 
 
 @asynccontextmanager
@@ -54,6 +55,7 @@ app.include_router(cross_project.router)
 app.include_router(reflow.router)
 app.include_router(meetings.router)
 app.include_router(skills.router)
+app.include_router(review_checklist.router)
 app.include_router(team.router)
 app.include_router(clients.router)
 app.include_router(inbox.router)

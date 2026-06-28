@@ -628,6 +628,13 @@ export const api = {
   ): Promise<{ status: string; created: number; existing: number; message: string }> {
     return request(`/api/projects/${projectId}/skill-results/${resultId}/to-assignments`, { method: 'POST' })
   },
+  // ── MoA 方案评审「专家会诊」(功能/甲方/成本三专家并发 + reasoner 聚合) ──
+  async runMoaReview(projectId: number): Promise<MoaReviewResult> {
+    return request(`/api/review-checklist/moa?project_id=${projectId}`, { method: 'POST' })
+  },
+  async getMoaReview(projectId: number): Promise<MoaReviewLatest> {
+    return request(`/api/review-checklist/${projectId}`)
+  },
   // ── 收件箱监听(P1-C:监听文件夹,新文件自动入库)──
   async inboxStatus(): Promise<{ inbox_root_path: string; accessible: boolean; pending: number }> {
     return request('/api/inbox/status')
@@ -856,6 +863,61 @@ export interface TaskAssignment {
   source_result_id: number
   done_at: string | null
   created_at: string
+}
+
+// ── MoA 专家会诊（方案评审）──
+export interface MoaChecklistItem {
+  item: string
+  pass: boolean
+  note?: string
+  severity?: string
+  expert_source?: string
+  design_impact?: string
+  suggested_action?: string
+}
+export interface MoaCategory {
+  category: string
+  label: string
+  items: MoaChecklistItem[]
+}
+export interface MoaConflict {
+  issue: string
+  function_view?: string
+  cost_view?: string
+  resolution?: string
+}
+export interface MoaChecklist {
+  overall_score?: number
+  risk_level?: string
+  pass_rate?: number
+  categories?: MoaCategory[]
+  conflict_items?: MoaConflict[]
+  next_steps?: string[]
+  parse_error?: boolean
+  raw_output?: string
+}
+export interface MoaReferenceDetail {
+  role: string
+  model: string
+  status: string
+  output: string
+  latency_ms: number
+  cost_yuan: number
+}
+export interface MoaReviewResult {
+  success: boolean
+  analysis_id: number
+  checklist: MoaChecklist
+  expert_summary: string
+  cost: { total_tokens: number; total_cost_yuan: number; total_latency_ms: number }
+  reference_details: MoaReferenceDetail[]
+}
+export interface MoaReviewLatest {
+  success: boolean
+  analysis_id?: number
+  created_at?: string
+  checklist?: MoaChecklist
+  message?: string
 }
 export interface ClientPortrait {
   client: string
