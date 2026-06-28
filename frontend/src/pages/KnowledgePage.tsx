@@ -143,6 +143,29 @@ export default function KnowledgePage() {
     if (!cur) return
     try { await api.updateAsset(cur.id, id, { status: 'active' }); loadAssets() } catch (e) { setErr((e as Error).message) }
   }
+  // 图生图(真 img2img):用「素材」资产作参考图生成,完成后新 render 自动进画廊
+  const [img2imgPrompt, setImg2imgPrompt] = useState('')
+  const [img2imgBusy, setImg2imgBusy] = useState(false)
+  const [img2imgMsg, setImg2imgMsg] = useState<string | null>(null)
+  const runImg2Img = async (refIds: number[]) => {
+    if (!cur || !img2imgPrompt.trim() || refIds.length === 0) return
+    setImg2imgBusy(true)
+    setImg2imgMsg(null)
+    try {
+      const r = await api.generateImageFromAssets(cur.id, img2imgPrompt.trim(), refIds)
+      if (r.status === 'ok') {
+        setImg2imgMsg(`已用 ${refIds.length} 张素材生成（模型 ${r.image_model || '—'}），已归档到下方效果图。`)
+        setImg2imgPrompt('')
+        loadAssets()
+      } else {
+        setImg2imgMsg(r.status === 'not_configured' ? '生图未配置（backend/.env 缺 IMAGE_API_KEY）' : (r.content || '生图失败'))
+      }
+    } catch (e) {
+      setImg2imgMsg((e as Error).message)
+    } finally {
+      setImg2imgBusy(false)
+    }
+  }
 
   const doSearch = async () => {
     const q = searchQ.trim()
@@ -736,19 +759,34 @@ export default function KnowledgePage() {
                       <span className="mode t2i">文生图（素材为空，按描述直接生成）</span>
                     ) : (
                       <>
-                        <span className="mode i2i">带入生图（{mats.length} 张素材）</span>
+                        <span className="mode i2i">图生图（{Math.min(mats.length, 4)} 张素材作参考）</span>
                         <span className="sep">·</span>
-                        <span style={{ color: 'var(--mut)' }}>将注入提示词</span>
+                        <span style={{ color: 'var(--mut)' }}>注入提示词</span>
                         <div className="promptchips">
-                          {['控制视角', '保持构图', ...mats.map((m, i) => `参考图${i + 1}·${TYPE_CN[m.asset_type]}`)].map((c, i) => (
+                          {['控制视角', '保持构图', ...mats.slice(0, 4).map((m, i) => `参考图${i + 1}·${TYPE_CN[m.asset_type]}`)].map((c, i) => (
                             <span className="pchip" key={i}>{c}</span>
                           ))}
                         </div>
-                        <span className="sep">·</span>
-                        <span style={{ color: 'var(--mut)', fontSize: 11 }}>真·图生图(传参考图)后续接入</span>
                       </>
                     )}
                   </div>
+                  {mats.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        value={img2imgPrompt}
+                        onChange={(e) => setImg2imgPrompt(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') runImg2Img(mats.slice(0, 4).map((m) => m.id)) }}
+                        placeholder="描述要生成的效果图（以上方素材为参考图）…"
+                        style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: '1px solid var(--line2)', borderRadius: 8, fontSize: 13, background: 'var(--panel2)', color: 'var(--ink)' }}
+                      />
+                      <button className="btn" disabled={img2imgBusy || !img2imgPrompt.trim()}
+                        onClick={() => runImg2Img(mats.slice(0, 4).map((m) => m.id))}
+                        style={{ background: 'var(--terra)', color: '#fff' }}>
+                        {img2imgBusy ? '生成中…（约 30-60s）' : `用这 ${Math.min(mats.length, 4)} 张素材生图`}
+                      </button>
+                    </div>
+                  )}
+                  {img2imgMsg && <div style={{ fontSize: 11.5, color: 'var(--ink2)', marginTop: 4 }}>{img2imgMsg}</div>}
                 </div>
 
                 {/* 筛选 tab */}

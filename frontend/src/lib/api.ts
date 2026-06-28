@@ -218,6 +218,16 @@ export const api = {
       }),
     )
   },
+  /** 图生图:用项目里的「素材」资产作参考图生成(P·真 img2img)。模型默认 gemini 编辑模型。 */
+  async generateImageFromAssets(projectId: number, prompt: string, refAssetIds: number[], model = 'gemini-3-pro-image-preview', signal?: AbortSignal): Promise<SkillRun> {
+    return SkillRunSchema.parse(
+      await request(`/api/projects/${projectId}/skills/img/run`, {
+        method: 'POST',
+        body: JSON.stringify({ input: prompt, model, ref_asset_ids: refAssetIds }),
+        signal,
+      }),
+    )
+  },
   /** 斜杠命令:文本类直跑(result)/出图轻确认(confirm_image)/非命令(not_command)。 */
   async runCommand(projectId: number, text: string, sessionId = 0, model = '', signal?: AbortSignal): Promise<SkillCommand> {
     return SkillCommandSchema.parse(

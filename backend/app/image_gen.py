@@ -20,8 +20,10 @@ import httpx
 from .config import settings
 
 # 卡上可选模型(默认 OpenAI;Gemini 更快更便宜)。两者同端点、同异步制,参数分派见下。
-ALLOWED_MODELS = {"gpt-image-1-official", "gpt-image-1.5-official", "gemini-3-pro-image-preview"}
+ALLOWED_MODELS = {"gpt-image-1-official", "gpt-image-1.5-official", "gpt-image-2", "gemini-3-pro-image-preview"}
 DEFAULT_MODEL = "gpt-image-1-official"  # 兜底默认(强制合法生图模型,杜绝外部脏 env 如 gpt-5 污染)
+# 确实吃参考图(image_urls)做图生图的模型。带参考图却选了别的 → 切到 gemini 编辑模型,绝不静默退 t2i。
+IMG2IMG_MODELS = {"gemini-3-pro-image-preview", "gpt-image-2"}
 NOT_CONFIGURED_MSG = "AI 生图未配置：请在 backend/.env 设置 IMAGE_API_KEY（不会伪造图片）。"
 
 
@@ -49,19 +51,28 @@ def _params_for(model: str, prompt: str) -> dict:
     return body
 
 
-def generate_image(prompt: str, model: str = "", *, poll_timeout: float = 180.0) -> ImageResult:
+def generate_image(
+    prompt: str, model: str = "", *, image_urls: Optional[list] = None, poll_timeout: float = 180.0
+) -> ImageResult:
     if not is_configured():
         return ImageResult(status="not_configured", message=NOT_CONFIGURED_MSG)
     # 收口到合法生图模型:用户选的优先,否则 settings 默认,再否则 DEFAULT_MODEL(防外部脏 env 如 gpt-5)
     if model not in ALLOWED_MODELS:
         model = settings.image_model if settings.image_model in ALLOWED_MODELS else DEFAULT_MODEL
+    # 图生图:带了参考图却选了不吃参考图的模型 → 切到能吃的(gemini 编辑模型),不静默退化成纯文生图。
+    if image_urls and model not in IMG2IMG_MODELS:
+        model = "gemini-3-pro-image-preview"
     base = settings.image_base_url.rstrip("/")
     headers = {"Authorization": f"Bearer {settings.image_api_key}", "Content-Type": "application/json"}
+
+    body = _params_for(model, prompt)
+    if image_urls:
+        body["image_urls"] = list(image_urls)[:16]  # APImart 上限 16 张
 
     try:
         with httpx.Client(timeout=60.0) as client:
             # 1) 提交
-            r = client.post(f"{base}/v1/images/generations", headers=headers, json=_params_for(model, prompt))
+            r = client.post(f"{base}/v1/images/generations", headers=headers, json=body)
             if r.status_code != 200:
                 return ImageResult(status="error", model=model, message=f"提交失败 {r.status_code}: {r.text[:200]}")
             data = (r.json() or {}).get("data") or []

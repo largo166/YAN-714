@@ -6,6 +6,8 @@
   产出结构化成果卡（标题/正文/出处）。复用 analysis 的 RAG 装配 + llm。
   红线：未配 key→not_configured 不伪造；无材料→no_material；不自动串跑（规则 9）。
 """
+import base64
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -294,8 +296,20 @@ def _run_skill_inner(
             except llm.LLMError as e:
                 return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
                                            content="生成提示词失败。", error_message=str(e))
-        # 2) 真出图(异步制,内部轮询)
-        res = image_gen.generate_image(prompt, model=payload.model)
+        # 1.5) 图生图参考图:读 ref_asset_ids 字节转 base64 data URI(本机图 APImart 抓不到,必须 base64;最多 4 张)
+        ref_urls: list[str] = []
+        for aid in (payload.ref_asset_ids or [])[:4]:
+            a = db.get(models.FileAsset, aid)
+            if a is None or a.project_id != project_id or a.status != "active":
+                continue
+            try:
+                data = uploads.abs_of(a.stored_path).read_bytes()
+                m = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp", "gif": "gif"}.get((a.ext or "").lower(), "png")
+                ref_urls.append(f"data:image/{m};base64," + base64.b64encode(data).decode())
+            except Exception:  # noqa: BLE001  单张参考图读失败跳过,不阻断
+                continue
+        # 2) 真出图(异步制,内部轮询)。带参考图→图生图(image_gen 内部确保用吃参考图的模型,不静默退 t2i)
+        res = image_gen.generate_image(prompt, model=payload.model, image_urls=ref_urls or None)
         if res.status == "not_configured":
             return schemas.SkillRunOut(skill_id=skill_id, status="not_configured", title="AI 生图", content=res.message)
         if res.status != "ok" or not res.image_bytes:
@@ -316,7 +330,7 @@ def _run_skill_inner(
             db.add(models.FileAsset(
                 project_id=project_id, source_file_id=0, asset_type="render",
                 stored_path=stored.stored_path, thumb_path=thumb_rel, ext=ext,
-                caption=(prompt[:200] if prompt else "AI 效果图"),
+                caption=((("[图生图] " if ref_urls else "") + (prompt or "AI 效果图")))[:200],
                 width=w, height=h, status="active",
             ))
             db.commit()
