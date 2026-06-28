@@ -572,8 +572,8 @@ export const api = {
     )
   },
   // ── 图片资产(从 PPT/PDF/Word 抽出的图,一等资产) ──
-  async listAssets(projectId: number): Promise<{ items: FileAsset[]; total: number }> {
-    return request(`/api/projects/${projectId}/assets`)
+  async listAssets(projectId: number, status: 'active' | 'trashed' = 'active'): Promise<{ items: FileAsset[]; total: number }> {
+    return request(`/api/projects/${projectId}/assets${status !== 'active' ? `?status=${status}` : ''}`)
   },
   // 改分类(asset_type)或软移除/恢复(status='trashed'|'active')——只改登记,不删图/源文件
   async updateAsset(projectId: number, assetId: number, body: { asset_type?: string; status?: string }): Promise<{ id: number; asset_type: string; status: string }> {

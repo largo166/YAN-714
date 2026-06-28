@@ -604,10 +604,11 @@ def extract_file_assets(project_id: int, file_id: int, db: Session = Depends(get
 
 
 @router.get("/{project_id}/assets")
-def list_assets(project_id: int, db: Session = Depends(get_db)) -> dict:
+def list_assets(project_id: int, status: str = "active", db: Session = Depends(get_db)) -> dict:
+    st = status if status in ("active", "trashed") else "active"
     rows = (
         db.query(models.FileAsset)
-        .filter(models.FileAsset.project_id == project_id, models.FileAsset.status == "active")
+        .filter(models.FileAsset.project_id == project_id, models.FileAsset.status == st)
         .order_by(models.FileAsset.id.desc())
         .all()
     )

@@ -55,6 +55,8 @@ export default function KnowledgePage() {
   const [metaNote, setMetaNote] = useState<string | null>(null)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [assets, setAssets] = useState<FileAsset[]>([]) // 从项目文件抽出的图片资产
+  const [removed, setRemoved] = useState<FileAsset[]>([]) // 已软移除(trashed)的资产,可恢复
+  const [showRemoved, setShowRemoved] = useState(false)
   // 全文搜索:接后端 FTS5/LIKE,命中带页码定位(chunk 溯源)
   const [searchQ, setSearchQ] = useState('')
   const [searchHits, setSearchHits] = useState<KnowledgeHit[] | null>(null)
@@ -116,9 +118,11 @@ export default function KnowledgePage() {
   const loadAssets = useCallback(() => {
     if (!cur) {
       setAssets([])
+      setRemoved([])
       return
     }
     api.listAssets(cur.id).then((d) => setAssets(d.items)).catch(() => setAssets([]))
+    api.listAssets(cur.id, 'trashed').then((d) => setRemoved(d.items)).catch(() => setRemoved([]))
   }, [cur])
 
   useEffect(() => {
@@ -134,6 +138,10 @@ export default function KnowledgePage() {
   const removeAsset = async (id: number) => {
     if (!cur) return
     try { await api.updateAsset(cur.id, id, { status: 'trashed' }); loadAssets() } catch (e) { setErr((e as Error).message) }
+  }
+  const restoreAsset = async (id: number) => {
+    if (!cur) return
+    try { await api.updateAsset(cur.id, id, { status: 'active' }); loadAssets() } catch (e) { setErr((e as Error).message) }
   }
 
   const doSearch = async () => {
@@ -791,6 +799,27 @@ export default function KnowledgePage() {
                       </div>
                     ))}
                     {shown.length > 60 && <div className="gempty" style={{ gridColumn: '1 / -1' }}>…共 {shown.length} 张，已显示前 60</div>}
+                  </div>
+                )}
+
+                {/* 已移除(软隐藏)资产 → 可恢复;原图/源文件都还在 */}
+                {removed.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <button className="anbtn" style={{ fontSize: 11 }} onClick={() => setShowRemoved((v) => !v)}>
+                      已移除（{removed.length}）{showRemoved ? ' 收起 ▴' : ' 查看 ▾'}
+                    </button>
+                    {showRemoved && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                        {removed.slice(0, 40).map((a) => (
+                          <div key={a.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                            <img src={api.assetThumbUrl(cur.id, a.id)} alt={a.caption.slice(0, 12) || '已移除'} title={a.caption}
+                              style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line2)', opacity: 0.55 }} />
+                            <button className="anbtn" style={{ fontSize: 10, padding: '1px 7px' }} onClick={() => restoreAsset(a.id)}>恢复</button>
+                          </div>
+                        ))}
+                        {removed.length > 40 && <div style={{ alignSelf: 'center', fontSize: 11, color: 'var(--mut)' }}>…共 {removed.length} 张</div>}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
