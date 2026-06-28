@@ -87,6 +87,8 @@ export default function ProjectCenterPage() {
   const [progress, setProgress] = useState<ProjectProgress | null>(null)
   // 会议纪要回流后 +1，触发下方 KPI/里程碑/进度重新拉取（同页即时刷新）
   const [refreshKey, setRefreshKey] = useState(0)
+  // 任务看板风险计数（过期/卡住）——折叠时也在 section hint 上显示徽章
+  const [taskRisk, setTaskRisk] = useState<{ overdue: number; stale: number }>({ overdue: 0, stale: 0 })
 
   // 切项目时拉取 KPI 真实计数（只读聚合）。curId 变化即重取，加载中暂显 —。
   useEffect(() => {
@@ -202,8 +204,12 @@ export default function ProjectCenterPage() {
         <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
       </Collapsible>
 
-      <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板" hint="会议纪要待办 → 待办 / 进行中 / 已完成">
-        <TaskBoardPanel projectId={curId} />
+      <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板"
+        count={taskRisk.overdue + taskRisk.stale > 0 ? `⚠ ${taskRisk.overdue + taskRisk.stale}` : undefined}
+        hint={taskRisk.overdue + taskRisk.stale > 0
+          ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住`
+          : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
+        <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} />
       </Collapsible>
 
       <Collapsible open={!!open.overview} onToggle={() => toggle('overview')} title="项目概览" hint="文件 / 会议 / 待办 / 风险 / 资产">

@@ -8,6 +8,8 @@ const COLS: { key: 'todo' | 'doing' | 'done'; label: string }[] = [
   { key: 'done', label: '已完成' },
 ]
 
+const STALE_DAYS = 7 // 未完成任务放置超过此天数即「卡住」(纯事实:放置时长,非预测)
+
 /** best-effort 过期判定:due 含 YYYY-MM-DD / . / / 才比；解析不出(如"本周/周五前")则不标红,不伪造预测。 */
 function isOverdue(due: string, status: string): boolean {
   if (status === 'done' || !due) return false
@@ -19,8 +21,25 @@ function isOverdue(due: string, status: string): boolean {
   return d < today
 }
 
-/** 任务看板(P0-A):会议纪要「确认」后其待办自动落到这里,在此推进状态。 */
-export default function TaskBoardPanel({ projectId }: { projectId: number | null }) {
+function ageDays(created_at: string): number {
+  const t = Date.parse(created_at)
+  if (Number.isNaN(t)) return 0
+  return Math.floor((Date.now() - t) / 86400000)
+}
+
+/** 卡住:未完成 + 放置 ≥ STALE_DAYS 天 + 不是「过期」(过期单独算,不重复计)。 */
+function isStale(t: TaskAssignment): boolean {
+  return t.status !== 'done' && !isOverdue(t.due, t.status) && ageDays(t.created_at) >= STALE_DAYS
+}
+
+/** 任务看板 + 风险提醒(P0-A / P1-G):纪要待办落此,在此推进;过期/卡住给警告徽章(不伪造预测)。 */
+export default function TaskBoardPanel({
+  projectId,
+  onRisk,
+}: {
+  projectId: number | null
+  onRisk?: (counts: { overdue: number; stale: number }) => void
+}) {
   const [tasks, setTasks] = useState<TaskAssignment[]>([])
   const [busy, setBusy] = useState<number | null>(null)
 
@@ -34,6 +53,12 @@ export default function TaskBoardPanel({ projectId }: { projectId: number | null
   useEffect(() => {
     load()
   }, [load])
+
+  const overdueCount = tasks.filter((t) => isOverdue(t.due, t.status)).length
+  const staleCount = tasks.filter((t) => isStale(t)).length
+  useEffect(() => {
+    onRisk?.({ overdue: overdueCount, stale: staleCount })
+  }, [overdueCount, staleCount, onRisk])
 
   const move = async (id: number, status: 'todo' | 'doing' | 'done') => {
     setBusy(id)
@@ -56,6 +81,14 @@ export default function TaskBoardPanel({ projectId }: { projectId: number | null
       <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>
         会议纪要「确认」后，其待办自动落到此看板；在此推进状态（待办 → 进行中 → 已完成）。有明确日期且过期的标红。
       </div>
+      {(overdueCount > 0 || staleCount > 0) && (
+        <div style={{ fontSize: 12, color: 'var(--red)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
+          ⚠ 需关注：
+          {overdueCount > 0 && <b>{overdueCount} 项过期</b>}
+          {overdueCount > 0 && staleCount > 0 && ' · '}
+          {staleCount > 0 && <b>{staleCount} 项卡住（放置 ≥{STALE_DAYS} 天未推进）</b>}
+        </div>
+      )}
       {tasks.length === 0 ? (
         <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
           暂无任务。到「会议纪要」生成纪要并点「确认」，其待办会自动出现在这里。
@@ -88,6 +121,9 @@ export default function TaskBoardPanel({ projectId }: { projectId: number | null
                             {t.due}
                             {over ? '（已过期）' : ''}
                           </span>
+                        )}
+                        {isStale(t) && (
+                          <span style={{ color: 'var(--terra)' }}>　🐌 卡住 {ageDays(t.created_at)} 天</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
