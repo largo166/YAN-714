@@ -366,8 +366,9 @@ export default function AgentPage() {
       await runCommand(content)
       return
     }
-    // 会议纪要意图 + 已附带文件 → 走「会议成果交付中心」正式纪要管线(产物进对话流 + 存会议中心)
-    if (/纪要|会议记录/.test(content) && attachedFiles.length > 0) {
+    // 会议纪要意图 → 走「会议成果交付中心」正式纪要管线(产物进对话流 + 存会议中心)。
+    // 收紧:必须「生成/整理/出/做/写/提炼…」+纪要,避免只是聊到"纪要"就误触发;且需已附带文件。
+    if (/(生成|整理|出|做|写|提炼|帮我做|给我做).{0,14}纪要/.test(content) && attachedFiles.length > 0) {
       await genMinuteFromFile(content, attachedFiles[attachedFiles.length - 1])
       return
     }
