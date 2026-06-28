@@ -200,6 +200,35 @@ class ProjectFile(Base):
     )
 
 
+class FileAsset(Base):
+    """从项目文件里抽出的图片资产(PPT 按 slide / PDF 按 page / Word 嵌入图 / 直接上传的图)。
+
+    一个 ProjectFile 可产出多张图（一等资产）。落 uploads/{pid}/_assets/，含缩略图与来源定位
+    (slide_no/page_no)+ 同页/同 slide 文字作 caption——为「图文混排成果物」与图片复用打底。
+    """
+
+    __tablename__ = "file_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_file_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)  # 来源 ProjectFile.id;0=直接上传的图
+    asset_type: Mapped[str] = mapped_column(String(30), default="image", nullable=False)  # image（后续可扩 chart/page_snapshot）
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)  # 相对 UPLOADS_ROOT 的原图路径
+    thumb_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 缩略图相对路径
+    ext: Mapped[str] = mapped_column(String(12), default="", nullable=False)
+    # 来源定位（无则 0）
+    page_no: Mapped[int] = mapped_column(Integer, default=0, nullable=False)   # PDF 页码
+    slide_no: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # PPT 幻灯片号
+    shape_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    caption: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 同页/同 slide 文字（截断）
+    width: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
 # ── Phase 4D: AI 研判 ──
 class ProjectAnalysis(Base):
     """一次研判结果（结论与结构化出处分离存储，便于人工审定）。"""

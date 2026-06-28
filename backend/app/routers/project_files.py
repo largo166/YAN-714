@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads
+from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads, image_assets
 from ..database import get_db
 from ..safe_paths import sanitize_filename
 
@@ -515,3 +515,132 @@ def index_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     f.indexed_doc_id = doc.id
     db.commit()
     return schemas.IndexFileOut(file_id=f.id, document_id=doc.id, title=doc.title)
+
+
+# ── 图片资产层：从文件抽图（PPT/PDF/Word 嵌入图 + 直接上传图）成「一等资产」 ──
+_IMG_EXTS = ("png", "jpg", "jpeg", "gif", "bmp", "webp")
+
+
+def _assets_dir(pid: int):
+    d = uploads.UPLOADS_ROOT / str(pid) / "_assets"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _extract_and_store_assets(db: Session, project: models.Project, pf: models.ProjectFile) -> int:
+    """抽图 + 落 uploads/{pid}/_assets/ + 落库 FileAsset。幂等:该源文件已抽过则跳过。返回新建数。"""
+    has = (
+        db.query(models.FileAsset)
+        .filter(models.FileAsset.source_file_id == pf.id, models.FileAsset.status == "active")
+        .first()
+    )
+    if has is not None:
+        return 0
+    pid = int(project.id)
+    ext = (pf.file_type or "").lower()
+    adir = _assets_dir(pid)
+
+    def _save(name: str, data: bytes) -> str:
+        (adir / name).write_bytes(data)
+        return f"{pid}/_assets/{name}"
+
+    def _add(data: bytes, *, a_ext: str, w: int, h: int, name: str,
+             page_no: int = 0, slide_no: int = 0, shape_index: int = 0, caption: str = "") -> None:
+        sp = _save(name, data)
+        thumb = image_assets.make_thumb(data)
+        tp = _save("thumb_" + name + ".jpg", thumb) if thumb else ""
+        db.add(models.FileAsset(
+            project_id=pid, source_file_id=int(pf.id), asset_type="image",
+            stored_path=sp, thumb_path=tp, ext=a_ext, page_no=page_no, slide_no=slide_no,
+            shape_index=shape_index, caption=caption, width=w, height=h,
+        ))
+
+    created = 0
+    if ext in _IMG_EXTS:
+        # 直接上传的图：文件本身就是资产（复制进 _assets，serve 统一走 uploads 根）
+        try:
+            data = uploads.abs_of(pf.stored_path, pf.storage_root).read_bytes()
+        except Exception:  # noqa: BLE001
+            return 0
+        w, h = image_assets._dims(data)
+        _add(data, a_ext=ext, w=w, h=h, name=f"f{pf.id}_orig.{ext}", caption=pf.filename)
+        created = 1
+    else:
+        try:
+            src = uploads.abs_of(pf.stored_path, pf.storage_root)
+        except Exception:  # noqa: BLE001
+            return 0
+        for i, a in enumerate(image_assets.extract(src, "." + ext)):
+            _add(a.data, a_ext=a.ext, w=a.width, h=a.height,
+                 name=f"f{pf.id}_{a.slide_no}_{a.page_no}_{i}.{a.ext}",
+                 page_no=a.page_no, slide_no=a.slide_no, shape_index=a.shape_index, caption=a.caption)
+            created += 1
+    if created:
+        db.commit()
+    return created
+
+
+def _asset_or_404(db: Session, project_id: int, asset_id: int) -> models.FileAsset:
+    a = db.get(models.FileAsset, asset_id)
+    if a is None or a.project_id != project_id or a.status != "active":
+        raise HTTPException(404, "资产不存在")
+    return a
+
+
+@router.post("/{project_id}/files/{file_id}/extract-assets")
+def extract_file_assets(project_id: int, file_id: int, db: Session = Depends(get_db)) -> dict:
+    """从某文件抽图为资产(幂等)。前端上传后异步触发,不阻塞上传。"""
+    project = _project_or_404(db, project_id)
+    pf = _file_or_404(db, project_id, file_id)
+    n = _extract_and_store_assets(db, project, pf)
+    total = (
+        db.query(models.FileAsset)
+        .filter(models.FileAsset.project_id == project_id, models.FileAsset.status == "active")
+        .count()
+    )
+    return {"extracted": n, "project_total": total}
+
+
+@router.get("/{project_id}/assets")
+def list_assets(project_id: int, db: Session = Depends(get_db)) -> dict:
+    rows = (
+        db.query(models.FileAsset)
+        .filter(models.FileAsset.project_id == project_id, models.FileAsset.status == "active")
+        .order_by(models.FileAsset.id.desc())
+        .all()
+    )
+    items = [
+        {
+            "id": r.id, "source_file_id": r.source_file_id, "ext": r.ext,
+            "page_no": r.page_no, "slide_no": r.slide_no, "shape_index": r.shape_index,
+            "caption": r.caption, "width": r.width, "height": r.height,
+        }
+        for r in rows
+    ]
+    return {"items": items, "total": len(items)}
+
+
+def _serve_asset(rel_path: str):
+    from fastapi.responses import FileResponse
+
+    try:
+        abs_path = uploads.abs_of(rel_path)  # 资产恒在 uploads 根下 _assets/
+    except Exception:  # noqa: BLE001
+        raise HTTPException(404, "资产文件不存在")
+    if not abs_path.is_file():
+        raise HTTPException(404, "资产文件不存在")
+    ext = abs_path.suffix.lower().lstrip(".")
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, f"image/{ext}")
+    return FileResponse(str(abs_path), media_type=mime)
+
+
+@router.get("/{project_id}/assets/{asset_id}/thumb")
+def asset_thumb(project_id: int, asset_id: int, db: Session = Depends(get_db)):
+    a = _asset_or_404(db, project_id, asset_id)
+    return _serve_asset(a.thumb_path or a.stored_path)
+
+
+@router.get("/{project_id}/assets/{asset_id}/image")
+def asset_image(project_id: int, asset_id: int, db: Session = Depends(get_db)):
+    a = _asset_or_404(db, project_id, asset_id)
+    return _serve_asset(a.stored_path)
