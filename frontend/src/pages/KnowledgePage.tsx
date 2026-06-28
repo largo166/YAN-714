@@ -40,8 +40,9 @@ export default function KnowledgePage() {
   const [lastWsPath, setLastWsPath] = useState('') // prompt 默认值(便利,非"已选择")
   const [selecting, setSelecting] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false) // 目录选择弹窗开关
-  // 识别模式:collection=子文件夹各一个项目(默认) | single=整个文件夹作一个项目
-  const [mode, setMode] = useState<'collection' | 'single'>('collection')
+  // 识别模式:single=整个文件夹作一个项目(默认,避免内部子文件夹被误拆成多个项目) |
+  // collection=子文件夹各一个项目(需用户显式选,用于"一个文件夹装了多个项目"的场景)
+  const [mode, setMode] = useState<'collection' | 'single'>('single')
 
   // 一键整理:真实落库结果 + 失败标记 + 最近整理时间(用于状态机与结果卡)。
   const [ingesting, setIngesting] = useState(false)
@@ -163,12 +164,12 @@ export default function KnowledgePage() {
     path = path.trim()
     setErr(null)
     setSelecting(true)
-    // 选新来源:清掉上次预览/整理结果与失败态(已入库列表不动);模式回默认 collection
+    // 选新来源:清掉上次预览/整理结果与失败态(已入库列表不动);模式回默认 single(选中夹=1项目)
     setPreview(null)
     setScan(null)
     setIngestResult(null)
     setIngestFailed(false)
-    setMode('collection')
+    setMode('single')
     try {
       // previewBatchIngest 文件/目录通吃;路径不存在 → 后端 400(只读,不改任何数据)
       const pv = await api.previewBatchIngest(path)
@@ -324,19 +325,19 @@ export default function KnowledgePage() {
                 <div style={{ margin: '10px 2px', padding: '10px 12px', background: 'var(--panel)', border: '1px solid var(--line2)', borderRadius: 10 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>这个文件夹要怎么识别？</div>
                   <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
-                    <input type="radio" name="ingmode" checked={mode === 'collection'} onChange={() => setMode('collection')} />
+                    <input type="radio" name="ingmode" checked={mode === 'single'} onChange={() => setMode('single')} />
                     <span style={{ fontSize: 12.5 }}>
-                      📚 <b>项目集合</b>：里面装着 <b>{preview.collection?.total_projects ?? preview.total_projects}</b> 个项目(每个子文件夹各算一个项目)
+                      📦 <b>单个项目</b>（默认）：整个文件夹是 <b>1</b> 个项目(子文件夹只是它的资料分类，如 原始资料/项目笔记)
                     </span>
                   </label>
                   <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
-                    <input type="radio" name="ingmode" checked={mode === 'single'} onChange={() => setMode('single')} />
+                    <input type="radio" name="ingmode" checked={mode === 'collection'} onChange={() => setMode('collection')} />
                     <span style={{ fontSize: 12.5 }}>
-                      📦 <b>单个项目</b>：整个文件夹是 <b>1</b> 个项目(子文件夹只是它的资料分类，如 原始资料/项目笔记)
+                      📚 <b>项目集合</b>：这个文件夹里装着 <b>{preview.collection?.total_projects ?? preview.total_projects}</b> 个项目(每个子文件夹各算一个项目)
                     </span>
                   </label>
                   <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
-                    只有你知道哪种对——选错可在「设为当前项目」后重选来源重整。
+                    默认按「单个项目」——只有确认这个文件夹装着多个独立项目时,才选「项目集合」拆分。
                   </div>
                 </div>
               )}
