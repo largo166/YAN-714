@@ -175,6 +175,25 @@ def main() -> None:
             server.should_exit = True
         return
 
+    # 收件箱监听(P1-C):后台轮询,每 60s POST /api/inbox/scan 自动入库。
+    # frozen exe 下后台线程异常会被静默吞,故线程体整体 try/except 写日志;前端另有手动「立即扫描」兜底。
+    # 未配收件箱时 scan_once 早返回(no-op),轻量空转。
+    def _inbox_poller() -> None:
+        while not server.should_exit:
+            time.sleep(60)
+            try:
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{port}/api/inbox/scan",
+                    method="POST", data=b"{}", headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    r.read()
+            except Exception as e:  # noqa: BLE001  扫描异常不致命,下轮重试
+                log(f"[launcher] 收件箱扫描异常(忽略,下轮重试):{e}")
+
+    threading.Thread(target=_inbox_poller, daemon=True).start()
+    log("[launcher] 收件箱轮询线程已起(60s)")
+
     # WebView2 运行时(方案 B):缺了先联网装 Evergreen 引导器;装不上给可见提示再尝试开窗
     if not _ensure_webview2(log):
         _msgbox(

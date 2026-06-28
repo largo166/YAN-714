@@ -74,7 +74,7 @@ export default function KnowledgePage() {
   }, [docs])
 
   // 可折叠分区(库存与健康除外——它默认展开且不可折叠)
-  const [open, setOpen] = useState<Record<string, boolean>>({ src: true, docs: false, assets: false })
+  const [open, setOpen] = useState<Record<string, boolean>>({ src: true, inbox: false, docs: false, assets: false })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
   const loadDocs = useCallback(async () => {
@@ -129,13 +129,55 @@ export default function KnowledgePage() {
   // 让用户在「一键整理」前清楚文件会进哪里(消除"以为进 A 实际进 B")。
   const [repoRoot, setRepoRoot] = useState('')
 
+  // 收件箱监听(P1-C):设一个文件夹,新文件自动入库(后台 60s 轮询 + 此处手动兜底)。
+  const [inboxInfo, setInboxInfo] = useState<{ inbox_root_path: string; accessible: boolean; pending: number } | null>(null)
+  const [inboxInput, setInboxInput] = useState('')
+  const [inboxBusy, setInboxBusy] = useState(false)
+  const [inboxMsg, setInboxMsg] = useState<string | null>(null)
+  const loadInbox = useCallback(() => {
+    api.inboxStatus().then((s) => { setInboxInfo(s); setInboxInput(s.inbox_root_path) }).catch(() => setInboxInfo(null))
+  }, [])
+  const saveInbox = async () => {
+    setInboxBusy(true)
+    setInboxMsg(null)
+    try {
+      const s = await api.inboxConfig(inboxInput.trim())
+      setInboxMsg(s.accessible ? '收件箱已设置，新文件将自动入库。' : (inboxInput.trim() ? '路径已存但不可访问，请检查。' : '已清除收件箱。'))
+      loadInbox()
+    } catch (e) {
+      setInboxMsg((e as Error).message)
+    } finally {
+      setInboxBusy(false)
+    }
+  }
+  const scanInboxNow = async () => {
+    setInboxBusy(true)
+    setInboxMsg(null)
+    try {
+      const r = await api.scanInbox()
+      setInboxMsg(
+        r.accessible
+          ? `扫描完成：入库 ${r.imported ?? 0} · 索引 ${r.indexed ?? 0} · 跳过 ${r.skipped ?? 0} · 失败 ${r.failed ?? 0}`
+          : (r.reason || '收件箱不可访问'),
+      )
+      loadInbox()
+      loadDocs()
+      loadStats()
+    } catch (e) {
+      setInboxMsg((e as Error).message)
+    } finally {
+      setInboxBusy(false)
+    }
+  }
+
   useEffect(() => {
     loadDocs()
     // 仅取上次工作区路径作 prompt 默认值(便利),不当作"已选择来源"——状态从「未选择」起步。
     api.workspaceStatus().then((w) => setLastWsPath(w.workspace_path || '')).catch(() => {})
     api.getSettings().then((s) => setRepoRoot(s.repository_root_path || '')).catch(() => {})
     loadStats()
-  }, [loadDocs, loadStats])
+    loadInbox()
+  }, [loadDocs, loadStats, loadInbox])
 
   const del = async (id: number) => {
     setErr(null)
@@ -419,6 +461,45 @@ export default function KnowledgePage() {
               {switchNote && <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>{switchNote}</div>}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* 收件箱监听(P1-C):设一个文件夹,新文件自动入库(后台 60s 轮询 + 手动兜底) */}
+      <section className="sec" data-open={open.inbox ? '1' : '0'}>
+        <button className="sechead" type="button" onClick={() => toggle('inbox')}>
+          <span className="chev">▸</span>
+          <span className="stitle">收件箱监听</span>
+          {inboxInfo?.accessible && <span className="scount">待处理 {inboxInfo.pending}</span>}
+          <span className="shint">设一个文件夹 · 丢进去的文件自动入库</span>
+        </button>
+        <div className="secbody">
+          <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>
+            把要入库的文件丢进这个文件夹，后台每分钟自动扫描并接入知识库（入库后原件移到该文件夹下的 <code>_done/</code>）。也可随时点「立即扫描」。
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              value={inboxInput}
+              onChange={(e) => setInboxInput(e.target.value)}
+              placeholder="收件箱文件夹的完整路径，如 C:\Users\…\ROM-AI收件箱"
+              style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: '1px solid var(--line2)', borderRadius: 8, fontSize: 13, background: 'var(--panel2)', color: 'var(--ink)' }}
+            />
+            <button className="btn" onClick={saveInbox} disabled={inboxBusy} style={{ background: 'var(--terra)', color: '#fff' }}>
+              {inboxBusy ? '处理中…' : '保存'}
+            </button>
+            <button className="anbtn" onClick={scanInboxNow} disabled={inboxBusy || !inboxInfo?.accessible} title={inboxInfo?.accessible ? '立即扫描收件箱并入库' : '请先保存一个可访问的收件箱路径'}>
+              立即扫描
+            </button>
+          </div>
+          <div style={{ fontSize: 11.5, marginTop: 6 }}>
+            {inboxInfo && (
+              <span style={{ color: inboxInfo.accessible ? 'var(--terra)' : 'var(--mut)' }}>
+                {inboxInfo.inbox_root_path
+                  ? (inboxInfo.accessible ? `● 已启用：${inboxInfo.inbox_root_path}` : `○ 路径不可访问：${inboxInfo.inbox_root_path}`)
+                  : '○ 未启用收件箱'}
+              </span>
+            )}
+            {inboxMsg && <span style={{ color: 'var(--ink2)', marginLeft: 8 }}>{inboxMsg}</span>}
+          </div>
         </div>
       </section>
 

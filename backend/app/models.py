@@ -89,6 +89,8 @@ class AppSetting(Base):
     # 受管资料库(仓库)根:用户新建的本地文件夹。空=未配置→一键整理回退程序内部 uploads。
     # 配置后整理文件落 {仓库}/{项目名}/{原名},知识库索引指向仓库。
     repository_root_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    # 收件箱根(P1-C):监听此文件夹,新文件自动入库。空=未启用。【新增列→需 alembic 0020】
+    inbox_root_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )

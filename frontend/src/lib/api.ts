@@ -607,6 +607,16 @@ export const api = {
       signal,
     })
   },
+  // ── 收件箱监听(P1-C:监听文件夹,新文件自动入库)──
+  async inboxStatus(): Promise<{ inbox_root_path: string; accessible: boolean; pending: number }> {
+    return request('/api/inbox/status')
+  },
+  async inboxConfig(path: string): Promise<{ inbox_root_path: string; accessible: boolean }> {
+    return request('/api/inbox/config', { method: 'POST', body: JSON.stringify({ path }) })
+  },
+  async scanInbox(): Promise<{ accessible: boolean; scanned?: number; imported?: number; indexed?: number; skipped?: number; failed?: number; reason?: string }> {
+    return request('/api/inbox/scan', { method: 'POST', body: '{}' })
+  },
   async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
     return BatchIngestPreviewSchema.parse(
       await request('/api/projects/batch-ingest/preview', {
