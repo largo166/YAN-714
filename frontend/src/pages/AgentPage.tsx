@@ -212,6 +212,7 @@ export default function AgentPage() {
   const [imgConfirm, setImgConfirm] = useState<{ prompt: string; model: string; message?: string } | null>(null)
   // 本项目文件 + 上传可见反馈(修复上传成功无提示)
   const [projFiles, setProjFiles] = useState<ProjectFile[]>([])
+  const [showFiles, setShowFiles] = useState(false) // 文件列表平时折叠,点标题才展开(默认不占地方)
   const [uploadNote, setUploadNote] = useState<string | null>(null)
   // 技能/命令运行进度(可见 + 可取消,消除「看着卡死」)
   const [pending, setPending] = useState<{ label: string; startedAt: number } | null>(null)
@@ -722,19 +723,30 @@ export default function AgentPage() {
         )}
         {cur && projFiles.length > 0 && (
           <div className="projfiles" style={{ marginTop: 8 }}>
-            <span style={{ fontSize: 11.5, color: 'var(--mut)', marginRight: 4 }}>本项目文件（{projFiles.length}）</span>
-            {projFiles.slice(0, 12).map((f) => (
-              <span
-                key={f.id}
-                className="chip"
-                style={{ cursor: 'default', fontSize: 11 }}
-                title={`解析状态：${f.parse_status}`}
-              >
-                📄 {f.filename}
-                {(f.parse_status === 'ok' || f.parse_status === 'ok_truncated') ? '' : ` · ${f.parse_status}`}
-              </span>
-            ))}
-            {projFiles.length > 12 && <span style={{ fontSize: 11, color: 'var(--mut)' }}>…+{projFiles.length - 12}</span>}
+            {/* 平时折叠:只显示可点小标题,点开才列文件(避免一长串 chip 占满界面) */}
+            <span
+              role="button"
+              onClick={() => setShowFiles((v) => !v)}
+              style={{ fontSize: 11.5, color: 'var(--mut)', cursor: 'pointer', userSelect: 'none' }}
+              title={showFiles ? '收起' : '展开查看本项目文件'}
+            >
+              {showFiles ? '▾' : '▸'} 本项目文件（{projFiles.length}）
+            </span>
+            {showFiles &&
+              projFiles.slice(0, 12).map((f) => (
+                <span
+                  key={f.id}
+                  className="chip"
+                  style={{ cursor: 'default', fontSize: 11, marginLeft: 4 }}
+                  title={`解析状态：${f.parse_status}`}
+                >
+                  📄 {f.filename}
+                  {(f.parse_status === 'ok' || f.parse_status === 'ok_truncated') ? '' : ` · ${f.parse_status}`}
+                </span>
+              ))}
+            {showFiles && projFiles.length > 12 && (
+              <span style={{ fontSize: 11, color: 'var(--mut)' }}>…+{projFiles.length - 12}</span>
+            )}
           </div>
         )}
 
