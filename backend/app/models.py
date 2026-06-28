@@ -150,6 +150,25 @@ class SkillResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
 
+class ReviewPrecheck(Base):
+    """方案评审预检结果(P1-D):成果提交前对照固定清单逐条预检的一次落库。
+    新表 → create_all 自动建,无需迁移。状态如实,不伪造。"""
+
+    __tablename__ = "review_prechecks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_result_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 被预检的 SkillResult.id(0=直接对材料)
+    status: Mapped[str] = mapped_column(String(30), default="ok", nullable=False)  # ok|not_configured|no_material|error
+    result_json: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 逐条结果 + summary 的 JSON
+    content: Mapped[str] = mapped_column(Text, default="", nullable=False)  # markdown
+    model: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
 # ── Phase 4B: 知识库 ──
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"

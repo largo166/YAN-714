@@ -9,7 +9,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters
+from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters, review_checklist
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -108,6 +108,82 @@ def _save_result(db: Session, project_id: int, session_id: int, out: schemas.Ski
     db.commit()
     db.refresh(row)
     return row.id
+
+
+# ── 方案评审预检(P1-D):成果提交前对照固定清单逐条预检 ──
+@router.get("/api/review-checklist", response_model=schemas.ReviewChecklistOut)
+def get_review_checklist() -> schemas.ReviewChecklistOut:
+    """返回内置评审检查清单模板(只读,不触发执行)。"""
+    return schemas.ReviewChecklistOut(
+        items=[schemas.ChecklistItemDef(**c) for c in review_checklist.CHECKLIST]
+    )
+
+
+def _save_precheck(db: Session, project_id: int, source_result_id: int, out: schemas.ReviewPrecheckOut) -> int:
+    row = models.ReviewPrecheck(
+        project_id=project_id, source_result_id=source_result_id or 0,
+        status=out.status, result_json=out.output_json, content=out.content,
+        model=out.model, error_message=out.error_message,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row.id
+
+
+@router.post("/api/projects/{project_id}/review-precheck", response_model=schemas.ReviewPrecheckOut)
+def run_review_precheck(
+    project_id: int, payload: schemas.ReviewPrecheckIn, db: Session = Depends(get_db)
+) -> schemas.ReviewPrecheckOut:
+    """对项目(可带 source_result_id 指向某条 review 成果)跑一遍清单,逐条 pass|warn|fail|na+依据。"""
+    project = db.get(models.Project, project_id)
+    if project is None:
+        raise HTTPException(404, "项目不存在")
+    cfg = _settings(db)
+    if not cfg.deepseek_api_key:
+        out = schemas.ReviewPrecheckOut(status="not_configured", content=NOT_CONFIGURED_MSG)
+        out.precheck_id = _save_precheck(db, project_id, payload.source_result_id, out)
+        return out
+
+    # 被预检的方案/评审意见(指向某条 review 成果时一并喂入)
+    review_content = ""
+    if payload.source_result_id:
+        src = db.get(models.SkillResult, payload.source_result_id)
+        if src is not None and src.project_id == project_id:
+            review_content = src.content or ""
+
+    query = f"{project.name} 方案评审 预检 {payload.input}".strip()
+    material = analysis.gather_material(db, project_id, query=query, top_k=5)
+    if material.empty and not review_content.strip():
+        out = schemas.ReviewPrecheckOut(status="no_material", content=NO_MATERIAL_MSG)
+        out.precheck_id = _save_precheck(db, project_id, payload.source_result_id, out)
+        return out
+
+    sysp, userp, fmt = review_checklist.build_precheck_prompt(project.name, material.context or "", review_content)
+    try:
+        answer = llm.chat_completion(
+            [{"role": "system", "content": sysp}, {"role": "user", "content": userp}],
+            api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+            response_format=fmt, timeout=90.0,
+        )
+    except llm.LLMError as e:
+        out = schemas.ReviewPrecheckOut(status="error", content="AI 调用失败，请稍后重试或检查设置。",
+                                        model=cfg.deepseek_model, error_message=str(e))
+        out.precheck_id = _save_precheck(db, project_id, payload.source_result_id, out)
+        return out
+
+    result = review_checklist.normalize_precheck(review_checklist.parse_json_loose(answer))
+    out = schemas.ReviewPrecheckOut(
+        status="ok",
+        items=[schemas.ReviewPrecheckItemOut(**it) for it in result["items"]],
+        summary=result["summary"],
+        content=review_checklist.precheck_to_markdown(result),
+        output_json=safe_json.dumps_safe(result),
+        source_result_id=payload.source_result_id,
+        model=cfg.deepseek_model,
+    )
+    out.precheck_id = _save_precheck(db, project_id, payload.source_result_id, out)
+    return out
 
 
 @router.post(

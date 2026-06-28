@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 
-import { api } from '@/lib/api'
+import { api, type ReviewPrecheck } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import RichText, { Foldable, JudgmentView, coreLine, parseJudgment, renderInline } from '@/components/RichText'
 import type { ChatMessage, ChatSession, KnowledgeHit, ProjectFile, ResultSendChannel, Skill, SkillRun, SkillResult, Agent } from '@/types/schemas'
@@ -27,8 +27,25 @@ function splitImgContent(content: string): { head: string; prompt: string } {
 }
 
 /** 成果卡(进对话流)：核心判断优先、长内容默认折叠、生图提示词折叠可复制、原始 markdown 清洗渲染。 */
+const PC_CN: Record<string, string> = { pass: '通过', warn: '注意', fail: '不符', na: '未评估' }
+const PC_COLOR: Record<string, string> = { pass: '#2e9b6b', warn: 'var(--terra)', fail: 'var(--red)', na: 'var(--mut)' }
+
 function ResultCard({ run, projectId }: { run: SkillRun; projectId: number | null }) {
   const r = run
+  // 方案评审预检(P1-D):review 成果可在提交前对照清单逐条预检
+  const [precheck, setPrecheck] = useState<ReviewPrecheck | null>(null)
+  const [prechecking, setPrechecking] = useState(false)
+  const runPrecheck = async () => {
+    if (projectId == null || !r.result_id) return
+    setPrechecking(true)
+    try {
+      setPrecheck(await api.runReviewPrecheck(projectId, r.result_id))
+    } catch (e) {
+      setPrecheck({ status: 'error', items: [], summary: {}, content: (e as Error).message, output_json: '', source_result_id: 0, precheck_id: 0, model: '', error_message: (e as Error).message })
+    } finally {
+      setPrechecking(false)
+    }
+  }
   const pill =
     r.status === 'ok'
       ? r.model || '已生成'
@@ -128,6 +145,49 @@ function ResultCard({ run, projectId }: { run: SkillRun; projectId: number | nul
             >
               ⤓ 导出 PPT
             </a>
+          )}
+          {r.skill_id === 'review' && r.result_id && projectId != null && (
+            <button
+              className="anbtn"
+              type="button"
+              disabled={prechecking}
+              onClick={runPrecheck}
+              title="提交前对照检查清单逐条预检(功能匹配/多专业/数据支撑/日照规范…)"
+            >
+              {prechecking ? '预检中…' : '✓ 提交前预检'}
+            </button>
+          )}
+        </div>
+      )}
+      {precheck && (
+        <div style={{ marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+          {precheck.status === 'ok' ? (
+            <>
+              <div style={{ fontSize: 12, marginBottom: 6 }}>
+                <b>评审预检</b> · {precheck.items.length} 项：
+                <span style={{ color: PC_COLOR.pass }}> {precheck.summary.pass ?? 0} 通过</span> ·
+                <span style={{ color: PC_COLOR.warn }}> {precheck.summary.warn ?? 0} 注意</span> ·
+                <span style={{ color: PC_COLOR.fail }}> {precheck.summary.fail ?? 0} 不符</span> ·
+                <span style={{ color: PC_COLOR.na }}> {precheck.summary.na ?? 0} 未评估</span>
+              </div>
+              {precheck.items.map((it) => (
+                <div key={it.id} style={{ fontSize: 11.5, marginTop: 4 }}>
+                  <span style={{ color: '#fff', background: PC_COLOR[it.status] || 'var(--mut)', borderRadius: 4, padding: '1px 6px', fontSize: 10.5 }}>
+                    {PC_CN[it.status] || it.status}
+                  </span>{' '}
+                  <b>{it.label}</b>：{it.finding}
+                  <span style={{ color: 'var(--mut)' }}>（出处：{it.evidence}）</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div style={{ fontSize: 12, color: 'var(--mut)' }}>
+              {precheck.status === 'not_configured'
+                ? '未配置 AI，无法预检。'
+                : precheck.status === 'no_material'
+                  ? '无材料，无法预检（不伪造）。'
+                  : `预检失败。${precheck.content || ''}`}
+            </div>
           )}
         </div>
       )}

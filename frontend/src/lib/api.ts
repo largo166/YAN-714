@@ -599,6 +599,14 @@ export const api = {
   async getClientPortrait(name: string): Promise<ClientPortrait> {
     return request(`/api/clients/${encodeURIComponent(name)}`)
   },
+  // ── 方案评审预检(P1-D:成果提交前对照清单逐条预检)──
+  async runReviewPrecheck(projectId: number, sourceResultId = 0, input = '', signal?: AbortSignal): Promise<ReviewPrecheck> {
+    return request(`/api/projects/${projectId}/review-precheck`, {
+      method: 'POST',
+      body: JSON.stringify({ source_result_id: sourceResultId, input }),
+      signal,
+    })
+  },
   async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
     return BatchIngestPreviewSchema.parse(
       await request('/api/projects/batch-ingest/preview', {
@@ -827,6 +835,25 @@ export interface ClientPortrait {
     current_stage: string
     cognition: { module_label: string; summary: string }[]
   }[]
+}
+export interface ReviewPrecheckItem {
+  id: string
+  label: string
+  dim: string
+  status: string // pass|warn|fail|na
+  finding: string
+  evidence: string
+}
+export interface ReviewPrecheck {
+  status: string // ok|not_configured|no_material|error
+  items: ReviewPrecheckItem[]
+  summary: { pass?: number; warn?: number; fail?: number; na?: number }
+  content: string
+  output_json: string
+  source_result_id: number
+  precheck_id: number
+  model: string
+  error_message: string
 }
 export interface WsFile {
   path: string

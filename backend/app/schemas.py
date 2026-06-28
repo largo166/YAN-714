@@ -324,6 +324,44 @@ class SkillResultListOut(BaseModel):
     total: int
 
 
+# ── 方案评审预检(P1-D) ──
+class ChecklistItemDef(BaseModel):
+    id: str
+    label: str
+    dim: str = ""
+    hint: str = ""
+
+
+class ReviewChecklistOut(BaseModel):
+    items: List[ChecklistItemDef]
+
+
+class ReviewPrecheckIn(BaseModel):
+    source_result_id: int = 0  # 指向某条 review 成果(0=直接对项目材料预检)
+    input: str = ""            # 用户补充重点(可选)
+
+
+class ReviewPrecheckItemOut(BaseModel):
+    id: str
+    label: str = ""
+    dim: str = ""
+    status: str  # pass|warn|fail|na
+    finding: str = ""
+    evidence: str = ""
+
+
+class ReviewPrecheckOut(BaseModel):
+    status: str  # ok|not_configured|no_material|error
+    items: List[ReviewPrecheckItemOut] = []
+    summary: dict = {}
+    content: str = ""
+    output_json: str = ""
+    source_result_id: int = 0
+    precheck_id: int = 0
+    model: str = ""
+    error_message: str = ""
+
+
 # ── 斜杠命令(对话框打 /xxx 触发技能) ──
 class SkillCommandIn(BaseModel):
     text: str = ""           # 用户输入,如 "/ppt 做6页"
