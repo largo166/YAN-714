@@ -906,11 +906,13 @@ export interface MoaReferenceDetail {
 }
 export interface MoaReviewResult {
   success: boolean
-  analysis_id: number
-  checklist: MoaChecklist
-  expert_summary: string
-  cost: { total_tokens: number; total_cost_yuan: number; total_latency_ms: number }
-  reference_details: MoaReferenceDetail[]
+  analysis_id?: number
+  checklist?: MoaChecklist
+  expert_summary?: string
+  cost?: { total_tokens: number; total_cost_yuan: number; total_latency_ms: number }
+  reference_details?: MoaReferenceDetail[]
+  error?: string             // success=false 时:可读错误
+  retry_suggestion?: string  // success=false 时:重试建议
 }
 export interface MoaReviewLatest {
   success: boolean

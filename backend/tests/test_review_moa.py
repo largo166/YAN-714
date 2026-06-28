@@ -89,3 +89,24 @@ def test_review_moa_unknown_project_404(client, monkeypatch):
     _set_key()
     r = client.post("/api/review-checklist/moa", params={"project_id": 999999})
     assert r.status_code == 404
+
+
+def test_review_moa_aggregator_failure_no_500(client, monkeypatch):
+    """主审(reasoner)调用失败 → 不 500，返回可读错误 + 重试建议（不伪造）；三专家意见一并带回。"""
+    from app import llm
+
+    def _agg_fails(messages, **kw):
+        if "评审委员会主席" in messages[0]["content"]:
+            raise llm.LLMError("reasoner timeout (stub)")
+        return "专家意见(stub)"
+
+    monkeypatch.setattr(moa, "chat_completion", _agg_fails)
+    _set_key()
+    pid = _new_project(client)
+    r = client.post("/api/review-checklist/moa", params={"project_id": pid})
+    assert r.status_code == 200  # 关键：聚合失败不冒成 500
+    body = r.json()
+    assert body["success"] is False
+    assert body["error"]
+    assert "重试" in body["retry_suggestion"]
+    assert len(body["reference_details"]) == 3  # 已花的三次专家调用结果不浪费

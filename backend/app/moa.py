@@ -437,16 +437,28 @@ def run_moa_sync(
     if not preset.aggregator:
         return MoAResult(success=False, error_message="聚合模型未配置")
     
-    agg_output, agg_input_tokens, agg_cost, agg_latency = _call_aggregator_sync(
-        preset.aggregator,
-        ref_outputs,
-        user_input,
-        project_context,
-        response_format,
-        api_key,
-        base_url,
-    )
-    
+    try:
+        agg_output, agg_input_tokens, agg_cost, agg_latency = _call_aggregator_sync(
+            preset.aggregator,
+            ref_outputs,
+            user_input,
+            project_context,
+            response_format,
+            api_key,
+            base_url,
+        )
+    except (LLMError, NotConfigured) as e:
+        # 主审聚合失败:不抛,带着已拿到的专家意见返回 success=False(调用方据此给可读错误+重试)
+        return MoAResult(
+            success=False, reference_outputs=ref_outputs,
+            error_message=f"主审聚合调用失败：{e}",
+        )
+    except Exception as e:  # 兜底:任何聚合异常都不冒成路由 500
+        return MoAResult(
+            success=False, reference_outputs=ref_outputs,
+            error_message=f"主审聚合异常：{e}",
+        )
+
     # Step 3: 解析 JSON
     final_output = agg_output
     try:

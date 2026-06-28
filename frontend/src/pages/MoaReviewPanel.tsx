@@ -177,6 +177,7 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
   const [createdAt, setCreatedAt] = useState<string | null>(null)
   const [historyOnly, setHistoryOnly] = useState(false)
   const [err, setErr] = useState('')
+  const [retryHint, setRetryHint] = useState('')
 
   // 挂载/切项目:回查最新一次会诊(可回查)
   const loadLatest = useCallback(() => {
@@ -211,11 +212,19 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
     if (projectId == null) return
     setPhase('loading')
     setErr('')
+    setRetryHint('')
     try {
       const r = await api.runMoaReview(projectId)
-      setChecklist(r.checklist)
-      setDetails(r.reference_details)
-      setCost(r.cost)
+      if (!r.success) {
+        // 后端聚合失败时返回可读错误 + 重试建议(不是 500、不是假数据)
+        setErr(r.error || '会诊失败')
+        setRetryHint(r.retry_suggestion || '')
+        setPhase('error')
+        return
+      }
+      setChecklist(r.checklist || null)
+      setDetails(r.reference_details || null)
+      setCost(r.cost || null)
       setCreatedAt(null)
       setHistoryOnly(false)
       setPhase('done')
@@ -229,7 +238,7 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
     <div className="card mt">
       <div className="ct" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span>
-          专家会诊 · MoA 评审{' '}
+          专家会诊 · 方案评审{' '}
           <span className="statpill live">功能 / 甲方 / 成本 三专家 + 主审</span>
         </span>
         <button className="btn" type="button" disabled={projectId == null || phase === 'loading'} onClick={run}>
@@ -252,8 +261,9 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
 
       {phase === 'error' && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--red)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '8px 10px' }}>
-          会诊失败：{err || '未知错误'}（不展示假数据）
-          <button className="anbtn" type="button" onClick={run} style={{ marginLeft: 10 }}>重试</button>
+          <div>会诊失败：{err || '未知错误'}（不展示假数据）</div>
+          {retryHint && <div style={{ color: 'var(--ink2)', marginTop: 4 }}>{retryHint}</div>}
+          <button className="anbtn" type="button" onClick={run} style={{ marginTop: 8 }}>重试</button>
         </div>
       )}
 

@@ -95,18 +95,30 @@ def run_review_moa(project_id: int, db: Session = Depends(get_db)):
         base_url=cfg.deepseek_base_url,
     )
     
+    # 聚合失败:不抛 500,返回可读错误 + 重试建议(reasoner 偶发超时/限流，重试通常即可)。
+    # 专家意见已拿到的也一并带回,不浪费已花的三次专家调用。
     if not result.success:
-        raise HTTPException(status_code=500, detail=f"MoA 评审失败: {result.error_message}")
-    
-    # 解析 JSON 结果
+        return {
+            "success": False,
+            "error": result.error_message or "专家会诊失败",
+            "retry_suggestion": "主审模型(deepseek-reasoner)偶发超时或限流，请稍后点「重试」；若反复失败，请检查网络与 DeepSeek 额度。",
+            "reference_details": [
+                {"role": r.role, "model": r.model_name, "status": r.status,
+                 "output": r.output if r.status == "success" else r.error,
+                 "latency_ms": r.latency_ms, "cost_yuan": r.cost_yuan}
+                for r in result.reference_outputs
+            ],
+        }
+
+    # 解析 JSON 结果(moa 已保证 final_output 为合法 JSON;极端兜底仍不抛 500)
     try:
         checklist = json.loads(result.final_output)
     except json.JSONDecodeError:
-        # 解析失败，尝试从原始聚合输出提取
-        raise HTTPException(
-            status_code=500, 
-            detail=f"聚合模型输出解析失败。原始输出:\n{result.aggregation_output[:500]}"
-        )
+        return {
+            "success": False,
+            "error": "主审输出解析失败（非合法 JSON）",
+            "retry_suggestion": "请点「重试」重新会诊；若反复出现，可能是材料过长导致输出截断。",
+        }
     
     # 保存到 ProjectAnalysis（复用现有表;真实列是 content，无 output_text）
     analysis = ProjectAnalysis(
