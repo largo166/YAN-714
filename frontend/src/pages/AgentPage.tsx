@@ -803,34 +803,32 @@ export default function AgentPage() {
             ))}
           </div>
         )}
-        {cur && projFiles.length > 0 && (
-          <div className="projfiles" style={{ marginTop: 8 }}>
-            {/* 平时折叠:只显示可点小标题,点开才列文件(避免一长串 chip 占满界面) */}
-            <span
-              role="button"
-              onClick={() => setShowFiles((v) => !v)}
-              style={{ fontSize: 11.5, color: 'var(--mut)', cursor: 'pointer', userSelect: 'none' }}
-              title={showFiles ? '收起' : '展开查看本项目文件'}
-            >
-              {showFiles ? '▾' : '▸'} 本项目文件（{projFiles.length}）
-            </span>
-            {showFiles &&
-              projFiles.slice(0, 12).map((f) => (
-                <span
-                  key={f.id}
-                  className="chip"
-                  style={{ cursor: 'default', fontSize: 11, marginLeft: 4 }}
-                  title={`解析状态：${f.parse_status}`}
-                >
-                  📄 {f.filename}
-                  {(f.parse_status === 'ok' || f.parse_status === 'ok_truncated') ? '' : ` · ${f.parse_status}`}
-                </span>
-              ))}
-            {showFiles && projFiles.length > 12 && (
-              <span style={{ fontSize: 11, color: 'var(--mut)' }}>…+{projFiles.length - 12}</span>
-            )}
-          </div>
-        )}
+        {(() => {
+          // 平时折叠 + 只列「可用」文件(解析成功);失败/需OCR 的一律不显示,去掉一堆 · failed 噪音
+          const okFiles = projFiles.filter((f) => f.parse_status === 'ok' || f.parse_status === 'ok_truncated')
+          if (!cur || okFiles.length === 0) return null
+          return (
+            <div className="projfiles" style={{ marginTop: 8 }}>
+              <span
+                role="button"
+                onClick={() => setShowFiles((v) => !v)}
+                style={{ fontSize: 11.5, color: 'var(--mut)', cursor: 'pointer', userSelect: 'none' }}
+                title={showFiles ? '收起' : '展开查看本项目文件'}
+              >
+                {showFiles ? '▾' : '▸'} 本项目文件（{okFiles.length}）
+              </span>
+              {showFiles &&
+                okFiles.slice(0, 12).map((f) => (
+                  <span key={f.id} className="chip" style={{ cursor: 'default', fontSize: 11, marginLeft: 4 }} title={f.filename}>
+                    📄 {f.filename}
+                  </span>
+                ))}
+              {showFiles && okFiles.length > 12 && (
+                <span style={{ fontSize: 11, color: 'var(--mut)' }}>…+{okFiles.length - 12}</span>
+              )}
+            </div>
+          )
+        })()}
 
         <div className="chatlog" ref={logRef} style={flow.length ? { marginTop: 12 } : { display: 'none' }}>
           {flow.map((it) =>
