@@ -131,6 +131,9 @@ export default function KnowledgePage() {
 
   // 项目效果图:筛选 tab + 改分类 / 软移除(复用 trashed 语义,可恢复,不删图/源文件)
   const [assetTab, setAssetTab] = useState('all')
+  // 效果图画廊分页:一次最多读 6 张缩略图(不一下子读几十张);切项目/切 tab 重置回 6
+  const [galleryShown, setGalleryShown] = useState(6)
+  useEffect(() => { setGalleryShown(6) }, [cur?.id, assetTab])
   const reclassAsset = async (id: number, asset_type: string) => {
     if (!cur) return
     try { await api.updateAsset(cur.id, id, { asset_type }); loadAssets() } catch (e) { setErr((e as Error).message) }
@@ -811,7 +814,7 @@ export default function KnowledgePage() {
                   </div></div>
                 ) : (
                   <div className="gallery">
-                    {shown.slice(0, 60).map((a) => (
+                    {shown.slice(0, galleryShown).map((a) => (
                       <div key={a.id} className="gtile" style={{ backgroundImage: `url("${api.assetThumbUrl(cur.id, a.id)}")` }}>
                         <span className="glabel">
                           {TYPE_CN[a.asset_type] || '图片'} · {(a.caption || '').slice(0, 12) || (a.slide_no ? `第${a.slide_no}页` : a.page_no ? `第${a.page_no}页` : '未命名')}
@@ -834,7 +837,13 @@ export default function KnowledgePage() {
                         </div>
                       </div>
                     ))}
-                    {shown.length > 60 && <div className="gempty" style={{ gridColumn: '1 / -1' }}>…共 {shown.length} 张，已显示前 60</div>}
+                    {shown.length > galleryShown && (
+                      <div className="gempty" style={{ gridColumn: '1 / -1' }}>
+                        <button className="anbtn" onClick={() => setGalleryShown((n) => n + 6)}>
+                          加载更多（每次 6 张，已显示 {Math.min(galleryShown, shown.length)} / {shown.length}）
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
