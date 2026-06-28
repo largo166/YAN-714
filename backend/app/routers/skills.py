@@ -308,6 +308,61 @@ def get_skill_result(project_id: int, result_id: int, db: Session = Depends(get_
     return row
 
 
+def _ppt_keywords(textval: str) -> set:
+    """切关键词:ASCII 词 + CJK 2 字 bigram(与检索分词同口径),供 caption↔slide 匹配。"""
+    import re
+
+    s: set = set()
+    for ck in re.findall(r"[A-Za-z0-9]+|[一-鿿]+", textval or ""):
+        if ck.isascii():
+            if len(ck) >= 2:
+                s.add(ck.lower())
+        else:
+            for i in range(len(ck) - 1):
+                s.add(ck[i : i + 2])
+    return s
+
+
+def _slide_image_map(db: Session, project_id: int, slides: list) -> dict:
+    """据 caption 关键词重叠，把每页匹配到一张项目图片资产(不复用、设阈值)。
+
+    返回 {slide_no: 图片绝对路径}。阈值=3 个关键词重叠才放图，宁缺勿滥(不硬塞无关图)。
+    """
+    assets = (
+        db.query(models.FileAsset)
+        .filter(models.FileAsset.project_id == project_id, models.FileAsset.status == "active")
+        .all()
+    )
+    cands = [(a, _ppt_keywords(a.caption)) for a in assets if (a.caption or "").strip()]
+    if not cands:
+        return {}
+    used: set = set()
+    out: dict = {}
+    for s in slides:
+        skw = _ppt_keywords(
+            " ".join(
+                [str(s.get("title", "")), str(s.get("keyMessage", "")),
+                 str(s.get("visualSuggestion", "")), " ".join(s.get("bullets") or [])]
+            )
+        )
+        if not skw:
+            continue
+        best, best_score = None, 0
+        for a, akw in cands:
+            if a.id in used:
+                continue
+            sc = len(skw & akw)
+            if sc > best_score:
+                best_score, best = sc, a
+        if best is not None and best_score >= 3:
+            used.add(best.id)
+            try:
+                out[s.get("no")] = str(uploads.abs_of(best.stored_path))
+            except Exception:  # noqa: BLE001
+                pass
+    return out
+
+
 @router.get("/api/projects/{project_id}/skill-results/{result_id}/export.pptx", include_in_schema=False)
 def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depends(get_db)):
     """把 PPT 大纲成果渲染成真 .pptx 下载(复用已落库的结构化 output_json)。"""
@@ -323,8 +378,9 @@ def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depe
     data = safe_json.loads_or(row.output_json, {})
     if not isinstance(data, dict) or not data.get("slides"):
         raise HTTPException(400, "该成果没有可导出的结构化内容")
+    slide_images = _slide_image_map(db, project_id, data.get("slides") or [])
     try:
-        pptx_bytes = exporters.build_pptx(data)
+        pptx_bytes = exporters.build_pptx(data, slide_images)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"PPT 生成失败：{type(e).__name__}: {e}")
     fname = exporters.safe_filename(data.get("title") or "汇报") + ".pptx"

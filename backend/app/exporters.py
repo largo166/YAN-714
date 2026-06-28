@@ -20,16 +20,18 @@ def safe_filename(*parts: str) -> str:
     return (name or "会议纪要")[:120]
 
 
-def build_pptx(data: dict) -> bytes:
+def build_pptx(data: dict, slide_images: dict | None = None) -> bytes:
     """把 PPT 大纲结构化数据(skill_structured.normalize_ppt 的输出)渲染成真 .pptx。
 
     版式:封面页 + 每页(页标题 + 核心观点 + 要点);讲稿提示/来源进幻灯片备注。
-    visualSuggestion 渲染为右侧占位框——这是【图片资产层】的接入点:以后某页带 image_ref
-    时,把占位换成 slide.shapes.add_picture(asset_path) 即可,版式无需重排。
+    slide_images={slide_no: 图片绝对路径}:某页有匹配图片资产 → 右侧插真实图片(图片资产层),
+    visualSuggestion 降为图下注脚;无图则 visualSuggestion 仍渲染为占位框。
     """
     from pptx import Presentation
     from pptx.dml.color import RGBColor
     from pptx.util import Emu, Inches, Pt
+
+    slide_images = slide_images or {}
 
     prs = Presentation()
     prs.slide_width = Inches(13.333)  # 16:9
@@ -87,8 +89,17 @@ def build_pptx(data: dict) -> bytes:
         for i, b in enumerate(bullets):
             line(bf, "• " + str(b), size=14, first=(i == 0))
 
-        # 视觉建议 → 右侧占位(图片层接入点)
-        if s.get("visualSuggestion"):
+        # 右侧：有匹配图片资产 → 插真实图片；否则 visualSuggestion 占位框
+        img_path = slide_images.get(s.get("no"))
+        if img_path:
+            try:
+                slide.shapes.add_picture(img_path, Emu(int(W * 0.62)), Inches(1.5), width=Emu(int(W * 0.34)))
+            except Exception:  # noqa: BLE001  图坏了跳过，不崩
+                img_path = None
+        if img_path and s.get("visualSuggestion"):
+            cap = textbox(slide, Emu(int(W * 0.62)), Inches(6.3), Emu(int(W * 0.34)), Inches(0.9))
+            line(cap, str(s["visualSuggestion"]), size=10, color=LGREY, first=True)
+        elif not img_path and s.get("visualSuggestion"):
             vf = textbox(slide, Emu(int(W * 0.63)), Inches(1.5), Emu(int(W * 0.33)), Inches(4.5))
             line(vf, "🖼 建议图：", size=12, bold=True, color=LGREY, first=True)
             line(vf, str(s["visualSuggestion"]), size=12, color=LGREY)
