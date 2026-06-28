@@ -132,9 +132,12 @@ export default function SettingsDrawer({ open, onClose }: Props) {
     setRepoOrganizing(true)
     try {
       const r = await api.organizeToRepository()
-      setRepoMsg(
-        `已整理进仓库：搬运 ${r.moved} 个文件${r.failed ? `，失败 ${r.failed}` : ''}（已在仓库 ${r.skipped} 个，跳过）。`,
-      )
+      const extra = [
+        r.skipped ? `已在仓库 ${r.skipped}` : '',
+        r.missing ? `源文件已不存在 ${r.missing}(陈旧记录,跳过)` : '',
+        r.failed ? `失败 ${r.failed}` : '',
+      ].filter(Boolean).join('，')
+      setRepoMsg(`已整理进仓库：搬运 ${r.moved} 个文件${extra ? `（${extra}）` : ''}。`)
     } catch (e) {
       setRepoErr((e as Error).message)
     } finally {

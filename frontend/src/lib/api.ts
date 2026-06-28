@@ -587,6 +587,7 @@ export const api = {
     projects_touched: number
     moved: number
     skipped: number
+    missing: number
     failed: number
     repository: string
   }> {

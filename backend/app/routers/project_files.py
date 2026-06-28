@@ -138,7 +138,7 @@ def _migrate_project_to_repo(db: Session, project: models.Project, repo_root: Pa
         )
         .all()
     )
-    moved = skipped = failed = 0
+    moved = skipped = missing = failed = 0
     for pf in files:
         if (pf.storage_root or "").strip():
             skipped += 1  # 已在仓库,不重复搬
@@ -146,7 +146,7 @@ def _migrate_project_to_repo(db: Session, project: models.Project, repo_root: Pa
         try:
             src = uploads.abs_of(pf.stored_path, "")  # 回退根 = UPLOADS_ROOT/{pid}/{name}
             if not src.exists():
-                failed += 1
+                missing += 1  # 源文件已不在内部目录(陈旧记录),不算失败:无文件可搬,不损坏任何东西
                 continue
             stored = uploads.copy_into_root(repo_root, project.name, src, original_name=pf.filename)
             try:
@@ -157,10 +157,10 @@ def _migrate_project_to_repo(db: Session, project: models.Project, repo_root: Pa
             pf.stored_path = stored.stored_path
             db.commit()
             moved += 1
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001  真异常(复制/写库失败)才算 failed
             db.rollback()
             failed += 1
-    return {"moved": moved, "skipped": skipped, "failed": failed}
+    return {"moved": moved, "skipped": skipped, "missing": missing, "failed": failed}
 
 
 def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> models.Project:
@@ -359,13 +359,14 @@ def organize_to_repository(db: Session = Depends(get_db)) -> dict:
     if not repo_root.is_dir():
         raise HTTPException(400, f"仓库不可访问,请检查仓库文件夹是否存在:{repo_path}")
 
-    total = {"projects_touched": 0, "moved": 0, "skipped": 0, "failed": 0}
+    total = {"projects_touched": 0, "moved": 0, "skipped": 0, "missing": 0, "failed": 0}
     for project in db.query(models.Project).all():
         r = _migrate_project_to_repo(db, project, repo_root)
         if r["moved"] or r["failed"]:
             total["projects_touched"] += 1
         total["moved"] += r["moved"]
         total["skipped"] += r["skipped"]
+        total["missing"] += r["missing"]
         total["failed"] += r["failed"]
     total["repository"] = str(repo_root)
     return total
