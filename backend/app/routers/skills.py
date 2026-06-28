@@ -153,7 +153,9 @@ def _run_skill_inner(
         if material.empty:
             return schemas.SkillRunOut(skill_id=skill_id, status="no_material", title=title, content=NO_MATERIAL_MSG)
         n = skill_structured.slide_count_from_input(payload.input)
-        sysp, userp, fmt = skill_structured.build_ppt_prompt(project.name, material.context or "", payload.input, n)
+        sysp, userp, fmt = skill_structured.build_ppt_prompt(
+            project.name, material.context or "", payload.input, n, audience=payload.audience
+        )
         try:
             answer = llm.chat_completion(
                 [{"role": "system", "content": sysp}, {"role": "user", "content": userp}],
@@ -163,7 +165,7 @@ def _run_skill_inner(
         except llm.LLMError as e:
             return schemas.SkillRunOut(skill_id=skill_id, status="error", title=title,
                                        content="AI 调用失败，请稍后重试或检查设置。", model=cfg.deepseek_model, error_message=str(e))
-        result = skill_structured.normalize_ppt(skill_structured.parse_json_loose(answer), n)
+        result = skill_structured.normalize_ppt(skill_structured.parse_json_loose(answer), n, audience=payload.audience)
         return schemas.SkillRunOut(
             skill_id=skill_id, status="ok", title="PPT 大纲",
             content=skill_structured.ppt_to_markdown(result),

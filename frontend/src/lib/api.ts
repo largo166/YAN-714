@@ -209,11 +209,11 @@ export const api = {
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
   },
-  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', signal?: AbortSignal): Promise<SkillRun> {
+  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', audience = '', signal?: AbortSignal): Promise<SkillRun> {
     return SkillRunSchema.parse(
       await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt }),
+        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt, audience }),
         signal,
       }),
     )

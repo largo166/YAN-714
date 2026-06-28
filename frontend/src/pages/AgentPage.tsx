@@ -211,6 +211,8 @@ export default function AgentPage() {
   const [runningSkill, setRunningSkill] = useState<string | null>(null)
   // 生图模型(默认 OpenAI gpt-image;可选 Gemini)
   const [imgModel, setImgModel] = useState('gpt-image-1-official')
+  // PPT 汇报对象档位(P1-F;空=通用,不分口径)
+  const [pptAudience, setPptAudience] = useState('')
   const [uploading, setUploading] = useState(false)
   const [agents, setAgents] = useState<Agent[]>([])
   const [showAllSkills, setShowAllSkills] = useState(false)
@@ -533,7 +535,7 @@ export default function AgentPage() {
     const ac = new AbortController()
     abortRef.current = ac
     try {
-      const r = await api.runSkill(cur.id, 'img', '', c.model, curSid ?? 0, usePlaceholder ? '' : finalPrompt, ac.signal)
+      const r = await api.runSkill(cur.id, 'img', '', c.model, curSid ?? 0, usePlaceholder ? '' : finalPrompt, '', ac.signal)
       appendResult(r)
       refreshArchive(cur.id)
     } catch (e) {
@@ -561,7 +563,9 @@ export default function AgentPage() {
     try {
       // 生图技能带所选模型(默认 OpenAI gpt-image);其它技能 model 忽略
       const model = skillId === 'img' ? imgModel : ''
-      const r = await api.runSkill(cur.id, skillId, text.trim(), model, curSid ?? 0, '', ac.signal)
+      // PPT 技能带汇报对象档位(P1-F);其它技能忽略
+      const audience = skillId === 'ppt' ? pptAudience : ''
+      const r = await api.runSkill(cur.id, skillId, text.trim(), model, curSid ?? 0, '', audience, ac.signal)
       appendResult(r)
       refreshArchive(cur.id)
     } catch (e) {
@@ -954,6 +958,19 @@ export default function AgentPage() {
               >
                 <option value="gpt-image-1-official">OpenAI gpt-image（质量 · 慢）</option>
                 <option value="gemini-3-pro-image-preview">Gemini（快 · 便宜）</option>
+              </select>
+            )}
+            {s.id === 'ppt' && (
+              <select
+                value={pptAudience}
+                onChange={(e) => setPptAudience(e.target.value)}
+                style={{ marginTop: 6, fontSize: 11.5, padding: '3px 6px', border: '1px solid var(--line2)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--ink)', width: '100%' }}
+                title="汇报对象档位：同一份材料按对象调措辞/侧重/详略"
+              >
+                <option value="">通用（不分口径）</option>
+                <option value="client">甲方汇报</option>
+                <option value="exec">集团高层</option>
+                <option value="review">专家评审会</option>
               </select>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>

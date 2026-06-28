@@ -284,6 +284,7 @@ class SkillRunIn(BaseModel):
     model: str = ""  # 生图技能选模型(gpt-image-1-official | gemini-3-pro-image-preview);其它技能忽略
     session_id: int = 0  # 关联的对话会话(成果归档用;0=无)
     image_prompt: str = ""  # 生图:用户已确认的最终英文提示词。非空则直接用,不再二次扩写(/出图 轻确认对齐)
+    audience: str = ""  # PPT 分口径档位:client|exec|review(空=不分口径);其它技能忽略(P1-F)
 
 
 class SkillRunOut(BaseModel):

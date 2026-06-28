@@ -82,7 +82,36 @@ _PPT_SCHEMA = (
 )
 
 
-def build_ppt_prompt(project_name: str, material_context: str, user_input: str, slide_count: int):
+# 汇报对象档位(P1-F):同一份材料按汇报对象调措辞/侧重/详略,只改表达不改事实。
+# code -> (中文口径名, 档位指令)。空 code = 不分口径(通用)。
+AUDIENCE_PRESETS: dict[str, tuple[str, str]] = {
+    "client": (
+        "甲方汇报",
+        "面向甲方/业主:突出方案如何解决甲方诉求、落地性与投资/进度可控;"
+        "措辞稳妥务实、少用内部术语,不暴露对内研判与风险博弈。",
+    ),
+    "exec": (
+        "集团高层",
+        "面向集团高层:先结论后细节,强调战略契合、收益与关键决策项;"
+        "每页一句话结论顶格、数字与里程碑优先,同页数下更精炼。",
+    ),
+    "review": (
+        "专家评审会",
+        "面向专家评审会:强调技术路线、规范依据与方案推导逻辑的完整性;"
+        "保留专业术语与依据出处,详略偏详、直面争议点并给出论据。",
+    ),
+}
+
+
+def resolve_audience(code: str) -> tuple[str, str]:
+    """档位 code → (中文口径名, 指令);未命中返回 ('','')。"""
+    return AUDIENCE_PRESETS.get((code or "").strip(), ("", ""))
+
+
+def build_ppt_prompt(
+    project_name: str, material_context: str, user_input: str, slide_count: int, audience: str = ""
+):
+    aud_name, aud_guide = resolve_audience(audience)
     system = (
         "你是资深方案汇报策划总监,把项目资料与知识库整理成可直接发给甲方的 PPT 大纲。"
         "每页=页标题+页面意图(purpose)+一句话结论(keyMessage)+短句要点(bullets)+图面需求(visualSuggestion);"
@@ -90,6 +119,8 @@ def build_ppt_prompt(project_name: str, material_context: str, user_input: str, 
         "绝不用 [日期]/[姓名]/[甲方] 这类方括号占位凑内容;资料里没有就省略或在 speakerNotes 标「需人工补充」。"
         "必须严格按页数输出结构化结果。只输出合法 JSON,不输出 markdown,不编造资料中没有的事实。"
     )
+    if aud_name:
+        system += f"\n本次汇报对象档位:{aud_name}。{aud_guide}只调整措辞/侧重/详略,不得增删材料中没有的事实。"
     user = "\n".join(
         [
             f"请基于项目数据与知识库资料,生成一份逻辑清晰、可直接汇报的 PPT 大纲。",
@@ -102,6 +133,7 @@ def build_ppt_prompt(project_name: str, material_context: str, user_input: str, 
             "- 每页都要有 title/purpose/keyMessage/bullets/visualSuggestion/speakerNotes/sourceRefs。",
             "- bullets 每页 3-5 条结构化短句,不写散文段落;每页只表达一个核心信息。",
             "- sourceRefs 只能引用下方出现过的项目名/知识库标题。资料不足就在该页 speakerNotes 标「需人工补充」,不编造。",
+            (f"- 通篇按「{aud_name}」口径组织语气与取舍,只改表达与详略,不改变事实。" if aud_name else ""),
             "",
             f"项目:{project_name}",
             f"目标页数:{slide_count}",
@@ -141,17 +173,18 @@ def _placeholder_slide(idx: int) -> dict:
     }
 
 
-def normalize_ppt(value: dict, slide_count: int) -> dict:
+def normalize_ppt(value: dict, slide_count: int, audience: str = "") -> dict:
     raw = _rec(value)
     slides = [_norm_slide(x, i) for i, x in enumerate(_list(raw.get("slides")))][:slide_count]
     for i in range(len(slides), slide_count):  # 少页补占位,杜绝静默少页
         slides.append(_placeholder_slide(i))
     for i, s in enumerate(slides):
         s["no"] = i + 1
+    aud_name, _ = resolve_audience(audience)  # 用户选的口径覆盖模型自填(显示中文名,不是 code)
     return {
         "title": _text(raw.get("title"), "PPT 大纲"),
         "subtitle": _text(raw.get("subtitle"), "基于项目资料与知识库生成"),
-        "audience": _text(raw.get("audience"), "项目团队"),
+        "audience": aud_name or _text(raw.get("audience"), "项目团队"),
         "narrative": _text(raw.get("narrative"), "资料已整理为汇报叙事,请人工复核关键事实。"),
         "slides": slides,
     }
