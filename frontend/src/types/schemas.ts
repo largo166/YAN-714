@@ -582,6 +582,7 @@ export const DirListSchema = z.object({
   path: z.string().default(''),
   parent: z.string().nullable().default(null),
   drives: z.array(z.string()).default([]),
+  shortcuts: z.array(DirEntrySchema).default([]),
   items: z.array(DirEntrySchema).default([]),
   error: z.string().default(''),
 })

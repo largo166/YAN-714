@@ -530,6 +530,7 @@ class DirListOut(BaseModel):
     path: str = ""
     parent: Optional[str] = None
     drives: List[str] = []
+    shortcuts: List[DirEntryOut] = []  # 盘符层的常用位置快捷入口(桌面/文档/下载/主目录)
     items: List[DirEntryOut] = []
     error: str = ""
 

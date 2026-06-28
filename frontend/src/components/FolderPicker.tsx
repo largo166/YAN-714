@@ -21,6 +21,7 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
   const [parent, setParent] = useState<string | null>(null)
   const [level, setLevel] = useState<'drives' | 'dir'>('drives')
   const [drives, setDrives] = useState<string[]>([])
+  const [shortcuts, setShortcuts] = useState<DirEntry[]>([])
   const [items, setItems] = useState<DirEntry[]>([])
   const [selectedFile, setSelectedFile] = useState<DirEntry | null>(null)
   const [loading, setLoading] = useState(false)
@@ -40,6 +41,7 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
       setCwd(d.path)
       setParent(d.parent)
       setDrives(d.drives)
+      setShortcuts(d.shortcuts)
       setItems(d.items)
     } catch (e) {
       setErr((e as Error).message)
@@ -104,6 +106,22 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
         <div style={{ padding: '8px 12px', overflow: 'auto', flex: 1, minHeight: 200 }}>
           {loading && <div style={{ color: 'var(--mut)', fontSize: 12, padding: 10 }}>加载中…</div>}
           {err && <div style={{ color: 'var(--red)', fontSize: 12, padding: 10 }}>{err}</div>}
+
+          {!loading && !err && level === 'drives' && shortcuts.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, color: 'var(--mut)', padding: '4px 10px 2px' }}>常用位置</div>
+              {shortcuts.map((s) => (
+                <div key={s.abs_path} style={rowStyle} onMouseDown={(e) => e.preventDefault()} onClick={() => load(s.abs_path)}
+                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--panel2)')}
+                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                     title={s.abs_path}>
+                  <span style={{ flex: 1 }}>{s.name}</span>
+                  <span className="mono" style={{ fontSize: 10.5, color: 'var(--mut)', wordBreak: 'break-all' }}>{s.abs_path}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: 'var(--mut)', padding: '8px 10px 2px' }}>磁盘</div>
+            </>
+          )}
 
           {!loading && !err && level === 'drives' && drives.map((d) => (
             <div key={d} style={rowStyle} onMouseDown={(e) => e.preventDefault()} onClick={() => load(d)}

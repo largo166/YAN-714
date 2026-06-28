@@ -34,6 +34,32 @@ def _list_drives() -> list[str]:
     return ["/"]
 
 
+def _common_locations() -> list["schemas.DirEntryOut"]:
+    """盘符层的常用位置快捷入口(桌面/文档/下载/主目录),只返回真实存在的目录。
+
+    免去用户逐层点进 C:\\Users\\<用户>\\Desktop。桌面优先标准路径,
+    其次 OneDrive 重定向(很多 Win 机桌面被重定向到 OneDrive\\Desktop)。
+    """
+    home = Path.home()
+    out: list[schemas.DirEntryOut] = []
+
+    def add(label: str, p: Path) -> None:
+        try:
+            if p.is_dir() and all(o.abs_path != str(p) for o in out):
+                out.append(schemas.DirEntryOut(name=label, abs_path=str(p), is_dir=True))
+        except OSError:
+            pass
+
+    desk = home / "Desktop"
+    if not desk.is_dir():
+        desk = home / "OneDrive" / "Desktop"
+    add("🖥 桌面", desk)
+    add("📄 文档", home / "Documents")
+    add("⬇ 下载", home / "Downloads")
+    add("🏠 用户主目录", home)
+    return out
+
+
 def _entry(p: Path) -> schemas.DirEntryOut | None:
     """把一个子项封装为 DirEntryOut;stat/访问失败返回 None(跳过不阻断)。"""
     try:
@@ -59,11 +85,11 @@ def list_dir(path: str = "") -> schemas.DirListOut:
     """列出某目录的直接子级(不递归);path 为空 → 返回盘符列表。"""
     path = (path or "").strip()
 
-    # 盘符层(初始/根)
+    # 盘符层(初始/根):盘符 + 常用位置快捷入口(桌面/文档/下载/主目录)
     if not path:
         return schemas.DirListOut(
             accessible=True, level="drives", path="", parent=None,
-            drives=_list_drives(), items=[],
+            drives=_list_drives(), shortcuts=_common_locations(), items=[],
         )
 
     root = Path(path)
