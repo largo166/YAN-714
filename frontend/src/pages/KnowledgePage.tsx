@@ -234,8 +234,6 @@ export default function KnowledgePage() {
 
   useEffect(() => {
     loadDocs()
-    // 仅取上次工作区路径作 prompt 默认值(便利),不当作"已选择来源"——状态从「未选择」起步。
-    api.workspaceStatus().then((w) => setLastWsPath(w.workspace_path || '')).catch(() => {})
     api.getSettings().then((s) => setRepoRoot(s.repository_root_path || '')).catch(() => {})
     loadStats()
     loadInbox()
@@ -340,7 +338,7 @@ export default function KnowledgePage() {
       // 同名项目并入,否则新建(浏览器拿不到源路径,用项目名做去重键)
       const list = await api.listProjects()
       let proj = list.items.find((p) => p.name === name) ?? null
-      if (!proj) proj = await api.createProject({ name })
+      if (!proj) proj = await api.createProject({ name, status: 'active' })
       let uploaded = 0
       let indexed = 0
       let failed = 0
