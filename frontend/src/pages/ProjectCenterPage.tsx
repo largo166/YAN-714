@@ -85,7 +85,7 @@ export default function ProjectCenterPage() {
   const [risks, setRisks] = useState<ProjectRisk[]>([])
   const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
   const [progress, setProgress] = useState<ProjectProgress | null>(null)
-  // 会议纪要回流后 +1，触发下方 KPI/里程碑/进度重新拉取（同页即时刷新）
+  // 会议纪要「回流」或「确认」后 +1：触发 KPI/里程碑/进度重取，并驱动任务看板重拉（确认会落成看板任务，同页即时刷新）
   const [refreshKey, setRefreshKey] = useState(0)
   // 任务看板风险计数（过期/卡住）——折叠时也在 section hint 上显示徽章
   const [taskRisk, setTaskRisk] = useState<{ overdue: number; stale: number }>({ overdue: 0, stale: 0 })
@@ -201,7 +201,11 @@ export default function ProjectCenterPage() {
       </Collapsible>
 
       <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
-        <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
+        <MeetingPanel
+          projectId={curId}
+          onReflowed={() => setRefreshKey((k) => k + 1)}
+          onConfirmed={() => setRefreshKey((k) => k + 1)}
+        />
       </Collapsible>
 
       <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板"
@@ -209,7 +213,7 @@ export default function ProjectCenterPage() {
         hint={taskRisk.overdue + taskRisk.stale > 0
           ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住`
           : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
-        <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} />
+        <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} refreshSignal={refreshKey} />
       </Collapsible>
 
       <Collapsible open={!!open.overview} onToggle={() => toggle('overview')} title="项目概览" hint="文件 / 会议 / 待办 / 风险 / 资产">

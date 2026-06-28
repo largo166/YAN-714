@@ -12,13 +12,16 @@ const GEN_HINT: Record<string, { text: string; cls: string }> = {
 const SEC = ['一、会议背景', '二、关键结论', '三、甲方诉求', '四、风险与分歧', '五、下一步行动']
 
 /** 会议成果交付中心：记录输入(贴文本/上传材料)→五段式→双版→Word/打印导出→可选腾讯会议。
- *  onReflowed：纪要回流后通知父级(项目中心)刷新 progress/milestones/overview。 */
+ *  onReflowed：纪要回流后通知父级(项目中心)刷新 progress/milestones/overview。
+ *  onConfirmed：纪要「人工审定」后通知父级,因为确认会在后端把待办落成任务看板项,需即时刷新看板。 */
 export default function MeetingPanel({
   projectId,
   onReflowed,
+  onConfirmed,
 }: {
   projectId: number | null
   onReflowed?: () => void
+  onConfirmed?: () => void
 }) {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [title, setTitle] = useState('')
@@ -123,6 +126,7 @@ export default function MeetingPanel({
     if (projectId == null || curMeeting == null || !minute) return
     try {
       setMinute(await api.confirmMinute(projectId, curMeeting, minute.id))
+      onConfirmed?.() // 确认即在后端把待办落成看板任务,通知父级刷新任务看板
     } catch (e) {
       setErr((e as Error).message)
     }

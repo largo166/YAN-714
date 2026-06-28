@@ -32,13 +32,16 @@ function isStale(t: TaskAssignment): boolean {
   return t.status !== 'done' && !isOverdue(t.due, t.status) && ageDays(t.created_at) >= STALE_DAYS
 }
 
-/** 任务看板 + 风险提醒(P0-A / P1-G):纪要待办落此,在此推进;过期/卡住给警告徽章(不伪造预测)。 */
+/** 任务看板 + 风险提醒(P0-A / P1-G):纪要待办落此,在此推进;过期/卡住给警告徽章(不伪造预测)。
+ *  refreshSignal:父级在「纪要确认」后 +1,确认会在后端把待办落成任务,需重拉看板(否则确认完看板还是空的)。 */
 export default function TaskBoardPanel({
   projectId,
   onRisk,
+  refreshSignal,
 }: {
   projectId: number | null
   onRisk?: (counts: { overdue: number; stale: number }) => void
+  refreshSignal?: number
 }) {
   const [tasks, setTasks] = useState<TaskAssignment[]>([])
   const [busy, setBusy] = useState<number | null>(null)
@@ -52,7 +55,7 @@ export default function TaskBoardPanel({
   }, [projectId])
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshSignal])
 
   const overdueCount = tasks.filter((t) => isOverdue(t.due, t.status)).length
   const staleCount = tasks.filter((t) => isStale(t)).length
