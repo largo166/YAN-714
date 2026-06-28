@@ -113,7 +113,8 @@ def list_dir(path: str = "") -> schemas.DirListOut:
     # 文件夹在前、各按名(不区分大小写)排序;父目录(到盘符根时 parent=None)
     items.sort(key=lambda x: (not x.is_dir, x.name.lower()))
     parent = None if root.parent == root else str(root.parent)
+    # 常用位置在每一层都返回,供前端常驻工具条(桌面任意层级一键直达)
     return schemas.DirListOut(
         accessible=True, level="dir", path=str(root), parent=parent,
-        drives=[], items=items,
+        drives=[], shortcuts=_common_locations(), items=items,
     )
