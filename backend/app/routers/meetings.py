@@ -239,8 +239,47 @@ def confirm_minute(project_id: int, meeting_id: int, minute_id: int, db: Session
         raise HTTPException(404, "纪要不存在")
     row.review_status = "confirmed"
     db.commit()
+    _todos_to_assignments(db, project_id, row)  # P0-A：确认即把 todos 落成可追踪任务
     db.refresh(row)
     return _minute_out(row)
+
+
+def _todos_to_assignments(db: Session, project_id: int, minute: models.MeetingMinute) -> int:
+    """把已确认纪要的 todos 落成可追踪任务(幂等:本纪要已落过则跳过)。owner 名精确匹配成员则关联。"""
+    exists = (
+        db.query(models.TeamAssignment)
+        .filter(models.TeamAssignment.source_minute_id == minute.id)
+        .first()
+    )
+    if exists is not None:
+        return 0
+    todos = safe_json.loads_or(minute.todos_json, [])
+    if not isinstance(todos, list):
+        return 0
+    members = {
+        m.name: m.id
+        for m in db.query(models.TeamMember).filter(models.TeamMember.status == "active").all()
+    }
+    created = 0
+    for t in todos:
+        if not isinstance(t, dict):
+            continue
+        title = str(t.get("text", "")).strip()
+        if not title:
+            continue
+        owner = str(t.get("owner", "")).strip()
+        db.add(
+            models.TeamAssignment(
+                project_id=project_id, member_id=members.get(owner),
+                task_title=title[:300], owner_name=owner[:100],
+                due=str(t.get("due", "")).strip()[:40],
+                status="todo", source_minute_id=minute.id,
+            )
+        )
+        created += 1
+    if created:
+        db.commit()
+    return created
 
 
 @router.post(

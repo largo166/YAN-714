@@ -15,6 +15,7 @@ import ProjectFilesPanel from './ProjectFilesPanel'
 import CognitionSection from './CognitionSection'
 import StageProgressPanel from './StageProgressPanel'
 import MeetingPanel from './MeetingPanel'
+import TaskBoardPanel from './TaskBoardPanel'
 import TencentMeetingCard from './TencentMeetingCard'
 import WorkspacePanel from './WorkspacePanel'
 
@@ -64,7 +65,7 @@ export default function ProjectCenterPage() {
   const [renameErr, setRenameErr] = useState<string | null>(null)
   // 各内容块折叠状态;这 6 块默认展开,其余(未列=undefined)默认折叠。点标题切换。
   const [open, setOpen] = useState<Record<string, boolean>>({
-    tencent: true, meeting: true, overview: true, stage: true, cognition: true, analysis: true,
+    tencent: true, meeting: true, tasks: true, overview: true, stage: true, cognition: true, analysis: true,
   })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
@@ -199,6 +200,10 @@ export default function ProjectCenterPage() {
 
       <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
         <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} />
+      </Collapsible>
+
+      <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板" hint="会议纪要待办 → 待办 / 进行中 / 已完成">
+        <TaskBoardPanel projectId={curId} />
       </Collapsible>
 
       <Collapsible open={!!open.overview} onToggle={() => toggle('overview')} title="项目概览" hint="文件 / 会议 / 待办 / 风险 / 资产">

@@ -1,5 +1,6 @@
 """ORM 模型。"""
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -46,14 +47,20 @@ class TeamAssignment(Base):
     __tablename__ = "team_assignments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    member_id: Mapped[int] = mapped_column(
-        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False, index=True
+    # 可空：会议纪要 todo 落成的任务可能没匹配到成员（只有 owner 名字）。
+    member_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=True, index=True
     )
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     task_title: Mapped[str] = mapped_column(String(300), nullable=False)
     due: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    # ── 任务看板闭环（P0-A）──
+    status: Mapped[str] = mapped_column(String(20), default="todo", nullable=False)  # todo / doing / done
+    owner_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)  # todo 的负责人名（未必匹配成员）
+    source_minute_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 来源会议纪要 id（0=手工）
+    done_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
 

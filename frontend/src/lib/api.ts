@@ -585,6 +585,13 @@ export const api = {
   assetImageUrl(projectId: number, assetId: number): string {
     return `${BASE_URL}/api/projects/${projectId}/assets/${assetId}/image`
   },
+  // ── 任务看板(P0-A:会议纪要确认后落成可追踪任务)──
+  async listAssignments(projectId: number): Promise<{ items: TaskAssignment[]; total: number }> {
+    return request(`/api/team/assignments?project_id=${projectId}`)
+  },
+  async updateAssignment(assignmentId: number, status: 'todo' | 'doing' | 'done'): Promise<TaskAssignment> {
+    return request(`/api/team/assignments/${assignmentId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+  },
   async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
     return BatchIngestPreviewSchema.parse(
       await request('/api/projects/batch-ingest/preview', {
@@ -788,6 +795,18 @@ export interface FileAsset {
   caption: string
   width: number
   height: number
+}
+export interface TaskAssignment {
+  id: number
+  project_id: number
+  task_title: string
+  owner_name: string
+  member_id: number | null
+  due: string
+  status: 'todo' | 'doing' | 'done' | string
+  source_minute_id: number
+  done_at: string | null
+  created_at: string
 }
 export interface WsFile {
   path: string
