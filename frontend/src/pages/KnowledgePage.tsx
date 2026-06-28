@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { api, type WorkspaceScan } from '@/lib/api'
+import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import { renderInline } from '@/components/RichText'
 import CrossProjectLibrary from './CrossProjectLibrary'
-import FolderPicker from '@/components/FolderPicker'
 import type {
-  BatchIngestImport,
-  BatchIngestPreview,
   KnowledgeDoc,
   KnowledgeDocListItem,
   KnowledgeStats,
 } from '@/types/schemas'
+
+// 选择来源支持的可解析扩展(与后端 parsing.SUPPORTED_EXTS 一致;客户端先筛,跳过 .rar 等)
+const SUPPORTED_EXTS = ['.txt', '.md', '.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg']
+const isSupportedName = (n: string) => SUPPORTED_EXTS.some((e) => n.toLowerCase().endsWith(e))
 
 function fmtSize(n: number): string {
   if (n >= 1 << 30) return (n / (1 << 30)).toFixed(1) + ' GB'
@@ -33,21 +34,20 @@ export default function KnowledgePage() {
   const [metaNote, setMetaNote] = useState<string | null>(null)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
 
-  // 选择来源(文件或文件夹):只读预览,不落库。source=当前已选来源;preview/scan=预览数据。
-  const [source, setSource] = useState<{ path: string; accessible: boolean } | null>(null)
-  const [preview, setPreview] = useState<BatchIngestPreview | null>(null)
-  const [scan, setScan] = useState<WorkspaceScan | null>(null) // 仅文件夹有意义的富指标,单文件为 null
-  const [lastWsPath, setLastWsPath] = useState('') // prompt 默认值(便利,非"已选择")
-  const [selecting, setSelecting] = useState(false)
-  const [pickerOpen, setPickerOpen] = useState(false) // 目录选择弹窗开关
-  // 识别模式:single=整个文件夹作一个项目(默认,避免内部子文件夹被误拆成多个项目) |
-  // collection=子文件夹各一个项目(需用户显式选,用于"一个文件夹装了多个项目"的场景)
-  const [mode, setMode] = useState<'collection' | 'single'>('single')
+  // 选择来源(原生对话框):picked=已选可解析文件(客户端筛);projName=整理成的项目名(可编辑)。
+  // 浏览器拿不到磁盘路径,改为选文件/文件夹后把可解析文件经本地回环上传接入(复用单文件上传链路)。
+  const [picked, setPicked] = useState<{ files: File[]; skipped: number; fromFolder: boolean } | null>(null)
+  const [projName, setProjName] = useState('')
+  const folderInputRef = useRef<HTMLInputElement>(null)
+  const filesInputRef = useRef<HTMLInputElement>(null)
 
-  // 一键整理:真实落库结果 + 失败标记 + 最近整理时间(用于状态机与结果卡)。
+  // 一键整理:逐文件上传+索引;进度 + 失败标记 + 结果 + 最近整理时间。
   const [ingesting, setIngesting] = useState(false)
   const [ingestFailed, setIngestFailed] = useState(false)
-  const [ingestResult, setIngestResult] = useState<BatchIngestImport | null>(null)
+  const [ingestProg, setIngestProg] = useState<{ done: number; total: number } | null>(null)
+  const [ingestResult, setIngestResult] = useState<
+    { projectName: string; projectId: number; uploaded: number; indexed: number; failed: number; total: number } | null
+  >(null)
   const [lastIngestAt, setLastIngestAt] = useState<Date | null>(null)
 
   // 已入库文档:逐条内联展开/折叠(一次只展开一个),展开时按需拉详情(content_text)。
@@ -152,76 +152,82 @@ export default function KnowledgePage() {
   }
 
   /** 动作一·选择来源:打开目录选择弹窗(后端列目录,点选文件夹或文件,不再手输路径)。 */
-  const selectSource = () => {
-    if (selecting || ingesting) return
-    setPickerOpen(true)
-  }
+  // <input webkitdirectory> 是非标准属性,JSX 不认;打开时用 ref 设上,即可选整个文件夹。
+  useEffect(() => {
+    folderInputRef.current?.setAttribute('webkitdirectory', '')
+  }, [])
 
-  /** 弹窗选定路径后:只读预览(不落库、不建项目)。原"拿到 path 之后"流程逐字保留。 */
-  const onPickSource = async (path: string) => {
-    setPickerOpen(false)
-    if (!path || !path.trim()) return
-    path = path.trim()
-    setErr(null)
-    setSelecting(true)
-    // 选新来源:清掉上次预览/整理结果与失败态(已入库列表不动);模式回默认 single(选中夹=1项目)
-    setPreview(null)
-    setScan(null)
+  /** 原生对话框选完(文件夹 or 多选文件)后:客户端筛可解析文件、推断项目名,不落库。 */
+  const onNativePicked = (fileList: FileList | null, fromFolder: boolean) => {
+    const all = fileList ? Array.from(fileList) : []
+    const files = all.filter((f) => isSupportedName(f.name))
+    const skipped = all.length - files.length
     setIngestResult(null)
     setIngestFailed(false)
-    setMode('single')
-    try {
-      // previewBatchIngest 文件/目录通吃;路径不存在 → 后端 400(只读,不改任何数据)
-      const pv = await api.previewBatchIngest(path)
-      setSource({ path, accessible: true })
-      setPreview(pv)
-      setLastWsPath(path)
-      // best-effort:仅文件夹有意义的富指标(类型分布/大文件);单文件会失败 → 忽略,用 preview 即可
-      try {
-        const w = await api.workspaceConfig(path)
-        if (w.accessible) setScan(await api.workspaceScan())
-      } catch {
-        /* 单文件或不可配置为工作区:跳过富指标 */
-      }
-    } catch (e) {
-      setSource(null)
-      setErr(`无法读取来源：${(e as Error).message}`)
-    } finally {
-      setSelecting(false)
-    }
-  }
-
-  /** 动作二·一键整理:对当前已选来源执行扫描+识别项目+复制接入+建索引(真实写库)。 */
-  const organize = async () => {
-    if (ingesting) return
-    if (!source) {
-      window.alert('请先选择文件或文件夹')
+    setErr(null)
+    if (files.length === 0) {
+      setPicked(null)
+      if (all.length) setErr(`所选内容没有可整理的文件（跳过 ${skipped} 个不支持的，如 .rar/.dwg）。`)
       return
     }
-    // 按当前选中模式判断可接入数(集合/单项目各算各的)
-    const sel = mode === 'single' ? preview?.single_project : preview?.collection
-    const supported = sel ? sel.total_supported : preview?.total_supported ?? 0
-    if (preview && supported === 0) {
-      window.alert('当前来源没有可解析/可接入的文件，请重新选择来源。')
+    // 项目名:文件夹→顶层文件夹名(webkitRelativePath 首段);多选文件→当前项目名(都可改)
+    const rel = (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath
+    setProjName(fromFolder && rel ? rel.split('/')[0] : cur?.name ?? '')
+    setPicked({ files, skipped, fromFolder })
+  }
+
+  /** 动作二·一键整理:把已选文件经本地回环逐个上传到目标项目并建索引(复用单文件上传链路)。 */
+  const organize = async () => {
+    if (ingesting || !picked) return
+    const name = projName.trim()
+    if (!name) {
+      window.alert('请填写要整理成的项目名称')
+      return
+    }
+    if (picked.files.length === 0) {
+      window.alert('没有可整理的文件，请重新选择来源。')
       return
     }
     setIngesting(true)
     setIngestFailed(false)
     setErr(null)
+    setIngestProg({ done: 0, total: picked.files.length })
     try {
-      const r = await api.importBatchIngest(source.path, mode)
-      // 先把新项目灌入共享上下文,再渲染结果卡——卡上「设为当前项目」点击不会被 reload 回落覆盖(消除竞态)
+      // 同名项目并入,否则新建(浏览器拿不到源路径,用项目名做去重键)
+      const list = await api.listProjects()
+      let proj = list.items.find((p) => p.name === name) ?? null
+      if (!proj) proj = await api.createProject({ name })
+      let uploaded = 0
+      let indexed = 0
+      let failed = 0
+      for (let i = 0; i < picked.files.length; i++) {
+        try {
+          const pf = await api.uploadProjectFile(proj.id, picked.files[i])
+          uploaded++
+          try {
+            await api.indexProjectFile(proj.id, pf.id)
+            indexed++
+          } catch {
+            /* 索引失败不致命:文件已接入,可在项目里手动重建索引 */
+          }
+        } catch {
+          failed++
+        }
+        setIngestProg({ done: i + 1, total: picked.files.length })
+      }
+      // 先灌共享上下文再渲染结果卡,避免「设为当前项目」被 reload 回落覆盖
       await reloadProjects()
-      setIngestResult(r)
+      setIngestResult({ projectName: name, projectId: proj.id, uploaded, indexed, failed, total: picked.files.length })
       setLastIngestAt(new Date())
-      setSwitchNote(`本次整理识别并接入 ${r.total_projects} 个项目，已在「项目中心」下拉出现。`)
+      setSwitchNote(`已整理「${name}」：接入 ${uploaded} 个文件、索引 ${indexed} 个${failed ? `，失败 ${failed}` : ''}，已在「项目中心」下拉。`)
       await loadDocs()
       loadStats()
     } catch (e) {
-      setIngestFailed(true) // 失败:保留 source,允许再次点击一键整理
+      setIngestFailed(true) // 失败:保留 picked,允许重试
       setErr((e as Error).message)
     } finally {
       setIngesting(false)
+      setIngestProg(null)
     }
   }
 
@@ -232,12 +238,11 @@ export default function KnowledgePage() {
       ? '整理失败'
       : ingestResult
         ? '已整理'
-        : source
+        : picked
           ? '已选择，待整理'
           : '未选择'
 
-  const topTypes = scan ? Object.entries(scan.type_stats).sort((a, b) => b[1] - a[1]).slice(0, 10) : []
-  const busy = selecting || ingesting
+  const busy = ingesting
 
   return (
     <>
@@ -258,8 +263,11 @@ export default function KnowledgePage() {
           {/* 当前来源 + 状态 */}
           <div className="kbrow" style={{ flexWrap: 'wrap' }}>
             <span className="meta">当前来源：</span>
-            {source ? (
-              <span className="pth mono">{source.path}</span>
+            {picked ? (
+              <span className="pth">
+                {picked.fromFolder ? '📁 文件夹' : '📄 多选文件'} · {picked.files.length} 个可整理
+                {picked.skipped ? `（跳过 ${picked.skipped} 个不支持）` : ''}
+              </span>
             ) : (
               <span className="meta" style={{ color: 'var(--mut)' }}>未选择</span>
             )}
@@ -268,22 +276,39 @@ export default function KnowledgePage() {
             </span>
           </div>
 
-          {/* 两个独立主按钮 */}
+          {/* 原生系统对话框:选文件夹 / 多选文件(隐藏 input,按钮触发) */}
+          <input
+            ref={folderInputRef}
+            type="file"
+            style={{ display: 'none' }}
+            onChange={(e) => { onNativePicked(e.target.files, true); e.target.value = '' }}
+          />
+          <input
+            ref={filesInputRef}
+            type="file"
+            multiple
+            accept=".txt,.md,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg"
+            style={{ display: 'none' }}
+            onChange={(e) => { onNativePicked(e.target.files, false); e.target.value = '' }}
+          />
           <div className="btnrow" style={{ marginTop: 8 }}>
-            <button className="btn" onClick={selectSource} disabled={busy}>
-              {selecting ? '读取中…' : '📂 选择来源'}
+            <button className="btn" onClick={() => folderInputRef.current?.click()} disabled={busy}>
+              📁 选择文件夹
+            </button>
+            <button className="btn" onClick={() => filesInputRef.current?.click()} disabled={busy}>
+              📄 选择文件(可多选)
             </button>
             <button
               className="btn"
               onClick={organize}
-              disabled={busy}
+              disabled={busy || !picked}
               style={{ background: 'var(--terra)', color: '#fff' }}
             >
-              {ingesting ? '整理中…' : '⚡ 一键整理'}
+              {ingesting ? (ingestProg ? `整理中… ${ingestProg.done}/${ingestProg.total}` : '整理中…') : '⚡ 一键整理'}
             </button>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--mut)', margin: '6px 2px 0' }}>
-            「选择来源」只读取并预览本地文件夹或单个文件（不建项目、不入库、不写索引）；确认无误后点「一键整理」才复制接入并建立本地索引。原始目录始终不动。
+            点「选择文件夹 / 文件」弹出系统对话框（左侧栏可一键到桌面 / 文档 / Downloads）。只接入可解析文件（txt/md/pdf/docx/pptx/xlsx/图片），自动跳过 .rar 等。确认无误后点「一键整理」复制接入并建索引，原始文件不动。
           </div>
           {/* 当前整理目标根:配置仓库则进仓库,否则程序内部目录(在设置→知识库与数据里配置仓库) */}
           <div style={{ fontSize: 11.5, color: 'var(--mut)', margin: '4px 2px 0' }}>
@@ -295,130 +320,57 @@ export default function KnowledgePage() {
             )}
           </div>
 
-          {/* 只读预览(选择来源后) */}
-          {preview && (
+          {/* 已选文件预览 + 整理成的项目名(可编辑) */}
+          {picked && !ingestResult && (
             <div className="card" style={{ marginTop: 12, background: 'var(--panel2)' }}>
-              <div className="ct">来源预览（只读，未移动/未写入任何文件）</div>
-              {scan && (
-                <div className="grid3" style={{ marginTop: 6 }}>
-                  <div className="metric"><div className="l">📄 文件总数</div><div className="v">{scan.total_files}</div></div>
-                  <div className="metric"><div className="l">📁 文件夹</div><div className="v">{scan.total_dirs}</div></div>
-                  <div className="metric"><div className="l">💾 总大小</div><div className="v" style={{ fontSize: 20 }}>{fmtSize(scan.total_size)}</div></div>
-                </div>
-              )}
-              <div className="grid3" style={{ marginTop: 8 }}>
-                <div className="metric"><div className="l">✅ 可解析(待接入)</div><div className="v t">{preview.total_supported}</div></div>
-                <div className="metric"><div className="l">⚠ 大文件</div><div className="v">{scan ? scan.large_files.length : '—'}</div></div>
-                <div className="metric"><div className="l">⛔ 不可解析</div><div className="v">{preview.total_unsupported}</div></div>
+              <div className="ct">待整理（{picked.files.length} 个可解析文件，原文件不动）</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '6px 2px' }}>
+                <span className="meta">整理成项目：</span>
+                <input
+                  value={projName}
+                  onChange={(e) => setProjName(e.target.value)}
+                  placeholder="项目名称"
+                  style={{ flex: 1, minWidth: 180, padding: '6px 10px', border: '1px solid var(--line2)', borderRadius: 8, fontSize: 13 }}
+                />
               </div>
-              <div style={{ fontSize: 12, color: 'var(--mut)', margin: '6px 2px' }}>
-                当前数据基地已入库 <b>{stats?.documents ?? docs.length}</b> 条 · 本次来源可接入 <b>{preview.total_supported}</b> 条（待整理）
+              <div style={{ fontSize: 11.5, color: 'var(--mut)', margin: '0 2px 6px' }}>
+                {picked.fromFolder ? '默认用文件夹名；' : '默认用当前项目名；'}同名项目会并入，否则新建。
+                {picked.skipped ? ` 已跳过 ${picked.skipped} 个不支持的文件。` : ''}
               </div>
-              {preview.total_supported === 0 && (
-                <div style={{ fontSize: 11.5, color: 'var(--red)', margin: '0 2px 6px' }}>
-                  该来源没有可解析的文件，点「一键整理」不会接入任何内容；请重新选择来源。
+              {picked.files.slice(0, 10).map((f, i) => (
+                <div className="kbrow" key={i}>
+                  <span className="pth">📄 {(f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name}</span>
+                  <span className="meta">{fmtSize(f.size)}</span>
                 </div>
-              )}
-
-              {/* 识别模式单选:有子文件夹时让用户选「集合/单项目」(不自动猜) */}
-              {!preview.is_single_file && preview.mode_hint === 'choose_mode' && (
-                <div style={{ margin: '10px 2px', padding: '10px 12px', background: 'var(--panel)', border: '1px solid var(--line2)', borderRadius: 10 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>这个文件夹要怎么识别？</div>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
-                    <input type="radio" name="ingmode" checked={mode === 'single'} onChange={() => setMode('single')} />
-                    <span style={{ fontSize: 12.5 }}>
-                      📦 <b>单个项目</b>（默认）：整个文件夹是 <b>1</b> 个项目(子文件夹只是它的资料分类，如 原始资料/项目笔记)
-                    </span>
-                  </label>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 0' }}>
-                    <input type="radio" name="ingmode" checked={mode === 'collection'} onChange={() => setMode('collection')} />
-                    <span style={{ fontSize: 12.5 }}>
-                      📚 <b>项目集合</b>：这个文件夹里装着 <b>{preview.collection?.total_projects ?? preview.total_projects}</b> 个项目(每个子文件夹各算一个项目)
-                    </span>
-                  </label>
-                  <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
-                    默认按「单个项目」——只有确认这个文件夹装着多个独立项目时,才选「项目集合」拆分。
-                  </div>
-                </div>
-              )}
-
-              {/* 识别到的项目/文件夹结构(随所选模式) */}
-              {(() => {
-                const selp = mode === 'single' ? preview.single_project : preview.collection
-                const list = selp ? selp.projects : preview.projects
-                const cnt = selp ? selp.total_projects : preview.total_projects
-                return list.length > 0 ? (
-                  <>
-                    <div className="ct" style={{ marginTop: 8 }}>
-                      {mode === 'single' ? '将作为 1 个项目接入' : `识别到的项目/文件夹结构（${cnt}）`}
-                    </div>
-                    {list.map((p) => (
-                      <div className="kbrow" key={p.path}>
-                        <span className="pth">📁 {p.project_name}</span>
-                        <span className="meta">{p.supported_count} 可解析 / {p.unsupported_count} 不支持</span>
-                      </div>
-                    ))}
-                  </>
-                ) : null
-              })()}
-
-              {/* 文件类型分布(仅文件夹扫描提供) */}
-              {topTypes.length > 0 && (
-                <>
-                  <div className="ct" style={{ marginTop: 8 }}>文件类型分布</div>
-                  <div className="tags">
-                    {topTypes.map(([ext, n]) => (
-                      <span className="tg" key={ext}><span className="k">{ext}</span>{n}</span>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* 大文件(秒级元数据登记,不强解析) */}
-              {scan && scan.large_files.length > 0 && (
-                <>
-                  <div className="ct" style={{ marginTop: 8 }}>大文件（登记元数据，不阻塞）</div>
-                  {scan.large_files.slice(0, 5).map((f) => (
-                    <div className="kbrow" key={f.abs_path}>
-                      <span className="pth">{f.path}</span>
-                      <span className="meta" style={{ color: 'var(--terra)' }}>{fmtSize(f.size)}</span>
-                    </div>
-                  ))}
-                </>
+              ))}
+              {picked.files.length > 10 && (
+                <div style={{ fontSize: 11.5, color: 'var(--mut)', padding: 4 }}>…等共 {picked.files.length} 个</div>
               )}
             </div>
           )}
 
-          {/* 整理结果卡(一键整理后):字段齐全 + 最近整理时间 + 切换到对应项目 */}
+          {/* 整理结果卡(一键整理后):接入/索引/失败 + 切换到该项目 */}
           {ingestResult && (
             <div className="card" style={{ marginTop: 12, background: 'var(--panel2)' }}>
-              <div className="ct">整理结果 · 识别 {ingestResult.total_projects} 个项目</div>
-              <div className="kbrow" style={{ flexWrap: 'wrap' }}>
-                <span className="meta">来源：</span><span className="pth mono">{ingestResult.root}</span>
-              </div>
+              <div className="ct">整理结果 · 项目「{ingestResult.projectName}」</div>
               <div style={{ fontSize: 13, color: 'var(--ink2)', margin: '4px 2px' }}>
-                已复制 <b>{ingestResult.copied}</b> · 已入库索引 <b>{ingestResult.indexed}</b> · 可解析{' '}
-                <b>{preview?.total_supported ?? ingestResult.copied}</b> · 不可解析/大文件{' '}
-                <b>{(preview?.total_unsupported ?? 0) + (scan?.large_files.length ?? 0)}</b> · 跳过重复{' '}
-                <b>{ingestResult.skipped_existing}</b> · 失败 <b>{ingestResult.failed}</b>
+                接入 <b>{ingestResult.uploaded}</b> 个文件 · 建索引 <b>{ingestResult.indexed}</b> · 失败{' '}
+                <b>{ingestResult.failed}</b> / 共 {ingestResult.total}
               </div>
               <div style={{ fontSize: 12, color: 'var(--mut)', margin: '0 2px 4px' }}>
                 索引状态：{ingestResult.indexed > 0 ? `已建立本地索引（${ingestResult.indexed} 条）` : '本次无新增索引'}
                 {lastIngestAt && <> · 最近整理时间：{lastIngestAt.toLocaleString('zh-CN')}</>}
               </div>
-              {ingestResult.projects.map((p) => (
-                <div className="kbrow" key={p.project_id} style={{ flexWrap: 'wrap' }}>
-                  <span className="pth"><b>{p.project_name}</b></span>
-                  <span className="meta">{p.copied} 文件 · {p.indexed > 0 ? `已入库 ${p.indexed}` : '未入库'} · 失败 {p.failed}</span>
-                  <span
-                    className="act"
-                    style={{ color: 'var(--terra)' }}
-                    onClick={() => { setCurId(p.project_id); setSwitchNote(`已设为当前项目「${p.project_name}」，切到「项目中心」即可看到它的文件 / 认知（按 project_id 隔离）。`) }}
-                  >
-                    设为当前项目
-                  </span>
-                </div>
-              ))}
+              <div className="kbrow" style={{ flexWrap: 'wrap' }}>
+                <span className="pth"><b>{ingestResult.projectName}</b></span>
+                <span
+                  className="act"
+                  style={{ color: 'var(--terra)' }}
+                  onClick={() => { setCurId(ingestResult.projectId); setSwitchNote(`已设为当前项目「${ingestResult.projectName}」，切到「项目中心」即可看到它的文件 / 认知。`) }}
+                >
+                  设为当前项目
+                </span>
+              </div>
               {switchNote && <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>{switchNote}</div>}
             </div>
           )}
@@ -553,13 +505,6 @@ export default function KnowledgePage() {
       {err && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
 
       <CrossProjectLibrary />
-
-      <FolderPicker
-        open={pickerOpen}
-        initialPath={lastWsPath}
-        onPick={onPickSource}
-        onClose={() => setPickerOpen(false)}
-      />
     </>
   )
 }
