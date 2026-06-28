@@ -715,6 +715,20 @@ export const api = {
       ),
     )
   },
+  /** 共创营地"生成这份文件的会议纪要":用已上传项目文件原文 → 建会议 → 出正式纪要(进会议中心)。 */
+  async minuteFromFile(projectId: number, fileId: number, title?: string): Promise<{
+    meeting_id: number
+    minute_id: number
+    title: string
+    gen_status: string
+    markdown: string
+    error: string
+  }> {
+    return request(`/api/projects/${projectId}/meetings/from-file`, {
+      method: 'POST',
+      body: JSON.stringify({ file_id: fileId, title }),
+    })
+  },
   /** Word 正式导出 URL（variant=external|internal）。 */
   minuteDocxUrl(projectId: number, meetingId: number, minuteId: number, variant: 'external' | 'internal' = 'external'): string {
     return `${BASE_URL}/api/projects/${projectId}/meetings/${meetingId}/minute/${minuteId}/export.docx?variant=${variant}`

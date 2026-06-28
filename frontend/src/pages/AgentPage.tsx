@@ -366,7 +366,48 @@ export default function AgentPage() {
       await runCommand(content)
       return
     }
+    // 会议纪要意图 + 已附带文件 → 走「会议成果交付中心」正式纪要管线(产物进对话流 + 存会议中心)
+    if (/纪要|会议记录/.test(content) && attachedFiles.length > 0) {
+      await genMinuteFromFile(content, attachedFiles[attachedFiles.length - 1])
+      return
+    }
     await doChat(content)
+  }
+
+  /** 会议纪要正式管线:用最近附带的文件出正式纪要,结果进对话流,记录存会议成果交付中心。 */
+  const genMinuteFromFile = async (content: string, file: { id: number; filename: string }) => {
+    if (!cur) return
+    setErr(null)
+    setShowCmdMenu(false)
+    setSending(true)
+    setPending({ label: '生成会议纪要 · 正式纪要管线', startedAt: Date.now() })
+    const uId = -Date.now()
+    const userMsg: ChatMessage = {
+      id: uId, session_id: 0, role: 'user', content, status: 'ok', error_message: '', created_at: new Date().toISOString(),
+    }
+    setFlow((f) => [...f, { kind: 'msg', key: `m${uId}`, msg: userMsg }])
+    setText('')
+    try {
+      const r = await api.minuteFromFile(cur.id, file.id)
+      const aId = -Date.now() - 1
+      let aMsg: ChatMessage
+      if (r.gen_status === 'ok') {
+        const md =
+          r.markdown +
+          `\n\n———\n✅ 已存入「会议成果交付中心」（基于「${file.filename}」），可在那里查看 / 导出 Word / 抽取待办。`
+        aMsg = { id: aId, session_id: 0, role: 'assistant', content: md, status: 'ok', error_message: '', created_at: new Date().toISOString() }
+      } else {
+        const emsg = r.gen_status === 'not_configured' ? '未配置 AI Key，请先到设置页配置。' : r.error || '纪要生成失败'
+        aMsg = { id: aId, session_id: 0, role: 'assistant', content: emsg, status: 'error', error_message: r.error || '', created_at: new Date().toISOString() }
+      }
+      setFlow((f) => [...f, { kind: 'msg', key: `m${aId}`, msg: aMsg }])
+    } catch (e) {
+      setErr((e as Error).message)
+      setFlow((f) => f.filter((x) => !(x.kind === 'msg' && x.msg.id === uId)))
+    } finally {
+      setSending(false)
+      setPending(null)
+    }
   }
 
   // 普通对话：乐观气泡 → 真实 user+assistant 进对话流（按时间序）。

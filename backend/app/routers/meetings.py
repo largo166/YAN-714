@@ -175,6 +175,47 @@ def generate_minute(project_id: int, meeting_id: int, db: Session = Depends(get_
     return _minute_out(row)
 
 
+@router.post("/{project_id}/meetings/from-file")
+def minute_from_file(project_id: int, payload: schemas.MinuteFromFileIn, db: Session = Depends(get_db)) -> dict:
+    """共创营地"生成这份文件的会议纪要"路由入口:用已上传项目文件原文 → 建会议 → 出正式纪要。
+
+    复用 create_meeting + generate_minute,产物进会议成果交付中心(可查看/导出 Word/抽取待办/回流);
+    同时返回渲染好的 markdown 供共创营地对话流直接展示。
+    """
+    _project_or_404(db, project_id)
+    pf = db.get(models.ProjectFile, payload.file_id)
+    if pf is None or pf.project_id != project_id or pf.status != "active":
+        raise HTTPException(404, "文件不存在或不属于本项目")
+    text = (pf.content_text or "").strip()
+    if not text:
+        raise HTTPException(400, "该文件没有可用文本(可能是扫描件/需OCR),无法生成纪要")
+
+    segs = transcription.text_to_segments(text)
+    title = (payload.title or "").strip() or f"纪要-{pf.filename}"
+    m = models.Meeting(
+        project_id=project_id, title=title, meeting_date="", attendees="",
+        raw_text=text, segments_json=safe_json.dumps_safe(transcription.segments_to_dicts(segs)),
+        transcript_source="material", status="created",
+    )
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+
+    minute = generate_minute(project_id, m.id, db)  # 复用正式纪要生成(五段式 + todos)
+    row = db.get(models.MeetingMinute, minute.id)
+    md = ""
+    if minute.gen_status == "ok" and row is not None:
+        md = meeting.render_markdown(m.title, _minute_dict(row), review_status=row.review_status, external_only=True)
+    return {
+        "meeting_id": m.id,
+        "minute_id": minute.id,
+        "title": m.title,
+        "gen_status": minute.gen_status,
+        "markdown": md,
+        "error": (row.error_message if row else "") or "",
+    }
+
+
 @router.get("/{project_id}/meetings/{meeting_id}/minute", response_model=schemas.MeetingMinuteOut)
 def get_latest_minute(project_id: int, meeting_id: int, db: Session = Depends(get_db)):
     _meeting_or_404(db, project_id, meeting_id)

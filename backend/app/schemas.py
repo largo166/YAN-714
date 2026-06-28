@@ -1043,6 +1043,12 @@ class MeetingCreateIn(BaseModel):
     raw_text: str = ""  # 贴会议记录文本
 
 
+class MinuteFromFileIn(BaseModel):
+    """共创营地"生成这份文件的会议纪要"：用已上传项目文件原文建会议并出正式纪要。"""
+    file_id: int
+    title: Optional[str] = None  # 不传则用 "纪要-{文件名}"
+
+
 class MeetingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
