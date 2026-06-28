@@ -214,6 +214,8 @@ export default function AgentPage() {
   const [projFiles, setProjFiles] = useState<ProjectFile[]>([])
   const [showFiles, setShowFiles] = useState(false) // 文件列表平时折叠,点标题才展开(默认不占地方)
   const [uploadNote, setUploadNote] = useState<string | null>(null)
+  // 本次上传后"附带"给对话的文件:发消息时带上其原文,让"上传 Word→生成会议纪要"等直接对话能拿到内容。
+  const [attachedFiles, setAttachedFiles] = useState<{ id: number; filename: string }[]>([])
   // 技能/命令运行进度(可见 + 可取消,消除「看着卡死」)
   const [pending, setPending] = useState<{ label: string; startedAt: number } | null>(null)
   const [, setTick] = useState(0)
@@ -258,7 +260,13 @@ export default function AgentPage() {
     try {
       const f = await api.uploadProjectFile(cur.id, file)
       const okParse = f.parse_status === 'ok' || f.parse_status === 'ok_truncated'
-      setUploadNote(`✓ 已上传「${f.filename}」到「${cur.name}」 · 解析：${okParse ? '成功，可被技能/研判调用' : f.parse_status}`)
+      // 解析成功 → 自动"附带"给对话(去重),让"上传后直接问"能拿到这份文件原文
+      if (okParse) {
+        setAttachedFiles((prev) => (prev.some((x) => x.id === f.id) ? prev : [...prev, { id: f.id, filename: f.filename }]))
+      }
+      setUploadNote(
+        `✓ 已上传「${f.filename}」到「${cur.name}」 · 解析：${okParse ? '成功，已附带到对话，可直接问' : f.parse_status + '（未能提取文本，无法附带）'}`,
+      )
       await refreshFiles(cur.id)
     } catch (e) {
       setUploadNote(`✕ 上传失败：${(e as Error).message}`)
@@ -315,6 +323,7 @@ export default function AgentPage() {
       setProjFiles([])
     }
     setUploadNote(null)
+    setAttachedFiles([]) // 切项目清空附带(附带文件归属项目)
   }, [cur, refreshArchive, refreshFiles])
 
   useEffect(() => {
@@ -392,6 +401,8 @@ export default function AgentPage() {
         // 也让后端注入该项目【已确认】结构化认知(上下文供给协议)，与知识库开关无关。
         project_id: cur ? cur.id : undefined,
         top_k: 5,
+        // 本次上传后附带的文件:注入其原文(上传 Word→生成会议纪要 等直接对话靠这个)
+        attached_file_ids: attachedFiles.map((f) => f.id),
       })
       setAiConfigured(res.ai_configured)
       setModel(res.model || model)
@@ -725,6 +736,29 @@ export default function AgentPage() {
         {uploadNote && (
           <div style={{ marginTop: 8, fontSize: 12, color: uploadNote.startsWith('✕') ? 'var(--red)' : 'var(--ok)' }}>
             {uploadNote}
+          </div>
+        )}
+        {/* 已附带文件:发消息时把这些文件原文带给 AI;✕ 可移除 */}
+        {attachedFiles.length > 0 && (
+          <div className="projfiles" style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--terra)' }}>📎 已附带（发送时带给 AI）：</span>
+            {attachedFiles.map((f) => (
+              <span
+                key={f.id}
+                className="chip"
+                style={{ fontSize: 11, borderColor: 'var(--terra-line)', background: 'var(--terra-soft)', color: 'var(--terra)' }}
+              >
+                📄 {f.filename}
+                <span
+                  role="button"
+                  title="移除（不再附带给对话）"
+                  onClick={() => setAttachedFiles((prev) => prev.filter((x) => x.id !== f.id))}
+                  style={{ marginLeft: 6, cursor: 'pointer', fontWeight: 700 }}
+                >
+                  ✕
+                </span>
+              </span>
+            ))}
           </div>
         )}
         {cur && projFiles.length > 0 && (

@@ -414,6 +414,8 @@ class SendMessageIn(BaseModel):
     knowledge_query: Optional[str] = None
     project_id: Optional[int] = None  # 项目级检索范围（E1）；None=全库
     top_k: int = 5
+    # 随消息附带的项目文件 id：把这些文件的解析全文注入上下文（共创营地"上传后直接问"用）
+    attached_file_ids: List[int] = []
 
 
 class KnowledgeHitOut(BaseModel):

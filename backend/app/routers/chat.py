@@ -87,6 +87,30 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
         cog_prompt, _cog_sources = analysis.cognition_system_prompt(db, payload.project_id)
     cognition_injected = False
 
+    # 2.6) 附带文件：用户上传后随消息带上的文件，注入其解析全文（限本项目、单文件截断防爆上下文）。
+    # 让"上传 Word → 生成这份文件的会议纪要"这类直接对话能拿到原文。
+    file_ctx = ""
+    if payload.attached_file_ids and payload.project_id is not None:
+        rows = (
+            db.query(models.ProjectFile)
+            .filter(
+                models.ProjectFile.id.in_(payload.attached_file_ids),
+                models.ProjectFile.project_id == payload.project_id,
+                models.ProjectFile.status == "active",
+            )
+            .all()
+        )
+        parts = []
+        for r in rows:
+            txt = (r.content_text or "").strip()
+            if txt:
+                parts.append(f"《{r.filename}》：\n{txt[:6000]}")
+        if parts:
+            file_ctx = (
+                "以下是用户随消息附带的文件原文，请基于这些原文回答"
+                "（如生成会议纪要、摘要、研判、改写等）：\n\n" + "\n\n---\n\n".join(parts)
+            )
+
     # 3) 生成 assistant 消息
     if not configured:
         assistant = models.ChatMessage(
@@ -103,6 +127,9 @@ def send_message(session_id: int, payload: schemas.SendMessageIn, db: Session = 
         if cog_prompt:
             chat_messages.append({"role": "system", "content": cog_prompt})
             cognition_injected = True
+        # 附带文件原文优先级高（用户明确要基于这份文件），置于知识库片段之前
+        if file_ctx:
+            chat_messages.append({"role": "system", "content": file_ctx})
         ctx = llm.build_context_prompt([h.__dict__ for h in hits]) if hits else None
         if ctx:
             chat_messages.append({"role": "system", "content": ctx})

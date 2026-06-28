@@ -145,6 +145,7 @@ export interface SendMessageInput {
   knowledge_query?: string
   project_id?: number
   top_k?: number
+  attached_file_ids?: number[]
 }
 
 export const api = {
