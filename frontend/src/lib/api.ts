@@ -582,6 +582,16 @@ export const api = {
       }),
     )
   },
+  /** 把现有【落在内部 uploads 的项目文件】整理进已配置的仓库 {仓库}/{项目名}/(存量迁移,幂等)。 */
+  async organizeToRepository(): Promise<{
+    projects_touched: number
+    moved: number
+    skipped: number
+    failed: number
+    repository: string
+  }> {
+    return request('/api/projects/repository/organize', { method: 'POST' })
+  },
   /** 只读列目录:path 为空 → 盘符列表;否则该目录直接子级。供目录选择弹窗用。 */
   async listDir(path = ''): Promise<DirList> {
     return DirListSchema.parse(

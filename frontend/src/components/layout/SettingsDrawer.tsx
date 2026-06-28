@@ -84,6 +84,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
   const [repoMsg, setRepoMsg] = useState<string | null>(null)
   const [repoErr, setRepoErr] = useState<string | null>(null)
   const [repoPickerOpen, setRepoPickerOpen] = useState(false)
+  const [repoOrganizing, setRepoOrganizing] = useState(false)
 
   // 本地 UI 态（未接后端，仅保真交互）
   const [autoIndex, setAutoIndex] = useState(true)
@@ -114,9 +115,30 @@ export default function SettingsDrawer({ open, onClose }: Props) {
     try {
       const saved = await api.updateSettings({ repository_root_path: path.trim() })
       setRepoRoot(saved.repository_root_path || '')
-      setRepoMsg(saved.repository_configured ? '仓库已配置，之后「一键整理」将整理进此文件夹' : '已解除仓库，整理回退程序内部目录')
+      setRepoMsg(
+        saved.repository_configured
+          ? '仓库已配置。以后上传/接入的文件将进此文件夹；现有文件点「整理进仓库」搬入。'
+          : '已解除仓库，整理回退程序内部目录',
+      )
     } catch (e) {
       setRepoErr((e as Error).message) // 后端 400 文案(不存在/不可写/嵌套 uploads…)
+    }
+  }
+
+  /** 存量迁移:把已落在内部 uploads 的现有项目文件搬进仓库(幂等可重复点)。 */
+  const organizeToRepo = async () => {
+    setRepoMsg(null)
+    setRepoErr(null)
+    setRepoOrganizing(true)
+    try {
+      const r = await api.organizeToRepository()
+      setRepoMsg(
+        `已整理进仓库：搬运 ${r.moved} 个文件${r.failed ? `，失败 ${r.failed}` : ''}（已在仓库 ${r.skipped} 个，跳过）。`,
+      )
+    } catch (e) {
+      setRepoErr((e as Error).message)
+    } finally {
+      setRepoOrganizing(false)
     }
   }
 
@@ -283,6 +305,16 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                 <button className="btn" onClick={() => setRepoPickerOpen(true)}>
                   {repoRoot ? '更改仓库' : '选择仓库文件夹'}
                 </button>
+                {repoRoot && (
+                  <button
+                    className="anbtn"
+                    disabled={repoOrganizing}
+                    onClick={organizeToRepo}
+                    title="把现有项目文件从程序内部搬进仓库 {仓库}/{项目名}/"
+                  >
+                    {repoOrganizing ? '整理中…' : '整理进仓库'}
+                  </button>
+                )}
                 {repoRoot && (
                   <button className="anbtn" onClick={() => saveRepository('')} title="解除配置,整理回退程序内部目录">解除</button>
                 )}

@@ -123,6 +123,46 @@ def _store_file(db: Session, project: models.Project, path) -> tuple:
     return stored, storage_root
 
 
+def _migrate_project_to_repo(db: Session, project: models.Project, repo_root: Path) -> dict:
+    """把某项目所有【回退布局(storage_root='',落在内部 uploads)】的活动文件搬进
+    {仓库}/{项目名}/。移动语义:复制成功后删内部副本。幂等:已在仓库的跳过。
+
+    返回 {moved, skipped, failed}。逐文件提交,单个失败不影响其它(回滚该文件)。
+    """
+    repo_root_str = _norm_source(repo_root)
+    files = (
+        db.query(models.ProjectFile)
+        .filter(
+            models.ProjectFile.project_id == project.id,
+            models.ProjectFile.status == "active",
+        )
+        .all()
+    )
+    moved = skipped = failed = 0
+    for pf in files:
+        if (pf.storage_root or "").strip():
+            skipped += 1  # 已在仓库,不重复搬
+            continue
+        try:
+            src = uploads.abs_of(pf.stored_path, "")  # 回退根 = UPLOADS_ROOT/{pid}/{name}
+            if not src.exists():
+                failed += 1
+                continue
+            stored = uploads.copy_into_root(repo_root, project.name, src, original_name=pf.filename)
+            try:
+                src.unlink()  # 复制成功 → 删内部副本(移动语义;失败不致命,文件已在仓库)
+            except OSError:
+                pass
+            pf.storage_root = repo_root_str
+            pf.stored_path = stored.stored_path
+            db.commit()
+            moved += 1
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            failed += 1
+    return {"moved": moved, "skipped": skipped, "failed": failed}
+
+
 def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> models.Project:
     """按【源文件夹路径】去重(可靠键,支持重新整理):同 source_path 已存在→复用(不改名,
     保留用户在项目中心可能做过的手动改名);否则用文件夹原名新建并记录来源路径。"""
@@ -304,6 +344,33 @@ def batch_ingest_import(
     )
 
 
+@router.post("/repository/organize")
+def organize_to_repository(db: Session = Depends(get_db)) -> dict:
+    """把所有项目【已落在内部 uploads 的现有文件】整理进已配置的仓库 {仓库}/{项目名}/。
+
+    解决「配置仓库前上传的文件不会自动进仓库」:配置只影响以后的上传,此端点补做存量迁移。
+    幂等可重复点;未配置仓库/仓库不可访问 → 400。
+    """
+    cfg = db.get(models.AppSetting, 1)
+    repo_path = (cfg.repository_root_path if cfg else "") or ""
+    if not repo_path:
+        raise HTTPException(400, "未配置仓库,请先在设置中配置受管资料库(仓库)")
+    repo_root = Path(repo_path)
+    if not repo_root.is_dir():
+        raise HTTPException(400, f"仓库不可访问,请检查仓库文件夹是否存在:{repo_path}")
+
+    total = {"projects_touched": 0, "moved": 0, "skipped": 0, "failed": 0}
+    for project in db.query(models.Project).all():
+        r = _migrate_project_to_repo(db, project, repo_root)
+        if r["moved"] or r["failed"]:
+            total["projects_touched"] += 1
+        total["moved"] += r["moved"]
+        total["skipped"] += r["skipped"]
+        total["failed"] += r["failed"]
+    total["repository"] = str(repo_root)
+    return total
+
+
 def _project_or_404(db: Session, project_id: int) -> models.Project:
     p = db.get(models.Project, project_id)
     if p is None:
@@ -378,10 +445,17 @@ def get_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{project_id}/image")
 def get_project_image(project_id: int, path: str, db: Session = Depends(get_db)):
-    """按 stored_path 读项目内图片(供生图成果卡显示)。走 validate_path,只读项目 uploads 内的图。"""
+    """按 stored_path 读项目内图片(供生图成果卡显示)。走 validate_path,只读受管根内的图。"""
     _project_or_404(db, project_id)
+    # 据该文件行取 storage_root(仓库/回退),否则仓库内的图会被当 uploads 找而 404(迁移后必踩)
+    pf = (
+        db.query(models.ProjectFile)
+        .filter(models.ProjectFile.project_id == project_id, models.ProjectFile.stored_path == path)
+        .first()
+    )
+    storage_root = (pf.storage_root if pf else "") or ""
     try:
-        abs_path = uploads.abs_of(path)  # validate_path 兜底:越界/不存在抛错
+        abs_path = uploads.abs_of(path, storage_root)  # validate_path 兜底:越界/不存在抛错
     except Exception:  # noqa: BLE001
         raise HTTPException(404, "图片不存在")
     if not abs_path.is_file():

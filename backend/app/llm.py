@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import time
 from typing import List, Optional
 
 import httpx
@@ -61,17 +62,35 @@ def chat_completion(
     payload = {"model": model, "messages": messages, "stream": False}
     if response_format is not None:
         payload["response_format"] = response_format  # DeepSeek 支持 {"type":"json_object"} 强制 JSON
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            resp = client.post(url, headers=headers, json=payload)
-        if resp.status_code != 200:
-            raise LLMError(f"DeepSeek 返回 {resp.status_code}: {resp.text[:300]}")
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
-    except NotConfigured:
-        raise
-    except (httpx.HTTPError, KeyError, ValueError) as e:
-        raise LLMError(f"调用 DeepSeek 失败: {e}") from e
+
+    # 瞬时网络/TLS 错误(如 "EOF occurred in violation of protocol")单次就硬失败,体验很差。
+    # 退避重试:传输层错误 + 5xx 重试,最多 3 次(0.6s/1.2s 退避);4xx(鉴权/参数)不重试。
+    last_exc: Optional[LLMError] = None
+    for attempt in range(3):
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                resp = client.post(url, headers=headers, json=payload)
+            if resp.status_code != 200:
+                detail = f"DeepSeek 返回 {resp.status_code}: {resp.text[:300]}"
+                if 500 <= resp.status_code < 600 and attempt < 2:
+                    last_exc = LLMError(detail)
+                    time.sleep(0.6 * (2 ** attempt))
+                    continue
+                raise LLMError(detail)
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except NotConfigured:
+            raise
+        except httpx.TransportError as e:
+            # 连接/TLS/超时类瞬时错误 → 退避重试(EOF in violation of protocol 即属此类)
+            last_exc = LLMError(f"调用 DeepSeek 失败: {e}")
+            if attempt < 2:
+                time.sleep(0.6 * (2 ** attempt))
+                continue
+        except (httpx.HTTPError, KeyError, ValueError) as e:
+            raise LLMError(f"调用 DeepSeek 失败: {e}") from e
+    assert last_exc is not None
+    raise last_exc
 
 
 def build_context_prompt(hits: List[dict]) -> Optional[str]:
