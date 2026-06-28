@@ -7,6 +7,7 @@ import CrossProjectLibrary from './CrossProjectLibrary'
 import type {
   KnowledgeDoc,
   KnowledgeDocListItem,
+  KnowledgeHit,
   KnowledgeStats,
 } from '@/types/schemas'
 
@@ -34,6 +35,11 @@ export default function KnowledgePage() {
   const [metaNote, setMetaNote] = useState<string | null>(null)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [assets, setAssets] = useState<FileAsset[]>([]) // 从项目文件抽出的图片资产
+  // 全文搜索:接后端 FTS5/LIKE,命中带页码定位(chunk 溯源)
+  const [searchQ, setSearchQ] = useState('')
+  const [searchHits, setSearchHits] = useState<KnowledgeHit[] | null>(null)
+  const [searchEngine, setSearchEngine] = useState('')
+  const [searching, setSearching] = useState(false)
 
   // 选择来源(原生对话框):picked=已选可解析文件(客户端筛);projName=整理成的项目名(可编辑)。
   // 浏览器拿不到磁盘路径,改为选文件/文件夹后把可解析文件经本地回环上传接入(复用单文件上传链路)。
@@ -98,6 +104,26 @@ export default function KnowledgePage() {
   useEffect(() => {
     loadAssets()
   }, [loadAssets])
+
+  const doSearch = async () => {
+    const q = searchQ.trim()
+    if (!q) {
+      setSearchHits(null)
+      return
+    }
+    setSearching(true)
+    setErr(null)
+    try {
+      const r = await api.searchKnowledge(q, 8)
+      setSearchHits(r.hits)
+      setSearchEngine(r.engine)
+    } catch (e) {
+      setErr((e as Error).message)
+      setSearchHits([])
+    } finally {
+      setSearching(false)
+    }
+  }
 
   // 当前生效的整理目标根:配置了仓库则显示仓库路径,否则"程序内部目录"。
   // 让用户在「一键整理」前清楚文件会进哪里(消除"以为进 A 实际进 B")。
@@ -414,6 +440,53 @@ export default function KnowledgePage() {
             <div className="hrow"><span className="hb" style={{ background: 'var(--ok)' }}></span>索引状态 正常 · {stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}<span className="r">当前本地库</span></div>
             <div className="hrow"><span className="hb" style={{ background: 'var(--mut)' }}></span>二进制图纸与图片登记元数据，暂不入全文检索<span className="r">资产登记</span></div>
           </div>
+        </div>
+      </section>
+
+      {/* 全文搜索:本地 FTS5/LIKE 检索已入库资料,命中带页码定位(chunk 溯源) */}
+      <section className="sec nocollapse" data-open="1">
+        <div className="sechead" style={{ cursor: 'default' }}>
+          <span className="chev" style={{ visibility: 'hidden' }}>▸</span>
+          <span className="stitle">全文搜索</span>
+          {searchEngine && <span className="scount">{searchEngine}</span>}
+          <span className="shint">本地索引 · 出处精确到页</span>
+        </div>
+        <div className="secbody">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') doSearch() }}
+              placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…"
+              style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--line2)', borderRadius: 8, fontSize: 13, background: 'var(--panel2)', color: 'var(--ink)' }}
+            />
+            <button className="btn" onClick={doSearch} disabled={searching} style={{ background: 'var(--terra)', color: '#fff' }}>
+              {searching ? '搜索中…' : '🔍 搜索'}
+            </button>
+            {searchHits !== null && (
+              <button className="anbtn" onClick={() => { setSearchHits(null); setSearchQ('') }}>清空</button>
+            )}
+          </div>
+          {searchHits !== null && (
+            <div style={{ marginTop: 10 }}>
+              {searchHits.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--mut)', padding: 6 }}>没有命中。换个关键词试试。</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 6 }}>命中 {searchHits.length} 条</div>
+                  {searchHits.map((h) => (
+                    <div className="kbrow" key={h.document_id} style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      <span className="pth" style={{ flex: 'none' }}>
+                        📄 <b>{h.title}</b>
+                        {h.locator && <span style={{ color: 'var(--terra)', fontSize: 11, marginLeft: 4 }}>· {h.locator}</span>}
+                      </span>
+                      <span className="meta" style={{ flexBasis: '100%', color: 'var(--ink2)', marginTop: 2 }}>{h.snippet}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
