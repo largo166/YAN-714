@@ -571,6 +571,20 @@ export const api = {
       await request(`/api/projects/${projectId}/files/${fileId}/index`, { method: 'POST' }),
     )
   },
+  // ── 图片资产(从 PPT/PDF/Word 抽出的图,一等资产) ──
+  async listAssets(projectId: number): Promise<{ items: FileAsset[]; total: number }> {
+    return request(`/api/projects/${projectId}/assets`)
+  },
+  /** 从某文件抽图为资产(幂等);上传后异步触发,不阻塞。 */
+  async extractFileAssets(projectId: number, fileId: number): Promise<{ extracted: number; project_total: number }> {
+    return request(`/api/projects/${projectId}/files/${fileId}/extract-assets`, { method: 'POST' })
+  },
+  assetThumbUrl(projectId: number, assetId: number): string {
+    return `${BASE_URL}/api/projects/${projectId}/assets/${assetId}/thumb`
+  },
+  assetImageUrl(projectId: number, assetId: number): string {
+    return `${BASE_URL}/api/projects/${projectId}/assets/${assetId}/image`
+  },
   async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
     return BatchIngestPreviewSchema.parse(
       await request('/api/projects/batch-ingest/preview', {
@@ -764,6 +778,17 @@ export const api = {
   },
 }
 
+export interface FileAsset {
+  id: number
+  source_file_id: number
+  ext: string
+  page_no: number
+  slide_no: number
+  shape_index: number
+  caption: string
+  width: number
+  height: number
+}
 export interface WsFile {
   path: string
   abs_path: string

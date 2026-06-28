@@ -278,6 +278,8 @@ export default function AgentPage() {
         `✓ 已上传「${f.filename}」到「${cur.name}」 · 解析：${okParse ? '成功，已附带到对话，可直接问' : f.parse_status + '（未能提取文本，无法附带）'}`,
       )
       await refreshFiles(cur.id)
+      // 后台抽图为资产(含图的 PPT/PDF/Word),不阻塞;结果在「数据基地 · 项目图片资产」看
+      void api.extractFileAssets(cur.id, f.id).catch(() => {})
     } catch (e) {
       setUploadNote(`✕ 上传失败：${(e as Error).message}`)
     } finally {

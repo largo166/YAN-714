@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { api } from '@/lib/api'
+import { api, type FileAsset } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import { renderInline } from '@/components/RichText'
 import CrossProjectLibrary from './CrossProjectLibrary'
@@ -33,6 +33,7 @@ export default function KnowledgePage() {
   const [genningId, setGenningId] = useState<number | null>(null)
   const [metaNote, setMetaNote] = useState<string | null>(null)
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
+  const [assets, setAssets] = useState<FileAsset[]>([]) // 从项目文件抽出的图片资产
 
   // 选择来源(原生对话框):picked=已选可解析文件(客户端筛);projName=整理成的项目名(可编辑)。
   // 浏览器拿不到磁盘路径,改为选文件/文件夹后把可解析文件经本地回环上传接入(复用单文件上传链路)。
@@ -84,6 +85,19 @@ export default function KnowledgePage() {
   const loadStats = useCallback(() => {
     api.getKnowledgeStats().then(setStats).catch(() => setStats(null))
   }, [])
+
+  // 当前项目的图片资产(从文件抽出的图);随项目切换刷新。
+  const loadAssets = useCallback(() => {
+    if (!cur) {
+      setAssets([])
+      return
+    }
+    api.listAssets(cur.id).then((d) => setAssets(d.items)).catch(() => setAssets([]))
+  }, [cur])
+
+  useEffect(() => {
+    loadAssets()
+  }, [loadAssets])
 
   // 当前生效的整理目标根:配置了仓库则显示仓库路径,否则"程序内部目录"。
   // 让用户在「一键整理」前清楚文件会进哪里(消除"以为进 A 实际进 B")。
@@ -200,10 +214,12 @@ export default function KnowledgePage() {
       let uploaded = 0
       let indexed = 0
       let failed = 0
+      const uploadedIds: number[] = []
       for (let i = 0; i < picked.files.length; i++) {
         try {
           const pf = await api.uploadProjectFile(proj.id, picked.files[i])
           uploaded++
+          uploadedIds.push(pf.id)
           try {
             await api.indexProjectFile(proj.id, pf.id)
             indexed++
@@ -222,6 +238,9 @@ export default function KnowledgePage() {
       setSwitchNote(`已整理「${name}」：接入 ${uploaded} 个文件、索引 ${indexed} 个${failed ? `，失败 ${failed}` : ''}，已在「项目中心」下拉。`)
       await loadDocs()
       loadStats()
+      // 后台抽图(不阻塞结果展示):每个文件抽完后刷新图片资产画廊
+      const pid = proj.id
+      void Promise.all(uploadedIds.map((fid) => api.extractFileAssets(pid, fid).catch(() => null))).then(loadAssets)
     } catch (e) {
       setIngestFailed(true) // 失败:保留 picked,允许重试
       setErr((e as Error).message)
@@ -487,18 +506,59 @@ export default function KnowledgePage() {
         </div>
       </section>
 
-      {/* 项目效果图:未接生图时保持空态(不伪造) */}
+      {/* 项目图片资产:从 PPT/PDF/Word 抽出的图(+ 直接上传图);有才显示,不伪造 */}
       <section className="sec nocollapse" data-open="1">
         <div className="sechead" style={{ cursor: 'default' }}>
           <span className="chev" style={{ visibility: 'hidden' }}>▸</span>
-          <span className="stitle">项目效果图</span>
-          <span className="scount">0 张</span>
-          <span className="shint">{cur ? `当前项目 · ${cur.name}` : '未选择项目'} · 未接生图</span>
+          <span className="stitle">项目图片资产</span>
+          <span className="scount">{assets.length} 张</span>
+          <span className="shint">{cur ? `当前项目 · ${cur.name}` : '未选择项目'} · 从文件抽取</span>
         </div>
         <div className="secbody">
-          <div className="gallery">
-            <div className="gempty">暂无效果图成果。生图未配置时保持空态，不伪造图。</div>
-          </div>
+          {assets.length === 0 ? (
+            <div className="gallery">
+              <div className="gempty">
+                {cur
+                  ? '暂无图片资产。上传含图的 PPT/PDF/Word 并「一键整理」后，会自动抽出其中的图。'
+                  : '请先选择项目。'}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {assets.slice(0, 60).map((a) => (
+                <a
+                  key={a.id}
+                  href={cur ? api.assetImageUrl(cur.id, a.id) : '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={
+                    [
+                      a.slide_no ? `PPT 第 ${a.slide_no} 页` : a.page_no ? `PDF 第 ${a.page_no} 页` : '',
+                      `${a.width}×${a.height}`,
+                      a.caption,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  }
+                  style={{ display: 'block', width: 120, height: 90, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line2)', background: 'var(--panel2)' }}
+                >
+                  {cur && (
+                    <img
+                      src={api.assetThumbUrl(cur.id, a.id)}
+                      alt={a.caption.slice(0, 20) || '图片资产'}
+                      loading="lazy"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  )}
+                </a>
+              ))}
+              {assets.length > 60 && (
+                <div style={{ alignSelf: 'center', fontSize: 12, color: 'var(--mut)', padding: '0 6px' }}>
+                  …共 {assets.length} 张
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
