@@ -17,6 +17,7 @@ from .routers import meetings
 from .routers import result_send
 from .routers import settings as settings_router
 from .routers import team
+from .routers import clients
 from .routers import workspace
 from .routers import skills
 from .routers import filesystem
@@ -53,6 +54,7 @@ app.include_router(reflow.router)
 app.include_router(meetings.router)
 app.include_router(skills.router)
 app.include_router(team.router)
+app.include_router(clients.router)
 app.include_router(agents.router)
 app.include_router(broadcast.router)
 app.include_router(boss.router)

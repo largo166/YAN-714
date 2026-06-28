@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { api } from '@/lib/api'
+import { api, type ClientPortrait } from '@/lib/api'
 import type { Agent, TeamMember, TickerItem } from '@/types/schemas'
 
 /** 协作平台：团队成员 + 智能助手卡 + 通知走马灯，接真实后端（C4）。
@@ -13,6 +13,16 @@ export default function HubPage() {
   const [form, setForm] = useState({ name: '', role: '', duty: '' })
   const [editId, setEditId] = useState<number | null>(null)
   const [editDuty, setEditDuty] = useState('')
+  // 甲方画像库(P1-E)
+  const [clients, setClients] = useState<{ name: string; project_count: number }[]>([])
+  const [selClient, setSelClient] = useState<string | null>(null)
+  const [portrait, setPortrait] = useState<ClientPortrait | null>(null)
+
+  const selectClient = (name: string) => {
+    setSelClient(name)
+    setPortrait(null)
+    api.getClientPortrait(name).then(setPortrait).catch(() => setPortrait(null))
+  }
 
   const loadMembers = useCallback(() => {
     api.listTeamMembers().then(setMembers).catch(() => setMembers([]))
@@ -22,6 +32,7 @@ export default function HubPage() {
     loadMembers()
     api.listAgents().then(setAgents).catch(() => setAgents([]))
     api.getTicker().then(setTicker).catch(() => setTicker([]))
+    api.listClients().then((d) => setClients(d.items)).catch(() => setClients([]))
   }, [loadMembers])
 
   const submitNew = async () => {
@@ -182,6 +193,65 @@ export default function HubPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="hublabel">
+        甲方画像库
+        <span className="sub">同一甲方的项目 / 诉求 / 历史聚合（仅汇已确认认知，不伪造）</span>
+        <span className="ln2"></span>
+      </div>
+      <div className="card" style={{ marginBottom: 26 }}>
+        {clients.length === 0 ? (
+          <div style={{ color: 'var(--mut)', fontSize: 13 }}>
+            暂无甲方。给项目填上「甲方」后，这里按甲方聚合其项目与诉求/历史。
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: portrait ? 12 : 0 }}>
+              {clients.map((c) => (
+                <button
+                  key={c.name}
+                  className="anbtn"
+                  onClick={() => selectClient(c.name)}
+                  style={selClient === c.name ? { borderColor: 'var(--terra-line)', background: 'var(--terra-soft)', color: 'var(--terra)' } : undefined}
+                >
+                  {c.name}（{c.project_count}）
+                </button>
+              ))}
+            </div>
+            {portrait && (
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 8 }}>
+                  <b>{portrait.client}</b> · {portrait.project_count} 个项目
+                  {portrait.cities.length > 0 && (
+                    <span style={{ color: 'var(--mut)' }}>　🏙 {portrait.cities.join('、')}</span>
+                  )}
+                </div>
+                {portrait.projects.map((p) => (
+                  <div key={p.id} style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
+                    <div style={{ fontSize: 12.5 }}>
+                      <b>{p.name}</b>
+                      {p.city && <span style={{ color: 'var(--mut)' }}>　{p.city}</span>}
+                      <span className="chip" style={{ marginLeft: 6 }}>{p.status}</span>
+                    </div>
+                    {p.cognition.length === 0 ? (
+                      <div style={{ fontSize: 11.5, color: 'var(--mut)', marginTop: 3 }}>
+                        暂无已确认认知（在项目中心「项目解读」确认后汇入）。
+                      </div>
+                    ) : (
+                      p.cognition.map((g, i) => (
+                        <div key={i} style={{ fontSize: 11.5, color: 'var(--ink2)', marginTop: 3 }}>
+                          <span style={{ color: 'var(--terra)' }}>{g.module_label}：</span>
+                          {g.summary}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="hublabel">

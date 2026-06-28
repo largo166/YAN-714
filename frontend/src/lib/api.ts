@@ -592,6 +592,13 @@ export const api = {
   async updateAssignment(assignmentId: number, status: 'todo' | 'doing' | 'done'): Promise<TaskAssignment> {
     return request(`/api/team/assignments/${assignmentId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
   },
+  // ── 甲方画像库(P1-E:按甲方聚合项目 + 已确认认知)──
+  async listClients(): Promise<{ items: { name: string; project_count: number }[]; total: number }> {
+    return request('/api/clients')
+  },
+  async getClientPortrait(name: string): Promise<ClientPortrait> {
+    return request(`/api/clients/${encodeURIComponent(name)}`)
+  },
   async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
     return BatchIngestPreviewSchema.parse(
       await request('/api/projects/batch-ingest/preview', {
@@ -807,6 +814,19 @@ export interface TaskAssignment {
   source_minute_id: number
   done_at: string | null
   created_at: string
+}
+export interface ClientPortrait {
+  client: string
+  project_count: number
+  cities: string[]
+  projects: {
+    id: number
+    name: string
+    city: string
+    status: string
+    current_stage: string
+    cognition: { module_label: string; summary: string }[]
+  }[]
 }
 export interface WsFile {
   path: string
