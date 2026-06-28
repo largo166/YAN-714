@@ -46,6 +46,21 @@ function ResultCard({ run, projectId }: { run: SkillRun; projectId: number | nul
       setPrechecking(false)
     }
   }
+  // 任务安排成果(task)一键落任务看板:把结构化任务落成可追踪 TeamAssignment(看板在项目中心)
+  const [landed, setLanded] = useState<{ status: string; message: string } | null>(null)
+  const [landing, setLanding] = useState(false)
+  const landToBoard = async () => {
+    if (projectId == null || !r.result_id) return
+    setLanding(true)
+    try {
+      const res = await api.taskResultToAssignments(projectId, r.result_id)
+      setLanded({ status: res.status, message: res.message })
+    } catch (e) {
+      setLanded({ status: 'error', message: (e as Error).message })
+    } finally {
+      setLanding(false)
+    }
+  }
   const pill =
     r.status === 'ok'
       ? r.model || '已生成'
@@ -157,6 +172,29 @@ function ResultCard({ run, projectId }: { run: SkillRun; projectId: number | nul
               {prechecking ? '预检中…' : '✓ 提交前预检'}
             </button>
           )}
+          {r.skill_id === 'task' && r.result_id && projectId != null && (
+            <button
+              className="anbtn"
+              type="button"
+              disabled={landing || landed?.status === 'ok' || landed?.status === 'already'}
+              onClick={landToBoard}
+              title="把这份任务安排落到『项目中心 · 任务看板』，逐条可推进状态"
+            >
+              {landing ? '落板中…' : '↳ 落入任务看板'}
+            </button>
+          )}
+        </div>
+      )}
+      {landed && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 12,
+            color: landed.status === 'ok' || landed.status === 'already' ? 'var(--ok)' : 'var(--mut)',
+          }}
+        >
+          {landed.message}
+          {(landed.status === 'ok' || landed.status === 'already') && ' 到「项目中心 · 任务看板」查看与推进。'}
         </div>
       )}
       {precheck && (

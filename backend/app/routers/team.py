@@ -20,6 +20,7 @@ def _task_dict(a: models.TeamAssignment) -> dict:
         "due": a.due,
         "status": a.status,
         "source_minute_id": a.source_minute_id,
+        "source_result_id": a.source_result_id,
         "done_at": a.done_at.isoformat() if a.done_at else None,
         "created_at": a.created_at.isoformat(),
     }

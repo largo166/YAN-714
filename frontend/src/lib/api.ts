@@ -621,6 +621,13 @@ export const api = {
       signal,
     })
   },
+  // ── 任务安排成果一键落任务看板(幂等:同一成果重复落不重复建)──
+  async taskResultToAssignments(
+    projectId: number,
+    resultId: number,
+  ): Promise<{ status: string; created: number; existing: number; message: string }> {
+    return request(`/api/projects/${projectId}/skill-results/${resultId}/to-assignments`, { method: 'POST' })
+  },
   // ── 收件箱监听(P1-C:监听文件夹,新文件自动入库)──
   async inboxStatus(): Promise<{ inbox_root_path: string; accessible: boolean; pending: number }> {
     return request('/api/inbox/status')
@@ -846,6 +853,7 @@ export interface TaskAssignment {
   due: string
   status: 'todo' | 'doing' | 'done' | string
   source_minute_id: number
+  source_result_id: number
   done_at: string | null
   created_at: string
 }

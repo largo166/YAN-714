@@ -60,6 +60,7 @@ class TeamAssignment(Base):
     status: Mapped[str] = mapped_column(String(20), default="todo", nullable=False)  # todo / doing / done
     owner_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)  # todo 的负责人名（未必匹配成员）
     source_minute_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 来源会议纪要 id（0=手工）
+    source_result_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 来源任务安排技能成果 id（0=非技能卡）
     done_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 

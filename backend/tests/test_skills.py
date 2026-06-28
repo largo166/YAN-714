@@ -206,5 +206,61 @@ def test_command_not_a_command(client):
     assert client.post(f"/api/projects/{pid}/command", json={"text": "/不认识 x"}).json()["status"] == "not_command"
 
 
+def test_task_structured_and_to_board(client, monkeypatch):
+    """任务安排技能:出差异化结构(任务/负责人/优先级/时序);一键落任务看板(owner匹配/幂等/空任务跳过)。
+
+    成员名用唯一串避免和共享测试库其他用例撞名(conftest 全程共用一个 SQLite)。"""
+    import json as _json
+    from app import llm
+    fake = {"title": "推进任务", "summary": "围绕方案定稿推进。", "tasks": [
+        {"task": "完善场地分析", "owner": "TASK唯一在册老王", "priority": "高", "order": 1, "due": "本周内"},
+        {"task": "对接甲方确认指标", "owner": "TASK非成员外部联系人", "priority": "中", "order": 2, "due": ""},
+        {"task": "", "owner": "x", "priority": "低", "order": 3, "due": ""},  # 空任务应跳过
+    ]}
+    monkeypatch.setattr(llm, "chat_completion", lambda messages, **kw: _json.dumps(fake, ensure_ascii=False))
+    pid = _new_project(client, name="任务落板测试")
+    _set_key()
+    client.post(f"/api/projects/{pid}/files", files={"file": ("任务书.md", "# 任务书\n场地与指标".encode("utf-8"), "text/markdown")})
+    mem = client.post("/api/team/members", json={"name": "TASK唯一在册老王", "role": "建筑师"})
+    assert mem.status_code == 201, mem.text
+    mem_id = mem.json()["id"]
+
+    # 出结构化任务(差异化字段)
+    r = client.post(f"/api/projects/{pid}/skills/task/run", json={"input": ""}).json()
+    assert r["status"] == "ok" and r["result_id"] > 0
+    result = _json.loads(r["output_json"])
+    assert len(result["tasks"]) == 2  # 空任务被跳过
+    assert result["tasks"][0]["priority"] == "高" and result["tasks"][0]["order"] == 1
+    assert result["tasks"][1]["order"] == 2  # order 重排为 1..N 连续
+    assert "## 任务清单" in r["content"]
+    rid = r["result_id"]
+
+    # 落板前看板为空
+    assert client.get("/api/team/assignments", params={"project_id": pid}).json()["total"] == 0
+    # 一键落板
+    land = client.post(f"/api/projects/{pid}/skill-results/{rid}/to-assignments").json()
+    assert land["status"] == "ok" and land["created"] == 2
+    board = client.get("/api/team/assignments", params={"project_id": pid}).json()
+    assert board["total"] == 2
+    by_title = {t["task_title"]: t for t in board["items"]}
+    assert set(by_title) == {"完善场地分析", "对接甲方确认指标"}
+    assert all(t["status"] == "todo" and t["source_result_id"] == rid for t in board["items"])
+    # owner 精确匹配在册成员 → 关联;非成员 → 不关联但留名(不伪造)
+    assert by_title["完善场地分析"]["member_id"] == mem_id
+    assert by_title["完善场地分析"]["due"] == "本周内"
+    assert by_title["对接甲方确认指标"]["member_id"] is None
+    assert by_title["对接甲方确认指标"]["owner_name"] == "TASK非成员外部联系人"
+
+    # 幂等:再落不重复
+    again = client.post(f"/api/projects/{pid}/skill-results/{rid}/to-assignments").json()
+    assert again["status"] == "already" and again["created"] == 0
+    assert client.get("/api/team/assignments", params={"project_id": pid}).json()["total"] == 2
+
+    # 非 task 成果不能落板(用 ppt 成果验 400)
+    ppt = client.post(f"/api/projects/{pid}/skills/ppt/run", json={"input": "做 3 页"}).json()
+    bad = client.post(f"/api/projects/{pid}/skill-results/{ppt['result_id']}/to-assignments")
+    assert bad.status_code == 400
+
+
 
 

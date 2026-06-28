@@ -314,3 +314,113 @@ def meeting_to_markdown(r: dict) -> str:
         lines += ["", "## 章节"]
         lines += [f"- {c['title']}:{c['summary']}" for c in r["chapters"]]
     return "\n".join(lines)
+
+
+# ── 任务安排(差异化结构:任务/负责人/优先级/时序;产物可一键落任务看板)──
+_TASK_SCHEMA = (
+    '{\n'
+    '  "title":"任务安排标题","summary":"1-2句总览:这批任务围绕什么目标",\n'
+    '  "tasks":[{"task":"具体可执行任务,一句话","owner":"建议负责角色或人名,没有就空",'
+    '"priority":"高/中/低","order":1,"due":"建议时序/期限,如『本周内』『方案定稿前』,没有就空"}],\n'
+    '  "note":"排期说明或资料缺口(可空)"\n'
+    '}'
+)
+
+
+def build_task_prompt(project_name: str, material_context: str, user_input: str):
+    """产出 (system, user, response_format) 给 DeepSeek json mode,把材料拆成可执行任务清单。"""
+    system = (
+        "你是建筑设计项目的执行统筹。把材料与诉求拆成一份可直接派活的任务清单:"
+        "每条=具体任务(task)+建议负责角色(owner)+优先级(priority,高/中/低)+建议时序(order 序号 + due 期限)。"
+        "任务要可执行、一句话说清『做什么』,不写空话套话;负责角色/期限材料里没有就留空,"
+        "绝不用 [姓名]/[负责人]/[日期] 这类方括号占位凑数。只输出合法 JSON,不编造材料里没有的事实。"
+    )
+    user = "\n".join(
+        [
+            f"项目:{project_name}",
+            "请把下面的材料与诉求拆解成可执行任务清单。输出 JSON 结构必须为:",
+            _TASK_SCHEMA,
+            "",
+            "要求:tasks 按推进先后用 order 连续编号(1,2,3…);priority 只能是 高/中/低;"
+            "owner 写建议负责角色(如『方案负责人』『建筑专业』)或材料里出现的人名,没有就留空;不要把猜测写成事实。",
+            (f"用户补充:{user_input.strip()}" if user_input.strip() else ""),
+            "",
+            "材料:",
+            (material_context.strip() or "(无可用材料,请基于项目名给出通用推进任务,并在 note 注明缺资料)"),
+        ]
+    )
+    return system, user, JSON_FORMAT
+
+
+def _norm_priority(v: Any) -> str:
+    """优先级收口为 高/中/低;英文/数字/别名容错,认不出落『中』。"""
+    s = _text(v).lower()
+    if s in ("高", "high", "h", "p0", "紧急", "urgent", "1"):
+        return "高"
+    if s in ("低", "low", "l", "p2", "3"):
+        return "低"
+    return "中"
+
+
+def normalize_task(value: Any) -> dict:
+    """模型 JSON → 稳定结构;只保留有 task 文本的行,order 重排为 1..N 连续,不崩。"""
+    raw = _rec(value)
+    tasks: list[dict] = []
+    for x in _list(raw.get("tasks") or raw.get("items") or raw.get("actions")):
+        t = _rec(x)
+        title = _text(t.get("task") or t.get("title") or t.get("content"))
+        if not title and not isinstance(x, dict):  # 容错:tasks 给成了纯字符串列表
+            title = _text(x)
+        if not title:  # 缺 task 字段的对象直接跳过,不把 dict 字符串化成垃圾任务
+            continue
+        tasks.append({
+            "task": title,
+            "owner": _text(t.get("owner") or t.get("role") or t.get("assignee")),
+            "priority": _norm_priority(t.get("priority") or t.get("level")),
+            "order": len(tasks) + 1,
+            "due": _text(t.get("due") or t.get("deadline") or t.get("when")),
+        })
+    return {
+        "title": _text(raw.get("title"), "任务安排"),
+        "summary": _text(raw.get("summary") or raw.get("overview")),
+        "tasks": tasks,
+        "note": _text(raw.get("note") or raw.get("remark")),
+    }
+
+
+def task_to_markdown(r: dict) -> str:
+    lines = [f"# {r['title']}"]
+    if r.get("summary"):
+        lines += ["", r["summary"]]
+    lines += ["", "## 任务清单"]
+    if r["tasks"]:
+        for t in r["tasks"]:
+            tail = (f"｜负责:{t['owner']}" if t["owner"] else "") + (f"｜时序:{t['due']}" if t["due"] else "")
+            lines.append(f"{t['order']}. [{t['priority']}] {t['task']}{tail}")
+    else:
+        lines.append("- 无可执行任务。")
+    if r.get("note"):
+        lines += ["", f"> {r['note']}"]
+    return "\n".join(lines)
+
+
+def run_task_structured(
+    *, project_name: str, context: str, user_extra: str,
+    api_key: str, base_url: str, model: str,
+) -> tuple[str, str]:
+    """跑一次任务结构化,返回 (content_markdown, output_json)。
+
+    解析得到 ≥1 条任务 → (task_to_markdown, json字符串);
+    解析无效(非 JSON / 无任务) → (原始答案, "") 让调用方按纯文本走(不伪造)。
+    抛 llm.NotConfigured / llm.LLMError 由调用方接。"""
+    from . import llm
+
+    system, user, fmt = build_task_prompt(project_name, context, user_extra)
+    answer = llm.chat_completion(
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        api_key=api_key, base_url=base_url, model=model, response_format=fmt, timeout=90.0,
+    )
+    result = normalize_task(parse_json_loose(answer))
+    if result["tasks"]:
+        return task_to_markdown(result), json.dumps(result, ensure_ascii=False)
+    return answer, ""  # 回落纯文本

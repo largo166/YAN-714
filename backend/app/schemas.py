@@ -288,6 +288,13 @@ class SkillRunIn(BaseModel):
     ref_asset_ids: List[int] = []  # 图生图参考资产 id(生图技能用其字节作参考图;空=文生图)
 
 
+class SkillTasksToBoardOut(BaseModel):
+    status: str          # ok|already|empty
+    created: int = 0     # 本次新建任务数
+    existing: int = 0    # already 时既有任务数
+    message: str = ""
+
+
 class SkillRunOut(BaseModel):
     skill_id: str
     status: str  # ok|not_configured|no_material|error

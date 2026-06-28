@@ -188,6 +188,72 @@ def run_review_precheck(
     return out
 
 
+# ── 任务安排成果 → 任务看板(P0-A 延伸):把结构化任务一键落成可追踪 TeamAssignment ──
+@router.post(
+    "/api/projects/{project_id}/skill-results/{result_id}/to-assignments",
+    response_model=schemas.SkillTasksToBoardOut,
+)
+def task_result_to_assignments(
+    project_id: int, result_id: int, db: Session = Depends(get_db)
+) -> schemas.SkillTasksToBoardOut:
+    """把『任务安排』成果的结构化任务一键落到项目任务看板(team_assignments)。
+
+    幂等:按 source_result_id 查重,同一成果重复落不重复建。owner 名精确匹配在册成员则关联 member_id。
+    非 task 成果→400;无结构化任务(回落了纯文本)→如实返回 empty,不伪造任务。"""
+    if db.get(models.Project, project_id) is None:
+        raise HTTPException(404, "项目不存在")
+    src = db.get(models.SkillResult, result_id)
+    if src is None or src.project_id != project_id:
+        raise HTTPException(404, "成果不存在")
+    if src.skill_id != "task":
+        raise HTTPException(400, "只有『任务安排』成果能落任务看板")
+
+    existing = (
+        db.query(models.TeamAssignment)
+        .filter(models.TeamAssignment.source_result_id == result_id)
+        .count()
+    )
+    if existing:
+        return schemas.SkillTasksToBoardOut(
+            status="already", created=0, existing=existing,
+            message=f"该成果已落过 {existing} 条任务到看板，未重复创建。",
+        )
+
+    data = safe_json.loads_or(src.output_json, {})
+    tasks = data.get("tasks") if isinstance(data, dict) else None
+    if not isinstance(tasks, list) or not tasks:
+        return schemas.SkillTasksToBoardOut(
+            status="empty", created=0, existing=0,
+            message="该成果没有结构化任务（可能回落了纯文本），无法落看板（不伪造）。",
+        )
+
+    members = {
+        m.name: m.id
+        for m in db.query(models.TeamMember).filter(models.TeamMember.status == "active").all()
+    }
+    created = 0
+    for t in tasks:
+        if not isinstance(t, dict):
+            continue
+        title = str(t.get("task", "")).strip()
+        if not title:
+            continue
+        owner = str(t.get("owner", "")).strip()
+        db.add(models.TeamAssignment(
+            project_id=project_id, member_id=members.get(owner),
+            task_title=title[:300], owner_name=owner[:100],
+            due=str(t.get("due", "")).strip()[:40],
+            status="todo", source_result_id=result_id,
+        ))
+        created += 1
+    if created:
+        db.commit()
+    return schemas.SkillTasksToBoardOut(
+        status="ok", created=created, existing=0,
+        message=f"已落 {created} 条任务到任务看板。",
+    )
+
+
 @router.post(
     "/api/projects/{project_id}/skills/{skill_id}/run",
     response_model=schemas.SkillRunOut,
@@ -350,9 +416,19 @@ def _run_skill_inner(
         )
 
     try:
-        # 判断类技能(方案评审/任务安排/竞品)走结构化:core/points/actions/questions/detail
+        # 任务安排走差异化结构(任务/负责人/优先级/时序),产物可一键落任务看板;解析无效→回落纯文本(不伪造)。
+        if skill_id == "task":
+            content, output_json = skill_structured.run_task_structured(
+                project_name=project.name, context=material.context, user_extra=payload.input,
+                api_key=cfg.deepseek_api_key, base_url=cfg.deepseek_base_url, model=cfg.deepseek_model,
+            )
+            return schemas.SkillRunOut(
+                skill_id=skill_id, status="ok", title=title, content=content,
+                output_json=output_json, sources=sources if needs_rag else [], model=cfg.deepseek_model,
+            )
+        # 判断类技能(方案评审/竞品)走结构化:core/points/actions/questions/detail
         # +文风内嵌;解析无效→回落纯文本(仍 ok,不伪造)。其余技能走普通文本。
-        if skill_id in ("review", "task", "compete"):
+        if skill_id in ("review", "compete"):
             content, output_json = structured_judgment.run_structured(
                 project_name=project.name, instruction=instruction,
                 context=material.context, user_extra=payload.input,
