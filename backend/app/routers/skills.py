@@ -9,7 +9,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads
+from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -306,6 +306,33 @@ def get_skill_result(project_id: int, result_id: int, db: Session = Depends(get_
     if row is None or row.project_id != project_id:
         raise HTTPException(404, "成果不存在")
     return row
+
+
+@router.get("/api/projects/{project_id}/skill-results/{result_id}/export.pptx", include_in_schema=False)
+def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depends(get_db)):
+    """把 PPT 大纲成果渲染成真 .pptx 下载(复用已落库的结构化 output_json)。"""
+    from urllib.parse import quote
+
+    from fastapi.responses import Response
+
+    row = db.get(models.SkillResult, result_id)
+    if row is None or row.project_id != project_id:
+        raise HTTPException(404, "成果不存在")
+    if row.skill_id != "ppt":
+        raise HTTPException(400, "仅 PPT 大纲成果可导出为 .pptx")
+    data = safe_json.loads_or(row.output_json, {})
+    if not isinstance(data, dict) or not data.get("slides"):
+        raise HTTPException(400, "该成果没有可导出的结构化内容")
+    try:
+        pptx_bytes = exporters.build_pptx(data)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"PPT 生成失败：{type(e).__name__}: {e}")
+    fname = exporters.safe_filename(data.get("title") or "汇报") + ".pptx"
+    return Response(
+        content=pptx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
+    )
 
 
 # ── 斜杠命令:对话框打 /xxx 直接触发技能 ──

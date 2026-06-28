@@ -238,6 +238,10 @@ export const api = {
   projectImageUrl(projectId: number, storedPath: string): string {
     return `${BASE_URL}/api/projects/${projectId}/image?path=${encodeURIComponent(storedPath)}`
   },
+  /** PPT 大纲成果导出为 .pptx 的下载 URL(后端据已落库结构化 output_json 渲染)。 */
+  skillResultPptxUrl(projectId: number, resultId: number): string {
+    return `${BASE_URL}/api/projects/${projectId}/skill-results/${resultId}/export.pptx`
+  },
 
   // ── 协作平台（C4）──
   async listAgents(): Promise<Agent[]> {

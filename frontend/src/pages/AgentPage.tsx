@@ -119,6 +119,16 @@ function ResultCard({ run, projectId }: { run: SkillRun; projectId: number | nul
               复制 JSON
             </button>
           )}
+          {r.skill_id === 'ppt' && r.result_id && projectId != null && (
+            <a
+              className="anbtn"
+              href={api.skillResultPptxUrl(projectId, r.result_id)}
+              style={{ textDecoration: 'none' }}
+              title="据本成果生成可下载的 .pptx"
+            >
+              ⤓ 导出 PPT
+            </a>
+          )}
         </div>
       )}
       {r.sources.length > 0 && (

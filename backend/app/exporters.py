@@ -20,6 +20,92 @@ def safe_filename(*parts: str) -> str:
     return (name or "会议纪要")[:120]
 
 
+def build_pptx(data: dict) -> bytes:
+    """把 PPT 大纲结构化数据(skill_structured.normalize_ppt 的输出)渲染成真 .pptx。
+
+    版式:封面页 + 每页(页标题 + 核心观点 + 要点);讲稿提示/来源进幻灯片备注。
+    visualSuggestion 渲染为右侧占位框——这是【图片资产层】的接入点:以后某页带 image_ref
+    时,把占位换成 slide.shapes.add_picture(asset_path) 即可,版式无需重排。
+    """
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.util import Emu, Inches, Pt
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)  # 16:9
+    prs.slide_height = Inches(7.5)
+    blank = prs.slide_layouts[6]
+    W: int = prs.slide_width
+
+    def textbox(slide, left, top, width, height):
+        tf = slide.shapes.add_textbox(left, top, width, height).text_frame
+        tf.word_wrap = True
+        return tf
+
+    def line(tf, text: str, *, size: int, bold: bool = False, color=None, first: bool = False):
+        p = tf.paragraphs[0] if first else tf.add_paragraph()
+        p.text = text
+        p.font.size = Pt(size)
+        p.font.bold = bold
+        if color is not None:
+            p.font.color.rgb = RGBColor(*color)
+        return p
+
+    GREY = (0x88, 0x88, 0x88)
+    LGREY = (0xA8, 0xA8, 0xA8)
+    TERRA = (0xB0, 0x55, 0x2A)
+
+    # ── 封面 ──
+    cover = prs.slides.add_slide(blank)
+    tf = textbox(cover, Inches(0.9), Inches(2.4), W - Inches(1.8), Inches(2.4))
+    line(tf, data.get("title") or "汇报", size=40, bold=True, first=True)
+    if data.get("subtitle"):
+        line(tf, data["subtitle"], size=20, color=GREY)
+    meta = []
+    if data.get("audience"):
+        meta.append("汇报对象：" + data["audience"])
+    meta.append("共 %d 页" % len(data.get("slides") or []))
+    line(tf, "　".join(meta), size=14, color=LGREY)
+    if data.get("narrative"):
+        nf = textbox(cover, Inches(0.9), Inches(5.2), W - Inches(1.8), Inches(1.6))
+        line(nf, data["narrative"], size=13, color=GREY, first=True)
+
+    # ── 内容页 ──
+    for s in data.get("slides") or []:
+        slide = prs.slides.add_slide(blank)
+        head = textbox(slide, Inches(0.6), Inches(0.4), W - Inches(1.2), Inches(0.9))
+        line(head, f"{s.get('no', '')}. {s.get('title', '')}".strip(". "), size=26, bold=True, first=True)
+
+        body_top = Inches(1.5)
+        if s.get("keyMessage"):
+            kf = textbox(slide, Inches(0.6), body_top, W - Inches(1.2), Inches(0.8))
+            line(kf, "▎ " + s["keyMessage"], size=16, bold=True, color=TERRA, first=True)
+            body_top = Inches(2.4)
+
+        bf = textbox(slide, Inches(0.6), body_top, Emu(int(W * 0.56)), Inches(4.0))
+        bullets = s.get("bullets") or []
+        for i, b in enumerate(bullets):
+            line(bf, "• " + str(b), size=14, first=(i == 0))
+
+        # 视觉建议 → 右侧占位(图片层接入点)
+        if s.get("visualSuggestion"):
+            vf = textbox(slide, Emu(int(W * 0.63)), Inches(1.5), Emu(int(W * 0.33)), Inches(4.5))
+            line(vf, "🖼 建议图：", size=12, bold=True, color=LGREY, first=True)
+            line(vf, str(s["visualSuggestion"]), size=12, color=LGREY)
+
+        notes = []
+        if s.get("speakerNotes"):
+            notes.append("讲稿：" + s["speakerNotes"])
+        if s.get("sourceRefs"):
+            notes.append("来源：" + "、".join(s["sourceRefs"]))
+        if notes:
+            slide.notes_slide.notes_text_frame.text = "\n".join(notes)
+
+    buf = io.BytesIO()
+    prs.save(buf)
+    return buf.getvalue()
+
+
 def build_docx(title: str, m: dict, *, internal: bool) -> bytes:
     """生成 .docx 字节。internal=False→对外版(不含对内研判)；True→对内版(含全部)。"""
     from docx import Document
