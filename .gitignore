@@ -37,5 +37,5 @@ build_exe/
 dist_exe/
 build/
 *.spec.bak
-# 放在仓库根的可分发 exe(预置真 key,绝不入库)
-/ROM-AI.exe
+# 放在仓库根的可分发 exe(预置真 key,绝不入库;含 ROM-AI-v1.exe 等版本号产物)
+/ROM-AI*.exe
