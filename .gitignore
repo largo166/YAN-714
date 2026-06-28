@@ -19,6 +19,7 @@ dist/
 .env
 .env.*
 !.env.example
+!desktop/.env.bundle.example
 *.local
 
 # ── 日志 / 临时 ──

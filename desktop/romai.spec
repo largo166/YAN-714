@@ -26,6 +26,13 @@ if str(BACKEND) not in sys.path:
 
 # ── 前端构建产物随包，运行时解到 _MEIPASS/frontend_dist ──
 datas = [(str(DIST_FRONT), "frontend_dist")]
+
+# ── 预置 key 分发(可选):若 desktop/.env.bundle 存在,打进 _MEIPASS 根 ──
+# 不入 git(.gitignore 的 .env.*)。首启 config._bootstrap_bundled_env 复制到 DATA_DIR/.env。
+# 无此文件时正常打包(空 key,收件人自己在设置页填)。
+BUNDLE_ENV = ROOT / "desktop" / ".env.bundle"
+if BUNDLE_ENV.is_file():
+    datas.append((str(BUNDLE_ENV), "."))
 # 带数据/模板的第三方包
 for pkg in ("docx", "pptx", "fitz", "pymupdf"):
     try:

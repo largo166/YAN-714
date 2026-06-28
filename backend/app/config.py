@@ -42,6 +42,31 @@ DATA_DIR = _resolve_data_dir()
 ENV_FILE = DATA_DIR / ".env" if _is_frozen() else (BASE_DIR / ".env")
 
 
+def _bootstrap_bundled_env() -> None:
+    """冻结态首启:若用户数据目录还没有 .env，且 bundle 内预置了 .env.bundle，则复制过去。
+
+    用于「开箱即用」分发：build 时把分发专用 key 放进 desktop/.env.bundle（不入 git），
+    打进 _MEIPASS。首启复制到 DATA_DIR/.env，供下方 Settings 读取生图/ASR key。
+    只在 .env 不存在时复制一次——用户之后在设置页/.env 的改动不会被覆盖。
+    """
+    if not _is_frozen():
+        return
+    target = DATA_DIR / ".env"
+    if target.exists():
+        return
+    bundled = RESOURCE_DIR / ".env.bundle"
+    if not bundled.is_file():
+        return
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(bundled.read_bytes())
+    except OSError:
+        pass
+
+
+_bootstrap_bundled_env()
+
+
 def frontend_dist_dir() -> Path:
     """前端构建产物 dist 目录：冻结态在 _MEIPASS/frontend_dist；开发态在 <repo>/frontend/dist。"""
     if _is_frozen():
@@ -62,6 +87,9 @@ class Settings(BaseSettings):
     database_url: str = ""
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
+    # DeepSeek key 权威存于 DB(AppSetting.deepseek_api_key);此处仅用于「预置 key 分发」:
+    # bundle 的 .env 带 deepseek_api_key → 首启 seed 写进空库的 AppSetting。运行期消费仍读 DB。
+    deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
