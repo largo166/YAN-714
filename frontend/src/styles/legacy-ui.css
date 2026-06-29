@@ -627,3 +627,17 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 .judgment .jhd{font-size:12px;font-weight:700;color:var(--mut);letter-spacing:.02em;margin:2px 0 4px}
 .judgment .jpoint{font-size:13px;line-height:1.6;margin:3px 0;display:flex;gap:8px;align-items:baseline}
 .judgment .jlabel{flex:none;font-size:11.5px;font-weight:600;color:var(--terra);border:1px solid var(--terra-line);background:var(--terra-soft);border-radius:6px;padding:1px 7px}
+
+/* ── 暗色板块外壳（按板块切换，App.tsx 切 body.darkui）──
+   目标：整 app 暗（含顶栏）。暗页（共创营地/管理驾驶舱…）随逐页改造加入 DARK_BOARDS，
+   未改造的浅色页不受影响（深色字标题不会糊在深底上）。 */
+body.darkui{background:linear-gradient(180deg,#030406 0%,#07080c 44%,#030406 100%);color:#f4f1ea}
+body.darkui .topbar{background:rgba(3,4,6,.72);border-bottom-color:rgba(255,255,255,.07)}
+body.darkui .brand svg{stroke:#f4f1ea}
+body.darkui .brand .word{color:#f4f1ea}
+body.darkui .brand .word span{color:#8f96a5}
+body.darkui .nav button{color:#d8d4cc}
+body.darkui .nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+body.darkui .nav button.on{color:#fff;background:linear-gradient(135deg,rgba(124,92,255,.24),rgba(66,165,255,.12));font-weight:600}
+body.darkui .nav .lock{color:#8f96a5}
+body.darkui .right{color:#8f96a5}
