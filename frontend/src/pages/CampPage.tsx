@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { api } from '@/lib/api'
@@ -8,6 +8,8 @@ import type { Skill, SkillRun, KnowledgeHit, ProjectCognition } from '@/types/sc
 
 // caselib/condition/slang 接真实端点(非技能执行),各自渲染
 const SPECIAL_SKILLS = new Set(['caselib', 'condition', 'slang'])
+// 拖拽进营地可接入的可解析扩展(与数据基地一致)
+const DROP_EXTS = ['.txt', '.md', '.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg']
 type SlangItem = { term: string; meaning: string; impact: string; action: string }
 type Special =
   | { type: 'knowledge'; hits: KnowledgeHit[] }
@@ -183,6 +185,38 @@ export default function CampPage() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [special, setSpecial] = useState<Special | null>(null)
+  // 拖拽接入：把文件拖进营地 → 上传到当前作用项目(建索引+抽图)→ 成为该项目材料
+  const dragDepth = useRef(0)
+  const [drag, setDrag] = useState(false)
+  const [dropMsg, setDropMsg] = useState<string | null>(null)
+  const [dropping, setDropping] = useState(false)
+
+  const onDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    dragDepth.current = 0
+    setDrag(false)
+    const all = Array.from(e.dataTransfer?.files || [])
+    if (all.length === 0) return
+    const files = all.filter((f) => DROP_EXTS.some((x) => f.name.toLowerCase().endsWith(x)))
+    if (files.length === 0) { setDropMsg('没有可接入的文件（支持 txt/md/pdf/docx/pptx/xlsx/图片）。'); return }
+    if (!cur) { setDropMsg('请先在顶部选择作用项目，再把文件拖进来。'); return }
+    setDropping(true)
+    setDropMsg(`正在接入 ${files.length} 个文件到「${cur.name}」…`)
+    let ok = 0, fail = 0
+    const ids: number[] = []
+    for (const f of files) {
+      try {
+        const pf = await api.uploadProjectFile(cur.id, f)
+        ids.push(pf.id)
+        try { await api.indexProjectFile(cur.id, pf.id) } catch { /* 索引失败不致命 */ }
+        ok++
+      } catch { fail++ }
+    }
+    void Promise.all(ids.map((id) => api.extractFileAssets(cur.id, id).catch(() => null)))
+    setDropping(false)
+    setDropMsg(`已接入 ${ok} 个文件到「${cur.name}」${fail ? `，失败 ${fail}` : ''} —— 已成为该项目材料，技能/评图可直接用。`)
+    setTimeout(() => setDropMsg(null), 6000)
+  }, [cur])
 
   useEffect(() => { api.listSkills().then((d) => setSkills(d.items)).catch(() => setSkills([])) }, [])
 
@@ -398,8 +432,30 @@ export default function CampPage() {
   }
 
   return (
-    <div style={{ minHeight: '100%', position: 'relative', color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 18% -6%, rgba(124,92,255,.28), transparent 31%), radial-gradient(circle at 86% 4%, rgba(66,165,255,.16), transparent 28%), radial-gradient(circle at 64% 108%, rgba(215,168,110,.11), transparent 32%), linear-gradient(180deg, #030406 0%, #07080c 44%, #030406 100%)' }}>
+    <div
+      onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; setDrag(true) }}
+      onDragOver={(e) => { e.preventDefault() }}
+      onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
+      onDrop={onDrop}
+      style={{ minHeight: '100%', position: 'relative', color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 18% -6%, rgba(124,92,255,.28), transparent 31%), radial-gradient(circle at 86% 4%, rgba(66,165,255,.16), transparent 28%), radial-gradient(circle at 64% 108%, rgba(215,168,110,.11), transparent 32%), linear-gradient(180deg, #030406 0%, #07080c 44%, #030406 100%)' }}>
       {view === 'skills' ? skillsView() : view === 'run' ? runView() : view === 'entry' ? entryView() : hero()}
+
+      {/* 拖拽接入：发光虚线遮罩 + 接入结果 toast */}
+      {drag && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(8,10,16,.7)', display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+          <div style={{ border: '2px dashed ' + C.purple, borderRadius: 24, padding: '40px 64px', background: 'rgba(124,92,255,.08)', color: '#fff', fontSize: 18, fontWeight: 700, textAlign: 'center', boxShadow: '0 0 60px rgba(124,92,255,.4)' }}>
+            ⬇ 松手接入到{cur ? `「${cur.name}」` : '项目'}
+            <div style={{ fontSize: 12, fontWeight: 400, color: C.ink2, marginTop: 8 }}>{cur ? 'txt/md/pdf/docx/pptx/xlsx/图片 → 成为该项目材料' : '请先在顶部选择作用项目'}</div>
+          </div>
+        </div>
+      )}
+      {dropMsg && (
+        <div style={{ position: 'fixed', left: '50%', bottom: 30, transform: 'translateX(-50%)', zIndex: 90, background: '#171a24', border: '1px solid ' + C.line, borderRadius: 12, padding: '10px 16px', color: C.ink2, fontSize: 13, boxShadow: '0 10px 30px rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', gap: 10, maxWidth: 'min(560px,92vw)' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: dropping ? C.amber : C.cyan, boxShadow: `0 0 8px ${dropping ? C.amber : C.cyan}` }} />
+          <span style={{ flex: 1 }}>{dropMsg}</span>
+          {!dropping && <button type="button" onClick={() => setDropMsg(null)} style={{ background: 'transparent', border: 0, color: C.mut, cursor: 'pointer', fontSize: 14 }}>✕</button>}
+        </div>
+      )}
 
       {/* 方案评审 · 模式选择 */}
       {picker && (
