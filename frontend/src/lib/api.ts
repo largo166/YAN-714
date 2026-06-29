@@ -939,6 +939,8 @@ export interface MoaReviewLatest {
   analysis_id?: number
   created_at?: string
   checklist?: MoaChecklist
+  reference_details?: MoaReferenceDetail[]  // 中间档:回查也能拿到三专家原话(老数据为空)
+  cost?: { total_tokens: number; total_cost_yuan: number; total_latency_ms: number }
   message?: string
 }
 export interface ClientPortrait {

@@ -74,10 +74,13 @@ def test_review_moa_stubbed_end_to_end(client, monkeypatch):
     assert len(body["reference_details"]) == 3        # 三位专家都跑了
     assert all(d["status"] == "success" for d in body["reference_details"])
     assert "total_cost_yuan" in body["cost"]
-    # GET 最新评审（验证字段名 content 修对了，json.loads 能回查）
+    # GET 最新评审（中间档[方案A]:回查也能拿到聚合结论 + 三专家原话 + 成本）
     g = client.get(f"/api/review-checklist/{pid}")
-    assert g.status_code == 200 and g.json()["success"] is True
-    assert g.json()["checklist"]["overall_score"] == 82
+    gb = g.json()
+    assert g.status_code == 200 and gb["success"] is True
+    assert gb["checklist"]["overall_score"] == 82
+    assert len(gb["reference_details"]) == 3           # 回查也能看专家原话(不再只剩聚合结论)
+    assert gb["cost"] and "total_cost_yuan" in gb["cost"]
     # 历史
     h = client.get(f"/api/review-checklist/{pid}/history")
     assert h.status_code == 200 and h.json()["count"] >= 1

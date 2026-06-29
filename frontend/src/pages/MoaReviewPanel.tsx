@@ -207,8 +207,8 @@ function MoaResult({
 
       {historyOnly && (
         <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 10 }}>
-          {createdAt ? `历史会诊 · ${new Date(createdAt).toLocaleString()}　` : ''}
-          历史记录仅保留聚合结论；专家原话与成本未单独留存（后续接入会诊链路表后补全）。
+          {createdAt ? `历史会诊 · ${new Date(createdAt).toLocaleString()}` : ''}
+          {!details && '　（本次会诊之前的老记录仅保留聚合结论，专家原话未留存）'}
         </div>
       )}
     </div>
@@ -238,8 +238,9 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
       .then((d) => {
         if (d.success && d.checklist) {
           setChecklist(d.checklist)
-          setDetails(null)
-          setCost(null)
+          // 中间档:回查也能拿到三专家原话与成本(老数据为空,退回只展示聚合结论)
+          setDetails(d.reference_details && d.reference_details.length ? d.reference_details : null)
+          setCost(d.cost || null)
           setCreatedAt(d.created_at || null)
           setHistoryOnly(true)
           setPhase('done')
