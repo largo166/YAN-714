@@ -36,9 +36,9 @@ const cardBase: React.CSSProperties = { border: `1px solid ${C.line}`, borderRad
 /** 驾驶舱 KPI 卡（.ckcard：顶边光条 + 发光角 + hover）。ac=顶条色 gl=角辉光。值 '—' 不伪造。 */
 function Kpi({ icon, label, value, color, ac, gl }: { icon: string; label: string; value: React.ReactNode; color?: string; ac: string; gl: string }) {
   return (
-    <div className="ckcard" style={{ padding: '15px 16px', minHeight: 92, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
-      <div style={{ color: C.mut, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
-      <div style={{ marginTop: 12, fontSize: 30, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
+    <div className="ckcard" style={{ padding: '14px 15px', minHeight: 84, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
+      <div style={{ color: C.mut, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }}><span>{icon}</span>{label}</div>
+      <div style={{ marginTop: 9, fontSize: 27, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
     </div>
   )
 }
@@ -47,10 +47,10 @@ function Kpi({ icon, label, value, color, ac, gl }: { icon: string; label: strin
 function Gauge({ pct }: { pct: number }) {
   const p = Math.max(0, Math.min(100, Math.round(pct)))
   return (
-    <div style={{ width: 168, height: 168, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `conic-gradient(#7c5cff 0% ${p}%, rgba(255,255,255,.06) ${p}% 100%)`, boxShadow: '0 0 46px rgba(124,92,255,.26)' }}>
-      <div style={{ width: 126, height: 126, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center', border: `1px solid ${C.line}` }}>
+    <div style={{ width: 156, height: 156, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, background: `conic-gradient(#7c5cff 0% ${p}%, rgba(255,255,255,.06) ${p}% 100%)`, boxShadow: '0 0 44px rgba(124,92,255,.26)' }}>
+      <div style={{ width: 118, height: 118, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center', border: `1px solid ${C.line}` }}>
         <div>
-          <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{p}<span style={{ fontSize: 15, color: C.mut }}>%</span></div>
+          <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{p}<span style={{ fontSize: 14, color: C.mut }}>%</span></div>
           <div style={{ fontSize: 11, color: C.mut, marginTop: 4 }}>阶段进度</div>
         </div>
       </div>
@@ -58,10 +58,10 @@ function Gauge({ pct }: { pct: number }) {
   )
 }
 
-/** 分组标题（核心 / 判断解析 / 资料）——竖条 + 标题 + 渐隐分隔线。 */
-function GroupLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
+/** 分组标题（核心 / 判断解析 / 资料）——竖条 + 标题 + 渐隐分隔线。可带 id 作跳转锚点。 */
+function GroupLabel({ children, hint, id }: { children: React.ReactNode; hint?: string; id?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 12px' }}>
+    <div id={id} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 12px', scrollMarginTop: 14 }}>
       <span style={{ width: 4, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#7c5cff,#42a5ff)', flexShrink: 0 }} />
       <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-.02em', flexShrink: 0 }}>{children}</h2>
       {hint && <span style={{ fontSize: 11.5, color: C.mut }}>{hint}</span>}
@@ -70,13 +70,14 @@ function GroupLabel({ children, hint }: { children: React.ReactNode; hint?: stri
   )
 }
 
-/** 可折叠分区外壳(复用 .sec/data-open 折叠骨架)：点标题展开/收起。纯包裹，不改内部功能。 */
+/** 可折叠分区外壳(复用 .sec/data-open 折叠骨架)。可带 id 作跳转锚点。纯包裹，不改内部功能。 */
 function Collapsible({
   open,
   onToggle,
   title,
   count,
   hint,
+  id,
   children,
 }: {
   open: boolean
@@ -84,10 +85,11 @@ function Collapsible({
   title: string
   count?: string
   hint?: string
+  id?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="sec" data-open={open ? '1' : '0'}>
+    <section className="sec" data-open={open ? '1' : '0'} id={id} style={{ scrollMarginTop: 14 }}>
       <button className="sechead" type="button" onClick={onToggle}>
         <span className="chev">▸</span>
         <span className="stitle">{title}</span>
@@ -99,9 +101,9 @@ function Collapsible({
   )
 }
 
-/** 项目中心：单项目工作台（借 DC 版面：概览 KPI 卡 + 主/侧两栏 + 资料降权）。
+/** 项目中心：单项目工作台（v2 版面：脉搏卡 + 本周聚焦卡 双 HERO + KPI 指标带 + 快速跳转 + 主/侧两栏 + 资料降权）。
  *  核心 = 前期判断解析 + 会议链路；资料读取/清理归数据基地（此处降权收底）。
- *  数据全接真实后端，逻辑不动；当前项目走共享上下文（useProject）。 */
+ *  数据全接真实后端，逻辑不动；聚焦/迷你统计全部派生自已取的真实数据，不新增后端、不伪造。 */
 export default function ProjectCenterPage() {
   const { projects, curId, setCurId, cur, err, reload } = useProject()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -114,12 +116,18 @@ export default function ProjectCenterPage() {
   })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
+  // 跳转锚点：展开目标块（如需）后平滑滚动到位
+  const jump = (anchorId: string, openKey?: string) => {
+    if (openKey) setOpen((o) => ({ ...o, [openKey]: true }))
+    setTimeout(() => document.getElementById(anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40)
+  }
+
   const doRename = async () => {
     if (curId == null || !renameVal.trim()) return
     setRenameErr(null)
     try {
       await api.updateProject(curId, { name: renameVal.trim() })
-      reload() // 刷新共享上下文 → 下拉/标题随即显示新名
+      reload()
       setRenaming(false)
     } catch (e) {
       setRenameErr((e as Error).message)
@@ -130,12 +138,9 @@ export default function ProjectCenterPage() {
   const [risks, setRisks] = useState<ProjectRisk[]>([])
   const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
   const [progress, setProgress] = useState<ProjectProgress | null>(null)
-  // 会议纪要「回流」或「确认」后 +1：触发 KPI/里程碑/进度重取，并驱动任务看板重拉
   const [refreshKey, setRefreshKey] = useState(0)
-  // 任务看板风险计数（过期/卡住）——折叠时也在 section hint 上显示徽章
   const [taskRisk, setTaskRisk] = useState<{ overdue: number; stale: number }>({ overdue: 0, stale: 0 })
 
-  // 切项目时拉取 KPI 真实计数（只读聚合）。curId 变化即重取，加载中暂显 —。
   useEffect(() => {
     if (curId == null) {
       setOverview(null)
@@ -161,7 +166,24 @@ export default function ProjectCenterPage() {
     }
   }, [curId, refreshKey])
 
-  const taskCount = taskRisk.overdue + taskRisk.stale
+  const nextNode = progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'
+
+  // 本周聚焦：实时聚合「需负责人介入」（全部来自已取真实数据，不伪造）
+  const highRisks = risks.filter((r) => r.level === 'high')
+  const urgentMs = milestones.filter((m) => m.urgent)
+  const taskBad = taskRisk.overdue + taskRisk.stale
+  const focusItems = [
+    highRisks.length > 0 && { dot: C.red, label: `高风险${highRisks[0] ? ' · ' + highRisks[0].text : ''}`, n: String(highRisks.length), go: '查看', onClick: () => jump('side-risks') },
+    urgentMs.length > 0 && { dot: C.gold, label: `紧急里程碑${urgentMs[0] ? ' · ' + urgentMs[0].title : ''}`, n: String(urgentMs.length), go: '里程碑', onClick: () => jump('side-milestones') },
+    taskBad > 0 && { dot: C.amber, label: '过期 / 卡住任务', n: `${taskRisk.overdue} / ${taskRisk.stale}`, go: '任务看板', onClick: () => jump('sec-tasks', 'tasks') },
+  ].filter(Boolean) as { dot: string; label: string; n: string; go: string; onClick: () => void }[]
+
+  const mini = (n: React.ReactNode, label: string, color?: string) => (
+    <div><div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{n}</div><div style={{ fontSize: 11, color: C.mut, marginTop: 2 }}>{label}</div></div>
+  )
+  const jumpChip = (label: string, onClick: () => void) => (
+    <button key={label} type="button" onClick={onClick} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: C.ink2, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.04)', borderRadius: 99, padding: '5px 12px' }}>{label}</button>
+  )
 
   return (
     <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
@@ -211,45 +233,77 @@ export default function ProjectCenterPage() {
 
       {err && <div style={{ ...cardBase, padding: 16, marginBottom: 16, color: C.red }}>项目数据加载失败：{err}</div>}
 
-      {/* HERO：阶段进度环形仪表(左) + 概览 KPI 簇(右)，主次错落（去掉后端恒 0 的「成果缺口」）。 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
-        <div className="ckcard" style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.28)' } as React.CSSProperties}>
+      {/* HERO：项目脉搏卡（环形仪表 + 阶段 + 下一节点 + 迷你统计）+ 本周聚焦卡（真实聚合，可点跳转） */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', gap: 16, marginBottom: 14 }}>
+        <div className="ckcard" style={{ padding: 20, display: 'grid', gridTemplateColumns: '156px 1fr', gap: 18, alignItems: 'center', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.26)' } as React.CSSProperties}>
           <Gauge pct={progress?.pct ?? 0} />
-          <div style={{ fontSize: 12, color: C.gold, textAlign: 'center', lineHeight: 1.5 }}>
-            {progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{cur ? (STAGE_CHIP[cur.status] ?? cur.status) : '—'}</div>
+            <div style={{ fontSize: 12, color: C.gold, marginTop: 6, lineHeight: 1.5 }}>{nextNode}</div>
+            <div style={{ display: 'flex', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
+              {mini(overview ? overview.files : '—', '文件')}
+              {mini(overview ? overview.meetings : '—', '会议')}
+              {mini(overview ? overview.minutes : '—', '会议纪要', C.cyan)}
+            </div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12 }}>
-          <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
-          <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} ac="#42a5ff" gl="rgba(66,165,255,.26)" />
-          <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
-          <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} color={C.cyan} ac="#36e6d4" gl="rgba(54,230,212,.24)" />
-          <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
-          <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} ac="linear-gradient(90deg,#7c5cff,#36e6d4)" gl="rgba(124,92,255,.22)" />
+        <div className="ckcard" style={{ padding: 18, ['--ac']: '#ff5e66', ['--gl']: 'rgba(255,94,102,.26)' } as React.CSSProperties}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>本周聚焦 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>需负责人介入（实时聚合）</span></div>
+          {focusItems.length === 0 ? (
+            <div style={{ color: C.mut, fontSize: 12.5, padding: '12px 0' }}>暂无需要立即介入的事。出现高风险 / 紧急里程碑 / 过期任务时在此聚合。</div>
+          ) : (
+            focusItems.map((f, i) => (
+              <button key={i} type="button" onClick={f.onClick} style={{ width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, borderTop: i === 0 ? 0 : `1px solid ${C.line}`, display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', color: C.ink2 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: f.dot, boxShadow: `0 0 8px ${f.dot}` }} />
+                <span style={{ flex: 1, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.label}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: f.dot }}>{f.n}</span>
+                <span style={{ fontSize: 11, color: C.mut, whiteSpace: 'nowrap' }}>{f.go} ›</span>
+              </button>
+            ))
+          )}
         </div>
+      </div>
+
+      {/* KPI 指标带（真实数据，去掉后端恒 0 的「成果缺口」） */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 14 }}>
+        <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
+        <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} ac="#42a5ff" gl="rgba(66,165,255,.26)" />
+        <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
+        <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} color={C.cyan} ac="#36e6d4" gl="rgba(54,230,212,.24)" />
+        <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
+        <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} ac="linear-gradient(90deg,#7c5cff,#36e6d4)" gl="rgba(124,92,255,.22)" />
+      </div>
+
+      {/* 快速跳转 */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: 11.5, color: C.mut }}>快速跳转：</span>
+        {jumpChip('会议链路', () => jump('grp-meeting'))}
+        {jumpChip('任务看板', () => jump('sec-tasks', 'tasks'))}
+        {jumpChip('项目解读', () => jump('sec-cognition', 'cognition'))}
+        {jumpChip('智能研判', () => jump('sec-analysis', 'analysis'))}
       </div>
 
       {/* 主（核心：会议链路 + 判断解析）+ 侧（状态：里程碑/风险/资产）两栏 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 18, alignItems: 'start', marginTop: 4 }}>
         <main style={{ minWidth: 0 }}>
-          <GroupLabel hint="腾讯会议 → 会议纪要 → 任务看板">会议链路</GroupLabel>
+          <GroupLabel id="grp-meeting" hint="腾讯会议 → 会议纪要 → 任务看板">会议链路</GroupLabel>
           <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
             <TencentMeetingCard projectId={curId} />
           </Collapsible>
           <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
             <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} onConfirmed={() => setRefreshKey((k) => k + 1)} />
           </Collapsible>
-          <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板"
-            count={taskCount > 0 ? `⚠ ${taskCount}` : undefined}
-            hint={taskCount > 0 ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住` : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
+          <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} id="sec-tasks" title="任务看板"
+            count={taskBad > 0 ? `⚠ ${taskBad}` : undefined}
+            hint={taskBad > 0 ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住` : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
             <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} refreshSignal={refreshKey} />
           </Collapsible>
 
-          <GroupLabel hint="任务书 / 场地 / 概念 … AI 解读 + 研判">判断解析</GroupLabel>
-          <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} title="项目解读" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
+          <GroupLabel id="grp-judge" hint="任务书 / 场地 / 概念 … AI 解读 + 研判">判断解析</GroupLabel>
+          <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} id="sec-cognition" title="项目解读" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
             <CognitionSection projectId={curId} />
           </Collapsible>
-          <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} title="智能研判"
+          <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} id="sec-analysis" title="智能研判"
             count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
             <ProjectAnalysisPanel projectId={curId} />
           </Collapsible>
@@ -259,7 +313,7 @@ export default function ProjectCenterPage() {
         </main>
 
         <aside style={{ display: 'grid', gap: 14, position: 'sticky', top: 14 }}>
-          <div style={{ ...cardBase, padding: 16 }}>
+          <div id="side-milestones" style={{ ...cardBase, padding: 16, scrollMarginTop: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>下一步 · 里程碑</div>
             {milestones.length === 0 ? (
               <div style={{ color: C.mut, fontSize: 12.5, padding: '6px 0' }}>暂无里程碑。接入项目任务后在此显示（负责人 · 截止）。</div>
@@ -273,7 +327,7 @@ export default function ProjectCenterPage() {
               ))
             )}
           </div>
-          <div style={{ ...cardBase, padding: 16 }}>
+          <div id="side-risks" style={{ ...cardBase, padding: 16, scrollMarginTop: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>风险看板 · 可复用资产</div>
             {risks.length === 0 ? (
               <div style={{ color: C.mut, fontSize: 12.5, padding: '6px 0' }}>暂无风险项。接入 AI 研判风险后在此显示。</div>
