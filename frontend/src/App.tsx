@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import SettingsDrawer from '@/components/layout/SettingsDrawer'
 import ServerError from '@/components/layout/ServerError'
 import TopBar from '@/components/layout/TopBar'
-import AgentPage from '@/pages/AgentPage'
+import CampPage from '@/pages/CampPage'
 import BossPage from '@/pages/BossPage'
 import HubPage from '@/pages/HubPage'
 import KnowledgePage from '@/pages/KnowledgePage'
@@ -46,7 +46,7 @@ export default function App() {
           {board === 'know' && <KnowledgePage />}
         </div>
         <div className={'page' + (board === 'agent' ? ' on' : '')}>
-          {board === 'agent' && <AgentPage />}
+          {board === 'agent' && <CampPage />}
         </div>
         <div className={'page' + (board === 'hub' ? ' on' : '')}>
           {board === 'hub' && <HubPage />}
