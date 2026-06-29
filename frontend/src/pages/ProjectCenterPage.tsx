@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
@@ -24,6 +24,9 @@ const STAGE_CHIP: Record<string, string> = {
   planning: '方案阶段',
   completed: '已完成',
 }
+
+// 拖拽进项目中心可接入的可解析扩展(与营地/数据基地一致)
+const DROP_EXTS = ['.txt', '.md', '.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg']
 
 // DC 暗色基元（与 BossPage/CampPage/HubPage 同一套色板，跨页一致）
 const C = {
@@ -140,6 +143,11 @@ export default function ProjectCenterPage() {
   const [progress, setProgress] = useState<ProjectProgress | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [taskRisk, setTaskRisk] = useState<{ overdue: number; stale: number }>({ overdue: 0, stale: 0 })
+  // 拖拽接入：把文件拖进项目中心 → 上传到当前项目(建索引+抽图)→ 成为该项目材料,刷新概览
+  const dragDepth = useRef(0)
+  const [drag, setDrag] = useState(false)
+  const [dropMsg, setDropMsg] = useState<string | null>(null)
+  const [dropping, setDropping] = useState(false)
 
   useEffect(() => {
     if (curId == null) {
@@ -185,8 +193,56 @@ export default function ProjectCenterPage() {
     <button key={label} type="button" onClick={onClick} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: C.ink2, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.04)', borderRadius: 99, padding: '5px 12px' }}>{label}</button>
   )
 
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    dragDepth.current = 0
+    setDrag(false)
+    const all = Array.from(e.dataTransfer?.files || [])
+    if (all.length === 0) return
+    const files = all.filter((f) => DROP_EXTS.some((x) => f.name.toLowerCase().endsWith(x)))
+    if (files.length === 0) { setDropMsg('没有可接入的文件（支持 txt/md/pdf/docx/pptx/xlsx/图片）。'); return }
+    if (curId == null || !cur) { setDropMsg('请先在上方选择 / 新建项目，再把文件拖进来。'); return }
+    setDropping(true)
+    setDropMsg(`正在接入 ${files.length} 个文件到「${cur.name}」…`)
+    let ok = 0, fail = 0
+    const ids: number[] = []
+    for (const f of files) {
+      try {
+        const pf = await api.uploadProjectFile(curId, f)
+        ids.push(pf.id)
+        try { await api.indexProjectFile(curId, pf.id) } catch { /* 索引失败不致命 */ }
+        ok++
+      } catch { fail++ }
+    }
+    void Promise.all(ids.map((id) => api.extractFileAssets(curId, id).catch(() => null)))
+    setDropping(false)
+    setRefreshKey((k) => k + 1)
+    setDropMsg(`已接入 ${ok} 个文件到「${cur.name}」${fail ? `，失败 ${fail}` : ''} —— 概览已更新，可在「资料」看到。`)
+    setTimeout(() => setDropMsg(null), 6000)
+  }
+
   return (
-    <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+    <div
+      onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; setDrag(true) }}
+      onDragOver={(e) => { e.preventDefault() }}
+      onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
+      onDrop={onDrop}
+      style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+      {drag && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(8,10,16,.7)', display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+          <div style={{ border: `2px dashed ${C.purple}`, borderRadius: 24, padding: '40px 64px', background: 'rgba(124,92,255,.08)', color: '#fff', fontSize: 18, fontWeight: 700, textAlign: 'center', boxShadow: '0 0 60px rgba(124,92,255,.4)' }}>
+            ⬇ 松手接入到{cur ? `「${cur.name}」` : '项目'}
+            <div style={{ fontSize: 12, fontWeight: 400, color: C.ink2, marginTop: 8 }}>{cur ? 'txt/md/pdf/docx/pptx/xlsx/图片 → 成为该项目材料' : '请先在上方选择 / 新建项目'}</div>
+          </div>
+        </div>
+      )}
+      {dropMsg && (
+        <div style={{ position: 'fixed', left: '50%', bottom: 30, transform: 'translateX(-50%)', zIndex: 90, background: '#171a24', border: `1px solid ${C.line}`, borderRadius: 12, padding: '10px 16px', color: C.ink2, fontSize: 13, boxShadow: '0 10px 30px rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', gap: 10, maxWidth: 'min(560px,92vw)' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: dropping ? C.amber : C.cyan, boxShadow: `0 0 8px ${dropping ? C.amber : C.cyan}` }} />
+          <span style={{ flex: 1 }}>{dropMsg}</span>
+          {!dropping && <button type="button" onClick={() => setDropMsg(null)} style={{ background: 'transparent', border: 0, color: C.mut, cursor: 'pointer', fontSize: 14 }}>✕</button>}
+        </div>
+      )}
       {/* HEADER：项目下拉 / 改名 / chip */}
       <div className="ptitle">
         <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>项目中心</h1>
