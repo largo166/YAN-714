@@ -21,24 +21,48 @@ router = APIRouter(tags=["skills"])
 NOT_CONFIGURED_MSG = "AI 引擎未配置，请先在设置中配置 API Key"
 NO_MATERIAL_MSG = "暂无可用材料：本项目无可解析文件且知识库无命中。请先上传资料或补充知识库后再执行。"
 
-# 对齐 HTML 权威稿 共创营地 6 张技能卡（id/标题/来源/示例提示与效果图一致）。
+# 共创营地技能库:5 分类 × 颜色(对齐 DC 设计稿)。
+_CAT_CONCEPT = ("概念与方案", "#7c5cff")
+_CAT_RESEARCH = ("竞品与研究", "#42a5ff")
+_CAT_TEXT = ("文本与汇报", "#d7a86e")
+_CAT_VISUAL = ("出图与表现", "#36e6d4")
+_CAT_REVIEW = ("审查与合规", "#ff5e66")
+
+
+def _skill(sid, title, icon, source, example, cat):
+    return {"id": sid, "title": title, "icon": icon, "source": source, "example": example,
+            "status": "待命", "category": cat[0], "color": cat[1]}
+
+
+# 技能目录(20+):前 8 个已接真实执行链路;新增 14 个本期接入(文本类走结构化/文本,视觉类走生图)。
 _SKILLS = [
-    {"id": "ppt", "title": "PPT 大纲生成", "icon": "▤", "source": "读知识库 + 项目数据",
-     "example": "帮我做一版方案汇报 PPT", "status": "待命"},
-    {"id": "img", "title": "AI 生图 · 意向图", "icon": "🖼", "source": "APImart 真出图 · 存项目",
-     "example": "生成几张退台立面意向图", "status": "待命"},
-    {"id": "review", "title": "方案评审", "icon": "◷", "source": "案例策略 + 方法模板比对",
-     "example": "对这版方案做评审，再对标一个类比项目", "status": "待命"},
-    {"id": "task", "title": "任务安排生成", "icon": "✓", "source": "→ 写回项目中心 下一步",
-     "example": "把需求拆成任务安排和下一步", "status": "待命"},
-    {"id": "meeting", "title": "会议纪要", "icon": "🔊", "source": "转写 + 甲方诉求转译",
-     "example": "把会议录音转成纪要并排好待办", "status": "待命"},
-    {"id": "compete", "title": "竞品分析", "icon": "◰", "source": "读知识库类比项目",
-     "example": "找一个类比项目做竞品分析", "status": "待命"},
-    {"id": "concept", "title": "概念激发", "icon": "✦", "source": "项目材料 + 设计灵感",
-     "example": "基于场地生成 3 个概念方向", "status": "待命"},
-    {"id": "compare", "title": "方案比选", "icon": "◇", "source": "多方案评图 + 设计判断",
-     "example": "比较 A/B/C 三版方案优劣", "status": "待命"},
+    # ── 概念与方案 ──
+    _skill("concept", "概念激发", "✦", "项目材料 + 设计灵感", "基于场地生成 3 个概念方向", _CAT_CONCEPT),
+    _skill("massing", "体量推敲", "◳", "场地条件 + 退台策略", "给这个地块推几个体量与退台比选", _CAT_CONCEPT),
+    _skill("compare", "方案比选", "⊞", "多方案评图 + 设计判断", "比较 A/B/C 三版方案优劣并推荐", _CAT_CONCEPT),
+    _skill("facade", "立面生成", "⌂", "生图 · 公建化立面", "生成一版退台公建化立面意向", _CAT_VISUAL),
+    # ── 竞品与研究 ──
+    _skill("compete", "竞品对标", "◎", "读知识库类比项目", "找一个类比项目做竞品对标", _CAT_RESEARCH),
+    _skill("caselib", "案例库检索", "❑", "按类型学检索标杆", "检索同类江景高端住宅标杆案例", _CAT_RESEARCH),
+    _skill("condition", "规划条件解读", "⛓", "红线/容积率/限高拆解", "把这块地的规划条件拆解成设计约束", _CAT_RESEARCH),
+    # ── 文本与汇报 ──
+    _skill("ppt", "PPT 大纲生成", "▤", "读知识库 + 项目数据", "帮我做一版方案汇报 PPT", _CAT_TEXT),
+    _skill("writer", "投标文本", "✎", "技术标设计说明", "起草一段以江为脉的设计立意说明", _CAT_TEXT),
+    _skill("brief", "汇报提纲", "❡", "甲方汇报结构与说辞", "生成一份 15 分钟甲方汇报提纲", _CAT_TEXT),
+    _skill("poster", "一页纸海报", "◰", "方案核心信息可视化", "把方案核心信息浓缩成一页纸要点", _CAT_TEXT),
+    _skill("slang", "甲方黑话翻译", "⇄", "甲方口径转设计语言", "把甲方这段话翻译成设计语言与红线", _CAT_TEXT),
+    _skill("meeting", "会议纪要", "🔊", "转写 + 甲方诉求转译", "把会议记录转成纪要并排好待办", _CAT_TEXT),
+    # ── 出图与表现 ──
+    _skill("img", "AI 生图 · 意向图", "🖼", "APImart 真出图 · 存项目", "生成几张退台立面意向图", _CAT_VISUAL),
+    _skill("director", "效果图导演", "☉", "组织出图视角脚本", "为这版方案规划人视/鸟瞰/序列出图脚本", _CAT_VISUAL),
+    _skill("shotlist", "视角脚本", "⊟", "人视/鸟瞰/序列分镜", "列出投标效果图的关键视角清单", _CAT_VISUAL),
+    _skill("moodboard", "风格参考板", "▦", "生图 · 材质与氛围", "生成一版宋韵 + 江景的风格参考意向", _CAT_VISUAL),
+    # ── 审查与合规 ──
+    _skill("review", "方案评审", "◷", "案例策略 + 方法模板比对", "对这版方案做评审，再对标一个类比项目", _CAT_REVIEW),
+    _skill("judge", "节点督办", "⏱", "盯紧里程碑与逾期风险", "扫一遍在推项目挑出今天最该处理的风险", _CAT_REVIEW),
+    _skill("norm", "规范审查", "⚖", "日照/间距/消防自检", "对这版总图做一次规范合规自检", _CAT_REVIEW),
+    _skill("task", "任务安排生成", "✓", "→ 一键落任务看板", "把需求拆成任务安排和下一步", _CAT_REVIEW),
+    _skill("flow", "定义工作流", "⛢", "设计—出图—评审流程", "给这个投标搭一条标准协作流水线", _CAT_REVIEW),
 ]
 
 # 技能执行 prompt 模板（id -> 成果标题 + 指令 + 是否需检索 RAG）
@@ -51,7 +75,26 @@ _SKILL_PROMPTS = {
     "compare": ("方案比选", "请基于材料对多个方案进行设计比选，从概念、空间、形式三个维度给出推荐。", True),
     "meeting": ("会议纪要要点", "请基于材料提炼会议要点：背景、关键结论、甲方诉求、风险分歧、下一步。", True),
     "img": ("生图提示词", "请基于材料生成若干条 AI 生图提示词（中英各一版），用于方案意向图；仅输出提示词文本，不生成图片。", False),
+    # ── 本期新增(文本类走结构化/文本路径) ──
+    "massing": ("体量推敲", "请基于场地与任务书推敲建筑体量：给出 2-3 个体量/退台策略，各说明形态逻辑、与场地关系、可深化方向。", True),
+    "caselib": ("案例库检索", "请从知识库与材料中检索同类型学的标杆案例：每个给项目特征、可借鉴策略、与本项目的相关度。", True),
+    "condition": ("规划条件解读", "请把规划条件（红线/容积率/限高/退线/日照等）拆解成对设计的具体约束与机会，逐条说明影响。", True),
+    "writer": ("投标文本", "请基于材料起草投标技术标设计说明：分设计立意/总体布局/示范区体验/技术亮点，语气贴合评审、术语规范。", True),
+    "brief": ("汇报提纲", "请基于材料生成甲方汇报提纲（15 分钟版），按『先共识、再亮点、后承诺』组织，每段标时长与要点。", True),
+    "poster": ("一页纸海报", "请把方案核心信息浓缩成一页纸要点结构：一句话主张 + 3-5 个支撑亮点 + 关键数据，适合汇报封面。", True),
+    "slang": ("甲方黑话翻译", "请把甲方原话/诉求翻译成设计语言：逐条给『原话 / 真实含义 / 对设计的影响 / 建议动作』。", True),
+    "director": ("效果图导演", "请为本方案规划效果图出图脚本：列人视/鸟瞰/序列等关键镜头，每个标视角、画面重点、想传达的卖点。", True),
+    "shotlist": ("视角脚本", "请列出投标效果图的关键视角清单：每条含视角类型（人视/鸟瞰/半鸟瞰/序列）、取景对象、画面意图。", True),
+    "judge": ("节点督办", "请基于材料梳理在推节点与里程碑：挑出最该处理的风险点，按『不处理的代价』排序，给催办建议。", True),
+    "norm": ("规范审查", "请对方案做规范合规自检：日照/间距/消防疏散/退线/容积率等逐条给 通过/需关注/不符 + 依据（不臆造规范条文）。", True),
+    "flow": ("定义工作流", "请为本项目搭一条『设计—出图—评审』标准流水线：分步骤，每步标负责人 / AI 可接管部分 / 产出。", True),
+    # ── 本期新增(视觉类走生图链路) ──
+    "facade": ("立面生成", "退台公建化住宅立面，精致材质与线脚，黄昏自然光，写实建筑摄影风格", False),
+    "moodboard": ("风格参考板", "高端住宅风格氛围参考，材质与光影意向，写实建筑表现", False),
 }
+
+# 视觉类技能:复用生图链路(image_gen),与 img 同路。其 _SKILL_PROMPTS 指令作为生图提示词的偏置。
+_IMAGE_SKILLS = {"img", "facade", "moodboard"}
 
 
 # ── 斜杠命令映射(对话框打 /xxx 直接触发技能;别名→skill_id)──
@@ -476,21 +519,24 @@ def _run_skill_inner(
             sources=sources if latest is None else [], model=cfg.deepseek_model,
         )
 
-    # ── 生图技能:DeepSeek 据材料生成提示词 → APImart 真出图 → 下载存项目 uploads ──
-    if skill_id == "img":
+    # ── 生图类技能(img / facade / moodboard):DeepSeek 据材料生成提示词 → APImart 真出图 → 存项目 uploads ──
+    if skill_id in _IMAGE_SKILLS:
         # 未配生图 key:如实提示,绝不伪造图(规则 3/10)。文本 key 单独判过。
         if not image_gen.is_configured():
-            return schemas.SkillRunOut(skill_id=skill_id, status="not_configured", title="AI 生图",
+            return schemas.SkillRunOut(skill_id=skill_id, status="not_configured", title=title,
                                        content=image_gen.NOT_CONFIGURED_MSG)
         # 1) 提示词:用户已在轻确认里看过/改过的最终 prompt → 直接用(对齐用户,不再二次扩写);
-        #    否则据『用户输入为主、材料兜底』扩写一条。
+        #    否则据『用户输入为主、材料兜底』扩写一条;facade/moodboard 用技能指令偏置生图意图。
         if payload.image_prompt.strip():
             prompt = payload.image_prompt.strip()
         else:
+            ask = payload.input
+            if skill_id != "img" and instruction:
+                ask = (instruction + "。" + (payload.input or "")).strip()
             try:
-                prompt = _gen_image_prompt(cfg, project.name, material.context or "", payload.input)
+                prompt = _gen_image_prompt(cfg, project.name, material.context or "", ask)
             except llm.LLMError as e:
-                return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
+                return schemas.SkillRunOut(skill_id=skill_id, status="error", title=title,
                                            content="生成提示词失败。", error_message=str(e))
         # 1.5) 图生图参考图:读 ref_asset_ids 字节转 base64 data URI(本机图 APImart 抓不到,必须 base64;最多 4 张)
         ref_urls: list[str] = []

@@ -78,6 +78,8 @@ export const SkillSchema = z.object({
   source: z.string(),
   example: z.string(),
   status: z.string(),
+  category: z.string().default(''),  // 共创营地技能库 5 分类
+  color: z.string().default(''),     // 分类色
 })
 export type Skill = z.infer<typeof SkillSchema>
 

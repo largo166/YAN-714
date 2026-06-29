@@ -272,6 +272,8 @@ class SkillOut(BaseModel):
     source: str = ""
     example: str = ""
     status: str = "待命"
+    category: str = ""   # 共创营地技能库 5 分类(概念与方案/竞品与研究/文本与汇报/出图与表现/审查与合规)
+    color: str = ""      # 分类色(#7c5cff 等),供前端分类渲染
 
 
 class SkillListOut(BaseModel):

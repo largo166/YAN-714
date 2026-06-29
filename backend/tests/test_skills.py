@@ -15,9 +15,13 @@ def test_list_skills(client):
     r = client.get("/api/skills")
     assert r.status_code == 200
     body = r.json()
-    assert body["total"] == 8
+    assert body["total"] == 22  # 共创营地技能库:8 原有 + 14 新增(5 分类)
     ids = {s["id"] for s in body["items"]}
     assert {"ppt", "img", "review", "task", "meeting", "compete", "concept", "compare"} <= ids
+    assert {"massing", "facade", "caselib", "condition", "writer", "brief", "poster",
+            "slang", "director", "shotlist", "moodboard", "judge", "norm", "flow"} <= ids
+    # 每项带分类与色(供前端技能库 5 分类渲染)
+    assert all(s["category"] and s["color"] for s in body["items"])
     # 每项含展示所需字段，且不泄漏任何密钥/执行副作用
     for s in body["items"]:
         assert s["title"] and s["example"]
