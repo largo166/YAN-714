@@ -12,8 +12,10 @@ router = APIRouter(prefix="/api/boss", tags=["boss"])
 
 
 def _week_start() -> datetime:
+    # 归零到本周一 00:00:否则周一(weekday()==0)时 start≈now,会漏掉当天早些时候的记录。
     now = datetime.utcnow()
-    return now - timedelta(days=now.weekday())
+    monday = now - timedelta(days=now.weekday())
+    return monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 @router.get("/dashboard", response_model=schemas.BossDashboardOut)
