@@ -347,6 +347,10 @@ export default function KnowledgePage() {
     folderInputRef.current?.setAttribute('webkitdirectory', '')
   }, [])
 
+  // 拖拽接入：把文件拖进数据基地 → 喂进「待整理」(走原有 命名项目→一键整理 确认流，不直接落库)
+  const dragDepth = useRef(0)
+  const [drag, setDrag] = useState(false)
+
   /** 原生对话框选完(文件夹 or 多选文件)后:客户端筛可解析文件、推断项目名,不落库。 */
   const onNativePicked = (fileList: FileList | null, fromFolder: boolean) => {
     const all = fileList ? Array.from(fileList) : []
@@ -430,7 +434,20 @@ export default function KnowledgePage() {
   )
 
   return (
-    <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+    <div
+      onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; setDrag(true) }}
+      onDragOver={(e) => { e.preventDefault() }}
+      onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
+      onDrop={(e) => { e.preventDefault(); dragDepth.current = 0; setDrag(false); const fl = e.dataTransfer?.files; if (fl && fl.length) { onNativePicked(fl, false); setTimeout(() => document.getElementById('sec-ingest')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40) } }}
+      style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+      {drag && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(8,10,16,.7)', display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+          <div style={{ border: `2px dashed ${C.purple}`, borderRadius: 24, padding: '40px 64px', background: 'rgba(124,92,255,.08)', color: '#fff', fontSize: 18, fontWeight: 700, textAlign: 'center', boxShadow: '0 0 60px rgba(124,92,255,.4)' }}>
+            ⬇ 松手加入「待整理」
+            <div style={{ fontSize: 12, fontWeight: 400, color: C.ink2, marginTop: 8 }}>txt/md/pdf/docx/pptx/xlsx/图片 → 命名项目后「一键整理」入库</div>
+          </div>
+        </div>
+      )}
       <div className="ptitle">
         <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>数据基地</h1>
         <span className="statpill live" style={{ marginLeft: 8 }}>本地索引 · 已接入</span>
@@ -490,7 +507,7 @@ export default function KnowledgePage() {
 
       {/* ① 读取与整理：状态机发光管线 + 选择/整理 + 收件箱 */}
       <GroupLabel hint="本地来源 → 一键整理入库 · 收件箱自动入库">① 读取与整理</GroupLabel>
-      <div className="ckcard" style={{ padding: 18, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
+      <div id="sec-ingest" className="ckcard" style={{ padding: 18, scrollMarginTop: 14, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
         {/* 状态机发光管线 */}
         {(() => {
           const curStep = ingestResult ? 3 : ingesting ? 2 : picked ? 1 : 0
