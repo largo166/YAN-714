@@ -62,8 +62,17 @@ function MoaResult({
   }
 
   const cats = checklist.categories || []
-  const conflicts = checklist.conflict_items || []
+  // 设计版聚合输出 cross_cutting_issues;旧版输出 conflict_items —— 两者都认。
+  const conflicts = checklist.cross_cutting_issues || checklist.conflict_items || []
   const steps = checklist.next_steps || []
+  const highlights = checklist.highlights || []
+  const coreIssues = checklist.core_issues || []
+  // 冲突项视角:设计版(概念/空间/形式)优先,回落旧版(功能/成本)。
+  const conflictViews = (c: (typeof conflicts)[number]) =>
+    ([
+      ['概念视角', c.concept_view], ['空间视角', c.spatial_view], ['形式视角', c.form_view],
+      ['功能视角', c.function_view], ['成本视角', c.cost_view],
+    ] as [string, string | undefined][]).filter(([, v]) => v)
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -78,6 +87,25 @@ function MoaResult({
       {cost && (
         <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
           ⚠ 成本为按字符数粗略估算，非真实账单；准确金额以 DeepSeek 控制台为准。
+        </div>
+      )}
+
+      {/* 一句话评图(设计总监口吻) */}
+      {checklist.one_sentence_review && (
+        <div style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: 'var(--ink)', borderLeft: '3px solid var(--terra)', paddingLeft: 10 }}>
+          {checklist.one_sentence_review}
+        </div>
+      )}
+
+      {/* 设计亮点 */}
+      {highlights.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <b style={{ fontSize: 13, color: 'var(--ok)' }}>✦ 设计亮点（{highlights.length}）</b>
+          {highlights.map((h, i) => (
+            <div key={i} style={{ fontSize: 12, marginTop: 3 }}>
+              <b>{h.aspect}</b>{h.note ? `：${h.note}` : ''}
+            </div>
+          ))}
         </div>
       )}
 
@@ -113,16 +141,35 @@ function MoaResult({
         </div>
       )}
 
+      {/* 核心问题 */}
+      {coreIssues.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <b style={{ fontSize: 13, color: 'var(--red)' }}>核心问题（{coreIssues.length}）</b>
+          {coreIssues.map((it, i) => (
+            <div key={i} style={{ fontSize: 12, marginTop: 4 }}>
+              <b>{it.issue}</b>
+              {(it.impact || it.suggestion) && (
+                <div style={{ color: 'var(--mut)', marginTop: 1, marginLeft: 4 }}>
+                  {it.impact && <span>影响：{it.impact}　</span>}
+                  {it.suggestion && <span>建议：{it.suggestion}</span>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 冲突项(MoA 核心价值:跨维度矛盾) */}
       {conflicts.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <b style={{ fontSize: 13, color: 'var(--terra)' }}>⚔ 冲突项（{conflicts.length}）</b>
+          <b style={{ fontSize: 13, color: 'var(--terra)' }}>⚔ 跨维度问题（{conflicts.length}）</b>
           {conflicts.map((c, i) => (
             <div key={i} style={{ marginTop: 6, border: '1px solid var(--terra-line)', background: 'var(--terra-soft)', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>
               <div style={{ fontWeight: 600 }}>{c.issue}</div>
-              {c.function_view && <div style={{ marginTop: 3 }}>· 功能视角：{c.function_view}</div>}
-              {c.cost_view && <div>· 成本视角：{c.cost_view}</div>}
-              {c.resolution && <div style={{ marginTop: 3, color: 'var(--ink)' }}>↳ 平衡建议：{c.resolution}</div>}
+              {conflictViews(c).map(([label, val], j) => (
+                <div key={j} style={{ marginTop: 3 }}>· {label}：{val}</div>
+              ))}
+              {c.resolution && <div style={{ marginTop: 3, color: 'var(--ink)' }}>↳ 整合建议：{c.resolution}</div>}
             </div>
           ))}
         </div>

@@ -209,11 +209,11 @@ export const api = {
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
   },
-  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', audience = '', signal?: AbortSignal): Promise<SkillRun> {
+  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', audience = '', mode = '', signal?: AbortSignal): Promise<SkillRun> {
     return SkillRunSchema.parse(
       await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt, audience }),
+        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt, audience, mode }),
         signal,
       }),
     )
@@ -882,16 +882,36 @@ export interface MoaCategory {
 }
 export interface MoaConflict {
   issue: string
+  // 设计版三视角（概念/空间/形式）
+  concept_view?: string
+  spatial_view?: string
+  form_view?: string
+  // 旧版兼容（功能/成本）
   function_view?: string
   cost_view?: string
   resolution?: string
+}
+export interface MoaHighlight {
+  aspect: string
+  note: string
+}
+export interface MoaCoreIssue {
+  issue: string
+  severity?: string
+  impact?: string
+  suggestion?: string
+  expert_source?: string
 }
 export interface MoaChecklist {
   overall_score?: number
   risk_level?: string
   pass_rate?: number
+  one_sentence_review?: string
+  highlights?: MoaHighlight[]
+  core_issues?: MoaCoreIssue[]
   categories?: MoaCategory[]
   conflict_items?: MoaConflict[]
+  cross_cutting_issues?: MoaConflict[]
   next_steps?: string[]
   parse_error?: boolean
   raw_output?: string

@@ -7,11 +7,13 @@
   红线：未配 key→not_configured 不伪造；无材料→no_material；不自动串跑（规则 9）。
 """
 import base64
+import json
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters, review_checklist, image_assets
+from .. import analysis, llm, models, schemas, skill_structured, structured_judgment, safe_json, image_gen, uploads, exporters, review_checklist, image_assets, moa
 from ..database import get_db
 
 router = APIRouter(tags=["skills"])
@@ -33,6 +35,10 @@ _SKILLS = [
      "example": "把会议录音转成纪要并排好待办", "status": "待命"},
     {"id": "compete", "title": "竞品分析", "icon": "◰", "source": "读知识库类比项目",
      "example": "找一个类比项目做竞品分析", "status": "待命"},
+    {"id": "concept", "title": "概念激发", "icon": "✦", "source": "项目材料 + 设计灵感",
+     "example": "基于场地生成 3 个概念方向", "status": "待命"},
+    {"id": "compare", "title": "方案比选", "icon": "◇", "source": "多方案评图 + 设计判断",
+     "example": "比较 A/B/C 三版方案优劣", "status": "待命"},
 ]
 
 # 技能执行 prompt 模板（id -> 成果标题 + 指令 + 是否需检索 RAG）
@@ -41,6 +47,8 @@ _SKILL_PROMPTS = {
     "review": ("方案评审意见", "请基于材料对当前方案做评审：分『优点 / 待改进问题 / 具体建议』三段，逐条说明依据。", True),
     "task": ("任务安排", "请基于材料拆解可执行任务清单：每条含『任务 / 建议负责角色 / 优先级 / 建议时序』。", True),
     "compete": ("竞品分析", "请从材料与知识库中找出类比项目，做对标分析：可比维度、各自做法、对本项目的借鉴。", True),
+    "concept": ("概念激发", "请基于项目材料提出 3-5 个有设计叙事、空间原型与形式灵感的概念方向。", True),
+    "compare": ("方案比选", "请基于材料对多个方案进行设计比选，从概念、空间、形式三个维度给出推荐。", True),
     "meeting": ("会议纪要要点", "请基于材料提炼会议要点：背景、关键结论、甲方诉求、风险分歧、下一步。", True),
     "img": ("生图提示词", "请基于材料生成若干条 AI 生图提示词（中英各一版），用于方案意向图；仅输出提示词文本，不生成图片。", False),
 }
@@ -54,6 +62,8 @@ _COMMANDS = [
     ("/评审", "review", "方案评审", False),
     ("/任务", "task", "任务安排", False),
     ("/竞品", "compete", "竞品分析", False),
+    ("/概念", "concept", "概念激发", False),
+    ("/比选", "compare", "方案比选", False),
     ("/出图", "img", "AI 生图(需确认)", True),
 ]
 _CMD_MAP = {c: (sid, confirm) for c, sid, _label, confirm in _COMMANDS}
@@ -254,6 +264,117 @@ def task_result_to_assignments(
     )
 
 
+def _moa_skill_markdown(title: str, checklist: dict) -> str:
+    """把 MoA JSON 压成现有成果卡可读 markdown；完整 JSON 放 output_json。"""
+    lines = [f"# {title} · 专家会诊", ""]
+    if checklist.get("one_sentence_review"):
+        lines += [f"核心判断：{checklist.get('one_sentence_review')}", ""]
+    if checklist.get("overall_score") is not None:
+        risk = checklist.get("risk_level", "—")
+        rate = checklist.get("pass_rate")
+        rate_text = f" · 通过度 {round(float(rate) * 100)}%" if isinstance(rate, (int, float)) else ""
+        lines += [f"总分：{checklist.get('overall_score')}/100 · 设计成熟度风险：{risk}{rate_text}", ""]
+    highlights = checklist.get("highlights") or []
+    if highlights:
+        lines.append("## 设计亮点")
+        for h in highlights[:5]:
+            lines.append(f"- {h.get('aspect', '亮点')}：{h.get('note', '')}")
+        lines.append("")
+    issues = checklist.get("core_issues") or []
+    if issues:
+        lines.append("## 核心问题")
+        for it in issues[:5]:
+            issue = it.get("issue", "")
+            impact = it.get("impact", "")
+            suggestion = it.get("suggestion", "")
+            lines.append(f"- {issue}" + (f"｜影响：{impact}" if impact else "") + (f"｜建议：{suggestion}" if suggestion else ""))
+        lines.append("")
+    conflicts = checklist.get("conflict_items") or checklist.get("cross_cutting_issues") or []
+    if conflicts:
+        lines.append("## 跨维度问题")
+        for c in conflicts[:4]:
+            lines.append(f"- {c.get('issue', '')}：{c.get('resolution', '')}")
+        lines.append("")
+    steps = checklist.get("next_steps") or []
+    if steps:
+        lines.append("## 下一步")
+        for i, step in enumerate(steps[:6], 1):
+            lines.append(f"{i}. {step}")
+    if len(lines) <= 2:
+        return json.dumps(checklist, ensure_ascii=False, indent=2)
+    return "\n".join(lines).strip()
+
+
+def _preset_key_for_skill(skill_id: str) -> str:
+    for key, preset in moa.BUILTIN_MOA_PRESETS.items():
+        if skill_id in (preset.applicable_skills or []):
+            return key
+    return ""
+
+
+def _run_skill_moa(
+    skill_id: str,
+    title: str,
+    project: models.Project,
+    material_ctx: str,
+    user_extra: str,
+    cfg: models.AppSetting,
+) -> Optional[schemas.SkillRunOut]:
+    """按 skill_id 找 MoA preset；无 preset 返回 None 让调用方回落单模型。"""
+    preset_key = _preset_key_for_skill(skill_id)
+    if not preset_key:
+        return None
+    preset = moa.BUILTIN_MOA_PRESETS[preset_key]
+    # 专家要评的「评审材料」= 项目材料(+用户补充);项目名只作背景,避免专家只评到元数据。
+    extra = (user_extra or "").strip()
+    material_text = (material_ctx or "").strip()
+    user_input = (material_text + (f"\n\n用户补充：{extra}" if extra else "")).strip() \
+        or f"项目「{project.name}」材料较少，请基于项目名给方向性设计评审。"
+    result = moa.run_moa_sync(
+        preset_key,
+        user_input=user_input,
+        project_context=f"项目：{project.name}",
+        response_format={"type": "json_object"},
+        api_key=cfg.deepseek_api_key,
+        base_url=cfg.deepseek_base_url,
+    )
+    model_label = preset.aggregator.model if preset.aggregator else cfg.deepseek_model
+    if not result.success:
+        # MoAResult 只有 error_message(无 error/retry_suggestion);兜底返回可读错误,不冒 500。
+        return schemas.SkillRunOut(
+            skill_id=skill_id,
+            status="error",
+            title=f"{title} · 专家会诊",
+            content=result.error_message or "专家会诊暂时失败，请稍后重试。",
+            output_json=safe_json.dumps_safe({
+                "success": False,
+                "error": result.error_message,
+                "retry_suggestion": "主审模型偶发超时/限流，请稍后点「重试」。",
+                "reference_details": [r.__dict__ for r in result.reference_outputs],
+            }),
+            model=model_label,
+            error_message=result.error_message or "MoA aggregator failed",
+        )
+    try:
+        checklist = json.loads(result.final_output or result.aggregation_output or "{}")
+    except Exception:
+        checklist = {"parse_error": True, "raw_output": result.final_output or result.aggregation_output}
+    return schemas.SkillRunOut(
+        skill_id=skill_id,
+        status="ok",
+        title=f"{title} · 专家会诊",
+        content=_moa_skill_markdown(title, checklist),
+        output_json=safe_json.dumps_safe({
+            "success": True,
+            "checklist": checklist,
+            "cost": {"total_tokens": result.total_tokens, "total_cost_yuan": result.total_cost_yuan, "total_latency_ms": result.total_latency_ms},
+            "reference_details": [r.__dict__ for r in result.reference_outputs],
+            "preset": preset.name,
+        }),
+        model=model_label,
+    )
+
+
 @router.post(
     "/api/projects/{project_id}/skills/{skill_id}/run",
     response_model=schemas.SkillRunOut,
@@ -291,6 +412,15 @@ def _run_skill_inner(
             skill_id=skill_id, status="not_configured", title=title,
             content=NOT_CONFIGURED_MSG, sources=[],
         )
+
+    # ── 专家会诊模式(P·MoA):mode=moa 且该技能有对应预设 → 多专家会诊;否则回落下方单模型分支 ──
+    if payload.mode == "moa" and _preset_key_for_skill(skill_id):
+        if needs_rag and material.empty:
+            return schemas.SkillRunOut(skill_id=skill_id, status="no_material", title=title, content=NO_MATERIAL_MSG)
+        moa_out = _run_skill_moa(skill_id, title, project, material.context or "", payload.input, cfg)
+        if moa_out is not None:
+            moa_out.sources = sources if needs_rag else []
+            return moa_out
 
     # ── 结构化技能：PPT 大纲 / 会议纪要（json mode + normalizer 兜底 + markdown）──
     if skill_id == "ppt":
@@ -426,6 +556,14 @@ def _run_skill_inner(
                 skill_id=skill_id, status="ok", title=title, content=content,
                 output_json=output_json, sources=sources if needs_rag else [], model=cfg.deepseek_model,
             )
+        # 需要多视角设计判断的技能可显式走 MoA Lite；默认仍保守使用原单模型结构化链路。
+        mode = (payload.mode or "").strip().lower()
+        if mode in ("moa", "auto") and moa.get_preset_for_skill(skill_id) is not None:
+            out = _run_skill_moa(skill_id, title, project, material.context, payload.input, cfg)
+            if out is not None:
+                out.sources = sources if needs_rag else []
+                return out
+
         # 判断类技能(方案评审/竞品)走结构化:core/points/actions/questions/detail
         # +文风内嵌;解析无效→回落纯文本(仍 ok,不伪造)。其余技能走普通文本。
         if skill_id in ("review", "compete"):

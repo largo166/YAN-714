@@ -15,9 +15,9 @@ def test_list_skills(client):
     r = client.get("/api/skills")
     assert r.status_code == 200
     body = r.json()
-    assert body["total"] == 6
+    assert body["total"] == 8
     ids = {s["id"] for s in body["items"]}
-    assert {"ppt", "img", "review", "task", "meeting", "compete"} <= ids
+    assert {"ppt", "img", "review", "task", "meeting", "compete", "concept", "compare"} <= ids
     # 每项含展示所需字段，且不泄漏任何密钥/执行副作用
     for s in body["items"]:
         assert s["title"] and s["example"]
@@ -264,3 +264,40 @@ def test_task_structured_and_to_board(client, monkeypatch):
 
 
 
+
+
+def test_review_skill_moa_mode_runs_and_archives(client, monkeypatch):
+    """技能入口 mode=moa：review 走 MoA Lite 专家会诊，并按 SkillResult 归档；全程桩掉模型不联网。"""
+    import json as _json
+    from app import moa
+
+    def fake_chat(messages, **kw):
+        if kw.get("response_format") == {"type": "json_object"}:
+            return _json.dumps({
+                "overall_score": 76,
+                "risk_level": "medium",
+                "pass_rate": 0.72,
+                "one_sentence_review": "概念已有方向，但空间高潮还不够锋利。",
+                "highlights": [{"aspect": "空间体验", "note": "入口序列有形成仪式感的潜力。"}],
+                "core_issues": [{"issue": "视觉母题不够集中", "severity": "medium", "impact": "传播记忆点不足", "suggestion": "强化一个可被反复识别的立面母题"}],
+                "categories": [{"category": "concept", "label": "概念叙事", "items": [{"item": "概念锋利度", "pass": True, "note": "有方向", "severity": "low"}]}],
+                "conflict_items": [],
+                "next_steps": ["明确入口空间故事", "强化立面视觉母题"],
+            }, ensure_ascii=False)
+        return "专家意见(stub)"
+
+    monkeypatch.setattr(moa, "chat_completion", fake_chat)
+    pid = _new_project(client, name="技能MoA测试")
+    _set_key()
+    client.post(f"/api/projects/{pid}/files", files={"file": ("方案.md", "# 方案\n入口礼序、宋式立面、退台空间".encode("utf-8"), "text/markdown")})
+    r = client.post(f"/api/projects/{pid}/skills/review/run", json={"input": "请从设计角度评审", "mode": "moa"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "ok"
+    assert "专家会诊" in body["title"]
+    assert "概念已有方向" in body["content"]
+    assert body["result_id"] > 0
+    output = _json.loads(body["output_json"])
+    assert output["success"] is True
+    assert output["checklist"]["overall_score"] == 76
+    assert len(output["reference_details"]) == 3

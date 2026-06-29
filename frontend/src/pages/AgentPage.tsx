@@ -634,7 +634,7 @@ export default function AgentPage() {
     const ac = new AbortController()
     abortRef.current = ac
     try {
-      const r = await api.runSkill(cur.id, 'img', '', c.model, curSid ?? 0, usePlaceholder ? '' : finalPrompt, '', ac.signal)
+      const r = await api.runSkill(cur.id, 'img', '', c.model, curSid ?? 0, usePlaceholder ? '' : finalPrompt, '', '', ac.signal)
       appendResult(r)
       refreshArchive(cur.id)
     } catch (e) {
@@ -647,7 +647,7 @@ export default function AgentPage() {
   }
 
   // 执行技能卡 → 成果卡进对话流（围绕当前项目 + 项目级 RAG）。需选中项目；不自动串跑。
-  const runSkill = async (skillId: string) => {
+  const runSkill = async (skillId: string, mode = '') => {
     if (!cur) {
       setErr('请先选择作用项目，再执行技能。')
       return
@@ -656,7 +656,7 @@ export default function AgentPage() {
     setErr(null)
     setRunningSkill(skillId)
     const label = skills.find((s) => s.id === skillId)?.title || '技能'
-    setPending({ label: `${label} · 生成中`, startedAt: Date.now() })
+    setPending({ label: `${label}${mode === 'moa' ? ' · 专家会诊' : ''} · 生成中`, startedAt: Date.now() })
     const ac = new AbortController()
     abortRef.current = ac
     try {
@@ -664,7 +664,7 @@ export default function AgentPage() {
       const model = skillId === 'img' ? imgModel : ''
       // PPT 技能带汇报对象档位(P1-F);其它技能忽略
       const audience = skillId === 'ppt' ? pptAudience : ''
-      const r = await api.runSkill(cur.id, skillId, text.trim(), model, curSid ?? 0, '', audience, ac.signal)
+      const r = await api.runSkill(cur.id, skillId, text.trim(), model, curSid ?? 0, '', audience, mode, ac.signal)
       appendResult(r)
       refreshArchive(cur.id)
     } catch (e) {
@@ -1082,6 +1082,18 @@ export default function AgentPage() {
               >
                 {runningSkill === s.id ? '执行中…' : '执行'}
               </button>
+              {['review', 'compete', 'concept', 'compare'].includes(s.id) && (
+                <button
+                  className="anbtn"
+                  type="button"
+                  disabled={!!runningSkill || !cur}
+                  title="多专家会诊（概念/空间/形式分别评，再由主审整合）· 约 40-60 秒"
+                  onClick={() => runSkill(s.id, 'moa')}
+                  style={{ borderColor: 'var(--terra-line)', color: 'var(--terra)' }}
+                >
+                  {runningSkill === s.id ? '会诊中…' : '✦ 专家会诊'}
+                </button>
+              )}
               <button
                 className="anbtn"
                 type="button"

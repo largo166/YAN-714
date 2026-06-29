@@ -35,8 +35,8 @@ def _new_project(client, name="MoA评审测试"):
 
 
 def _fake_chat(messages, **kw):
-    """假 LLM：聚合(主席)给 JSON，专家给文本。绝不联网。"""
-    if "评审委员会主席" in messages[0]["content"]:
+    """假 LLM：聚合调用给 JSON，专家给文本。绝不联网。"""
+    if kw.get("response_format") == {"type": "json_object"}:
         return json.dumps({
             "overall_score": 82, "risk_level": "medium", "pass_rate": 0.8,
             "categories": [{"category": "function", "label": "功能匹配", "items": [
@@ -96,7 +96,7 @@ def test_review_moa_aggregator_failure_no_500(client, monkeypatch):
     from app import llm
 
     def _agg_fails(messages, **kw):
-        if "评审委员会主席" in messages[0]["content"]:
+        if kw.get("response_format") == {"type": "json_object"}:
             raise llm.LLMError("reasoner timeout (stub)")
         return "专家意见(stub)"
 
@@ -110,3 +110,23 @@ def test_review_moa_aggregator_failure_no_500(client, monkeypatch):
     assert body["error"]
     assert "重试" in body["retry_suggestion"]
     assert len(body["reference_details"]) == 3  # 已花的三次专家调用结果不浪费
+
+
+def test_skill_card_moa_mode(client, monkeypatch):
+    """技能卡 review 以 mode=moa 跑 → 走专家会诊分发，输出 MoA 结构化结果（不崩、不联网）。"""
+    monkeypatch.setattr(moa, "chat_completion", _fake_chat)
+    _set_key()
+    pid = _new_project(client)
+    # review 需 RAG：上传材料，否则 no_material
+    client.post(f"/api/projects/{pid}/files",
+                files={"file": ("方案.md", "# 方案\n概念：山水叙事，退台体量".encode("utf-8"), "text/markdown")})
+    r = client.post(f"/api/projects/{pid}/skills/review/run", json={"input": "评审这版", "mode": "moa"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "ok" and body["skill_id"] == "review"
+    data = json.loads(body["output_json"])
+    assert data["success"] is True and "checklist" in data
+    assert data["checklist"].get("overall_score") == 82       # 聚合 JSON 被解析
+    assert len(data["reference_details"]) == 3                 # 三位评图人
+
+
