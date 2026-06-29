@@ -71,16 +71,15 @@ def test_review_moa_stubbed_end_to_end(client, monkeypatch):
     body = r.json()
     assert body["success"] is True
     assert body["checklist"]["overall_score"] == 82  # 聚合 JSON 被正确解析
-    assert len(body["reference_details"]) == 3        # 三位专家都跑了
+    assert len(body["reference_details"]) == 3        # 本次会诊(实时)能看到三专家原话…
     assert all(d["status"] == "success" for d in body["reference_details"])
     assert "total_cost_yuan" in body["cost"]
-    # GET 最新评审（中间档[方案A]:回查也能拿到聚合结论 + 三专家原话 + 成本）
+    # …但不落库:GET 回查只还原最终结论,会诊过程/专家原话不持久化 → 回查不含 reference_details
     g = client.get(f"/api/review-checklist/{pid}")
     gb = g.json()
     assert g.status_code == 200 and gb["success"] is True
     assert gb["checklist"]["overall_score"] == 82
-    assert len(gb["reference_details"]) == 3           # 回查也能看专家原话(不再只剩聚合结论)
-    assert gb["cost"] and "total_cost_yuan" in gb["cost"]
+    assert "reference_details" not in gb  # 回查不含专家原话(会诊过程不落库)
     # 历史
     h = client.get(f"/api/review-checklist/{pid}/history")
     assert h.status_code == 200 and h.json()["count"] >= 1
@@ -130,6 +129,6 @@ def test_skill_card_moa_mode(client, monkeypatch):
     data = json.loads(body["output_json"])
     assert data["success"] is True and "checklist" in data
     assert data["checklist"].get("overall_score") == 82       # 聚合 JSON 被解析
-    assert len(data["reference_details"]) == 3                 # 三位评图人
+    assert "reference_details" not in data                    # 会诊过程/专家原话不落库(只留最终结论)
 
 

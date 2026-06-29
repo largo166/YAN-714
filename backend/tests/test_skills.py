@@ -300,4 +300,4 @@ def test_review_skill_moa_mode_runs_and_archives(client, monkeypatch):
     output = _json.loads(body["output_json"])
     assert output["success"] is True
     assert output["checklist"]["overall_score"] == 76
-    assert len(output["reference_details"]) == 3
+    assert "reference_details" not in output  # 会诊过程/专家原话不落库(只留最终结论)

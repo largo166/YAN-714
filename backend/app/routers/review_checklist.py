@@ -120,7 +120,7 @@ def run_review_moa(project_id: int, db: Session = Depends(get_db)):
             "retry_suggestion": "请点「重试」重新会诊；若反复出现，可能是材料过长导致输出截断。",
         }
     
-    # 专家原话明细 + 成本(回查也要能看 → 存进 output_json 信封,而非仅聚合结论)
+    # 三专家原话 + 成本仅用于本次「实时显示」,不落库——会诊过程不持久化。
     reference_details = [
         {
             "role": ref.role,
@@ -137,23 +137,19 @@ def run_review_moa(project_id: int, db: Session = Depends(get_db)):
         "total_cost_yuan": result.total_cost_yuan,
         "total_latency_ms": result.total_latency_ms,
     }
-    # 保存到 ProjectAnalysis（复用现有表;中间档[方案A]:output_json 存完整信封,回查可还原专家原话;
-    # content 仍存聚合 JSON 向后兼容,且不新增 MoAChain 表/迁移）
+    # 落库只存最终评审结论(聚合 JSON);三专家原话/会诊过程不持久化、回查不还原。
     analysis = ProjectAnalysis(
         project_id=project_id,
         task="review_moa",
         content=result.final_output,
-        output_json=json.dumps(
-            {"checklist": checklist, "reference_details": reference_details, "cost": cost},
-            ensure_ascii=False,
-        ),
+        output_json=result.final_output,
         model="moa:review_moa",             # 标记成果来源（3×deepseek-chat + deepseek-reasoner）
     )
     db.add(analysis)
     db.commit()
     db.refresh(analysis)
 
-    # 组装返回
+    # 组装返回:reference_details/cost 仅本次实时展示(不入库,上面已说明)
     return {
         "success": True,
         "analysis_id": analysis.id,
@@ -180,30 +176,17 @@ def get_review_checklist(project_id: int, db: Session = Depends(get_db)):
             "checklist": None,
         }
     
-    # 中间档[方案A]:output_json 存的是完整信封(checklist + reference_details + cost);
-    # 升级前的老记录里 output_json/content 直接是聚合 JSON,无专家原话 → 回落只给聚合结论。
-    checklist, reference_details, cost = None, [], None
+    # 回查只还原最终评审结论;会诊过程(三专家原话)不持久化,故回查不含专家原话。
     try:
-        env = json.loads(analysis.output_json) if analysis.output_json else {}
+        checklist = json.loads(analysis.content)
     except json.JSONDecodeError:
-        env = {}
-    if isinstance(env, dict) and "reference_details" in env:
-        checklist = env.get("checklist")
-        reference_details = env.get("reference_details") or []
-        cost = env.get("cost")
-    else:
-        try:
-            checklist = json.loads(analysis.content)
-        except json.JSONDecodeError:
-            checklist = {"parse_error": True, "raw": analysis.content}
+        checklist = {"parse_error": True, "raw": analysis.content}
 
     return {
         "success": True,
         "analysis_id": analysis.id,
         "created_at": analysis.created_at,
         "checklist": checklist,
-        "reference_details": reference_details,
-        "cost": cost,
     }
 
 

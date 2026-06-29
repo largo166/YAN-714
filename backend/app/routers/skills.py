@@ -350,7 +350,7 @@ def _run_skill_moa(
                 "success": False,
                 "error": result.error_message,
                 "retry_suggestion": "主审模型偶发超时/限流，请稍后点「重试」。",
-                "reference_details": [r.__dict__ for r in result.reference_outputs],
+                # 三专家原话/会诊过程不落库
             }),
             model=model_label,
             error_message=result.error_message or "MoA aggregator failed",
@@ -368,8 +368,8 @@ def _run_skill_moa(
             "success": True,
             "checklist": checklist,
             "cost": {"total_tokens": result.total_tokens, "total_cost_yuan": result.total_cost_yuan, "total_latency_ms": result.total_latency_ms},
-            "reference_details": [r.__dict__ for r in result.reference_outputs],
             "preset": preset.name,
+            # 三专家原话/会诊过程不落库,只保留最终结论(checklist)
         }),
         model=model_label,
     )
