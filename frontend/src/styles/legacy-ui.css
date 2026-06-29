@@ -628,16 +628,52 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 .judgment .jpoint{font-size:13px;line-height:1.6;margin:3px 0;display:flex;gap:8px;align-items:baseline}
 .judgment .jlabel{flex:none;font-size:11.5px;font-weight:600;color:var(--terra);border:1px solid var(--terra-line);background:var(--terra-soft);border-radius:6px;padding:1px 7px}
 
-/* ── 暗色板块外壳（按板块切换，App.tsx 切 body.darkui）──
-   目标：整 app 暗（含顶栏）。暗页（共创营地/管理驾驶舱…）随逐页改造加入 DARK_BOARDS，
-   未改造的浅色页不受影响（深色字标题不会糊在深底上）。 */
-body.darkui{background:linear-gradient(180deg,#030406 0%,#07080c 44%,#030406 100%);color:#f4f1ea}
+/* ── 全局暗色主题（整 app 暗·一次到位；index.html 给 body 静态挂 darkui）──
+   做法：在 body.darkui 作用域重定义 legacy 颜色变量 → 所有用变量的 .card/.metric/.statpill 等一次变暗；
+   再单独修正 5 个「深底浅字」反转点（用 var(--ink) 当底色）与写死浅色的组件。
+   :root 浅色保留可回退；BossPage/CampPage 为内联暗色，不依赖这些变量。 */
+body.darkui{
+  --bg:#07080c;--panel:#12141c;--panel2:#0d0f15;--ink:#f4f1ea;--ink2:#c9c5bd;--mut:#8b91a0;
+  --line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.12);
+  --terra:#7c5cff;--terra-soft:rgba(124,92,255,.15);--terra-line:rgba(124,92,255,.4);
+  --ok:#49d18d;--blue:#5fb0ff;--red:#ff6b73;
+  background:linear-gradient(180deg,#030406 0%,#07080c 44%,#030406 100%);color:var(--ink);
+}
+/* 顶栏 */
 body.darkui .topbar{background:rgba(3,4,6,.72);border-bottom-color:rgba(255,255,255,.07)}
 body.darkui .brand svg{stroke:#f4f1ea}
 body.darkui .brand .word{color:#f4f1ea}
-body.darkui .brand .word span{color:#8f96a5}
-body.darkui .nav button{color:#d8d4cc}
+body.darkui .brand .word span{color:#8b91a0}
 body.darkui .nav button:hover{background:rgba(255,255,255,.06);color:#fff}
 body.darkui .nav button.on{color:#fff;background:linear-gradient(135deg,rgba(124,92,255,.24),rgba(66,165,255,.12));font-weight:600}
-body.darkui .nav .lock{color:#8f96a5}
-body.darkui .right{color:#8f96a5}
+/* 反转点：原 var(--ink) 深底浅字 → 暗色下改紫蓝渐变实心 */
+body.darkui .btn{background:linear-gradient(135deg,#7c5cff,#42a5ff);color:#fff}
+body.darkui .btn:hover{background:linear-gradient(135deg,#8b6dff,#54b0ff)}
+body.darkui .bubble.u{background:linear-gradient(135deg,rgba(124,92,255,.92),rgba(66,165,255,.82));color:#fff}
+body.darkui .cmitem .av{background:linear-gradient(135deg,#7c5cff,#42a5ff);color:#fff}
+body.darkui .sendtoast{background:#171a24;color:var(--ink);border:1px solid var(--line)}
+body.darkui #srv-err button{background:linear-gradient(135deg,#7c5cff,#42a5ff);color:#fff}
+/* 写死浅色组件 → 暗色等价 */
+body.darkui .statpill.live{color:#7fdca8;border-color:rgba(73,209,141,.4);background:rgba(73,209,141,.12)}
+body.darkui .statpill.prog{color:#8fc7ff;border-color:rgba(66,165,255,.4);background:rgba(66,165,255,.12)}
+body.darkui .statpill.demo{color:#e2c07a;border-color:rgba(215,168,110,.4);background:rgba(215,168,110,.12)}
+body.darkui .statpill.fail{color:#ff9b9b;border-color:rgba(255,94,102,.4);background:rgba(255,94,102,.12)}
+body.darkui .anmock{color:#e2c07a;background:rgba(215,168,110,.12);border-color:rgba(215,168,110,.35)}
+body.darkui .anreal{color:#7fdca8;background:rgba(73,209,141,.12);border-color:rgba(73,209,141,.35)}
+body.darkui #srv-err code{background:rgba(255,255,255,.08);color:var(--ink2)}
+body.darkui .projitem.on .pi-stage{background:rgba(124,92,255,.18);border-color:rgba(124,92,255,.4);color:#c8bcff}
+body.darkui .matcard .mname{background:rgba(10,12,18,.85);color:var(--ink2)}
+body.darkui .gov button{background:rgba(20,22,30,.92);color:var(--ink)}
+body.darkui .gov button:hover{background:rgba(30,33,45,.96);color:#c8bcff}
+/* 暗色表单域：.ipt 与裸 input/textarea 原本吃浏览器默认白底 → 走深底 */
+body.darkui .ipt,
+body.darkui textarea,
+body.darkui input[type=text],
+body.darkui input[type=search],
+body.darkui input[type=date],
+body.darkui input[type=number],
+body.darkui input[type=password],
+body.darkui input:not([type]){background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:10px}
+body.darkui .ipt::placeholder,body.darkui textarea::placeholder,body.darkui input::placeholder{color:var(--mut)}
+/* 显式透明容器内的输入恢复透明，避免双层底（搜索条/对话框/key/path） */
+body.darkui .searchbar input,body.darkui .composer2 textarea,body.darkui .keyin input,body.darkui .pathin input{background:transparent;border:0}

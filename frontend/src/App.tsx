@@ -12,19 +12,11 @@ import { api } from '@/lib/api'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import type { BoardKey } from '@/types/boards'
 
-// 已暗色化的板块（整 app 暗·逐页推进）。改造完一页就把它的 key 加进来。
-const DARK_BOARDS = new Set<BoardKey>(['agent', 'boss'])
-
 export default function App() {
   const [board, setBoard] = useState<BoardKey>('proj')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [serverDown, setServerDown] = useState(false)
-
-  // 暗页时给 <body> 挂 darkui，让背景与顶栏一起转暗（含顶栏）
-  useEffect(() => {
-    document.body.classList.toggle('darkui', DARK_BOARDS.has(board))
-    return () => document.body.classList.remove('darkui')
-  }, [board])
+  // 整 app 暗：darkui 由 index.html 静态挂在 <body>，全局常开（不再按板块切换）
 
   // 顶栏「本地运行」状态 + 后端不可达检测（对应旧 /api/health 轮询）
   useEffect(() => {
