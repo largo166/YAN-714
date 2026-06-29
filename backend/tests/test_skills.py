@@ -271,7 +271,7 @@ def test_task_structured_and_to_board(client, monkeypatch):
 
 
 def test_review_skill_moa_mode_runs_and_archives(client, monkeypatch):
-    """技能入口 mode=moa：review 走 MoA Lite 专家会诊，并按 SkillResult 归档；全程桩掉模型不联网。"""
+    """技能入口 mode=moa：review 走 MoA Lite 设计委员会，并按 SkillResult 归档；全程桩掉模型不联网。"""
     import json as _json
     from app import moa
 
@@ -298,10 +298,10 @@ def test_review_skill_moa_mode_runs_and_archives(client, monkeypatch):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "ok"
-    assert "专家会诊" in body["title"]
+    assert "设计委员会" in body["title"]
     assert "概念已有方向" in body["content"]
     assert body["result_id"] > 0
     output = _json.loads(body["output_json"])
     assert output["success"] is True
     assert output["checklist"]["overall_score"] == 76
-    assert "reference_details" not in output  # 会诊过程/专家原话不落库(只留最终结论)
+    assert "reference_details" not in output  # 评图过程/专家原话不落库(只留最终结论)

@@ -628,7 +628,7 @@ export const api = {
   ): Promise<{ status: string; created: number; existing: number; message: string }> {
     return request(`/api/projects/${projectId}/skill-results/${resultId}/to-assignments`, { method: 'POST' })
   },
-  // ── MoA 方案评审「专家会诊」(功能/甲方/成本三专家并发 + reasoner 聚合) ──
+  // ── MoA 方案评审「设计委员会」(功能/甲方/成本三位评图人并发 + reasoner 聚合) ──
   async runMoaReview(projectId: number): Promise<MoaReviewResult> {
     return request(`/api/review-checklist/moa?project_id=${projectId}`, { method: 'POST' })
   },
@@ -865,7 +865,7 @@ export interface TaskAssignment {
   created_at: string
 }
 
-// ── MoA 专家会诊（方案评审）──
+// ── MoA 设计委员会（方案评审）──
 export interface MoaChecklistItem {
   item: string
   pass: boolean
@@ -938,7 +938,7 @@ export interface MoaReviewLatest {
   success: boolean
   analysis_id?: number
   created_at?: string
-  checklist?: MoaChecklist  // 回查只还原最终评审结论;会诊过程(专家原话)不持久化
+  checklist?: MoaChecklist  // 回查只还原最终评审结论;评图过程(专家原话)不持久化
   message?: string
 }
 export interface ClientPortrait {

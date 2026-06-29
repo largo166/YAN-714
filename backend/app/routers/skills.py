@@ -309,7 +309,7 @@ def task_result_to_assignments(
 
 def _moa_skill_markdown(title: str, checklist: dict) -> str:
     """把 MoA JSON 压成现有成果卡可读 markdown；完整 JSON 放 output_json。"""
-    lines = [f"# {title} · 专家会诊", ""]
+    lines = [f"# {title} · 设计委员会", ""]
     if checklist.get("one_sentence_review"):
         lines += [f"核心判断：{checklist.get('one_sentence_review')}", ""]
     if checklist.get("overall_score") is not None:
@@ -387,8 +387,8 @@ def _run_skill_moa(
         return schemas.SkillRunOut(
             skill_id=skill_id,
             status="error",
-            title=f"{title} · 专家会诊",
-            content=result.error_message or "专家会诊暂时失败，请稍后重试。",
+            title=f"{title} · 设计委员会",
+            content=result.error_message or "设计委员会暂时失败，请稍后重试。",
             output_json=safe_json.dumps_safe({
                 "success": False,
                 "error": result.error_message,
@@ -405,7 +405,7 @@ def _run_skill_moa(
     return schemas.SkillRunOut(
         skill_id=skill_id,
         status="ok",
-        title=f"{title} · 专家会诊",
+        title=f"{title} · 设计委员会",
         content=_moa_skill_markdown(title, checklist),
         output_json=safe_json.dumps_safe({
             "success": True,
@@ -456,7 +456,7 @@ def _run_skill_inner(
             content=NOT_CONFIGURED_MSG, sources=[],
         )
 
-    # ── 专家会诊模式(P·MoA):mode=moa 且该技能有对应预设 → 多专家会诊;否则回落下方单模型分支 ──
+    # ── 设计委员会模式(P·MoA):mode=moa 且该技能有对应预设 → 多设计委员会;否则回落下方单模型分支 ──
     if payload.mode == "moa" and _preset_key_for_skill(skill_id):
         if needs_rag and material.empty:
             return schemas.SkillRunOut(skill_id=skill_id, status="no_material", title=title, content=NO_MATERIAL_MSG)

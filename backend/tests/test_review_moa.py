@@ -1,6 +1,6 @@
 """MoA 方案评审路由桩测（零成本：桩掉 chat_completion，不联网、不花钱）。
 
-验证修完导入/字段/schema 后：FastAPI 能带新路由加载、三专家并发→聚合→落库→GET 回查全程不崩。
+验证修完导入/字段/schema 后：FastAPI 能带新路由加载、三位评图人并发→聚合→落库→GET 回查全程不崩。
 真·付费验证不在这里（单独跑）。
 """
 import json
@@ -62,7 +62,7 @@ def test_review_moa_not_configured(client):
 
 
 def test_review_moa_stubbed_end_to_end(client, monkeypatch):
-    """配 key + 桩 LLM → 三专家并发 → 聚合 JSON → 落 ProjectAnalysis → GET 回查，全程不崩、不联网。"""
+    """配 key + 桩 LLM → 三位评图人并发 → 聚合 JSON → 落 ProjectAnalysis → GET 回查，全程不崩、不联网。"""
     monkeypatch.setattr(moa, "chat_completion", _fake_chat)
     _set_key()
     pid = _new_project(client)
@@ -71,15 +71,15 @@ def test_review_moa_stubbed_end_to_end(client, monkeypatch):
     body = r.json()
     assert body["success"] is True
     assert body["checklist"]["overall_score"] == 82  # 聚合 JSON 被正确解析
-    assert len(body["reference_details"]) == 3        # 本次会诊(实时)能看到三专家原话…
+    assert len(body["reference_details"]) == 3        # 本次评图(实时)能看到三位评图人原话…
     assert all(d["status"] == "success" for d in body["reference_details"])
     assert "total_cost_yuan" in body["cost"]
-    # …但不落库:GET 回查只还原最终结论,会诊过程/专家原话不持久化 → 回查不含 reference_details
+    # …但不落库:GET 回查只还原最终结论,评图过程/专家原话不持久化 → 回查不含 reference_details
     g = client.get(f"/api/review-checklist/{pid}")
     gb = g.json()
     assert g.status_code == 200 and gb["success"] is True
     assert gb["checklist"]["overall_score"] == 82
-    assert "reference_details" not in gb  # 回查不含专家原话(会诊过程不落库)
+    assert "reference_details" not in gb  # 回查不含专家原话(评图过程不落库)
     # 历史
     h = client.get(f"/api/review-checklist/{pid}/history")
     assert h.status_code == 200 and h.json()["count"] >= 1
@@ -94,7 +94,7 @@ def test_review_moa_unknown_project_404(client, monkeypatch):
 
 
 def test_review_moa_aggregator_failure_no_500(client, monkeypatch):
-    """主审(reasoner)调用失败 → 不 500，返回可读错误 + 重试建议（不伪造）；三专家意见一并带回。"""
+    """主审(reasoner)调用失败 → 不 500，返回可读错误 + 重试建议（不伪造）；三位评图人意见一并带回。"""
     from app import llm
 
     def _agg_fails(messages, **kw):
@@ -115,7 +115,7 @@ def test_review_moa_aggregator_failure_no_500(client, monkeypatch):
 
 
 def test_skill_card_moa_mode(client, monkeypatch):
-    """技能卡 review 以 mode=moa 跑 → 走专家会诊分发，输出 MoA 结构化结果（不崩、不联网）。"""
+    """技能卡 review 以 mode=moa 跑 → 走设计委员会分发，输出 MoA 结构化结果（不崩、不联网）。"""
     monkeypatch.setattr(moa, "chat_completion", _fake_chat)
     _set_key()
     pid = _new_project(client)
@@ -129,6 +129,6 @@ def test_skill_card_moa_mode(client, monkeypatch):
     data = json.loads(body["output_json"])
     assert data["success"] is True and "checklist" in data
     assert data["checklist"].get("overall_score") == 82       # 聚合 JSON 被解析
-    assert "reference_details" not in data                    # 会诊过程/专家原话不落库(只留最终结论)
+    assert "reference_details" not in data                    # 评图过程/专家原话不落库(只留最终结论)
 
 

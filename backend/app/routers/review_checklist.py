@@ -100,7 +100,7 @@ def run_review_moa(project_id: int, db: Session = Depends(get_db)):
     if not result.success:
         return {
             "success": False,
-            "error": result.error_message or "专家会诊失败",
+            "error": result.error_message or "设计委员会失败",
             "retry_suggestion": "主审模型(deepseek-reasoner)偶发超时或限流，请稍后点「重试」；若反复失败，请检查网络与 DeepSeek 额度。",
             "reference_details": [
                 {"role": r.role, "model": r.model_name, "status": r.status,

@@ -656,7 +656,7 @@ export default function AgentPage() {
     setErr(null)
     setRunningSkill(skillId)
     const label = skills.find((s) => s.id === skillId)?.title || '技能'
-    setPending({ label: `${label}${mode === 'moa' ? ' · 专家会诊' : ''} · 生成中`, startedAt: Date.now() })
+    setPending({ label: `${label}${mode === 'moa' ? ' · 设计委员会' : ''} · 生成中`, startedAt: Date.now() })
     const ac = new AbortController()
     abortRef.current = ac
     try {
@@ -1087,11 +1087,11 @@ export default function AgentPage() {
                   className="anbtn"
                   type="button"
                   disabled={!!runningSkill || !cur}
-                  title="多专家会诊（概念/空间/形式分别评，再由主审整合）· 约 40-60 秒"
+                  title="多设计委员会（概念/空间/形式分别评，再由主审整合）· 约 40-60 秒"
                   onClick={() => runSkill(s.id, 'moa')}
                   style={{ borderColor: 'var(--terra-line)', color: 'var(--terra)' }}
                 >
-                  {runningSkill === s.id ? '会诊中…' : '✦ 专家会诊'}
+                  {runningSkill === s.id ? '评图中…' : '✦ 设计委员会'}
                 </button>
               )}
               <button
@@ -1110,7 +1110,7 @@ export default function AgentPage() {
         )}
       </div>
 
-      {/* 专家会诊 · MoA 方案评审(第一个真实 MoA 产品能力):基于当前项目认知,多专家会诊出结构化检查清单 */}
+      {/* 设计委员会 · MoA 方案评审(第一个真实 MoA 产品能力):基于当前项目认知,多设计委员会出结构化检查清单 */}
       <MoaReviewPanel projectId={cur ? cur.id : null} />
 
       {/* 成果即时进对话流(上方);此处为「项目成果 · 归档」回查历史——刷新/过几天仍可翻出。默认折叠。 */}

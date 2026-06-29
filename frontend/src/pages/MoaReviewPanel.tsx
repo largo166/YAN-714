@@ -34,7 +34,7 @@ function Metric({ label, value, sub, color }: { label: string; value: string; su
   )
 }
 
-/** MoA 评审结果渲染(总分/风险/通过率 + 六维度 + 冲突项 + 下一步 + 三专家原话 + 成本)。 */
+/** MoA 评审结果渲染(总分/风险/通过率 + 六维度 + 冲突项 + 下一步 + 三位评图人原话 + 成本)。 */
 function MoaResult({
   checklist,
   details,
@@ -185,11 +185,11 @@ function MoaResult({
         </div>
       )}
 
-      {/* 三专家原话(可审计;仅新会诊有,历史回查无) */}
+      {/* 三位评图人原话(可审计;仅新评图有,历史回查无) */}
       {details && details.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <button className="anbtn" type="button" onClick={() => setShowExperts((v) => !v)}>
-            {showExperts ? '收起三位专家原话 ▴' : `查看三位专家原话（${details.length}）▾`}
+            {showExperts ? '收起三位评图人原话 ▴' : `查看三位评图人原话（${details.length}）▾`}
           </button>
           {showExperts && details.map((d, i) => (
             <div key={i} style={{ marginTop: 6, border: '1px solid var(--line2)', borderRadius: 8, padding: '8px 10px' }}>
@@ -207,15 +207,15 @@ function MoaResult({
 
       {historyOnly && (
         <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 10 }}>
-          {createdAt ? `历史会诊 · ${new Date(createdAt).toLocaleString()}　` : ''}
-          历史只保留评审结论；会诊过程（三专家原话）按设计不留存。
+          {createdAt ? `历史评图 · ${new Date(createdAt).toLocaleString()}　` : ''}
+          历史只保留评审结论；评图过程（三位评图人原话）按设计不留存。
         </div>
       )}
     </div>
   )
 }
 
-/** 专家会诊 · MoA 方案评审最小闭环:可点(触发) / 可看(结果) / 可回查(挂载读最新)。 */
+/** 设计委员会 · MoA 方案评审最小闭环:可点(触发) / 可看(结果) / 可回查(挂载读最新)。 */
 export default function MoaReviewPanel({ projectId }: { projectId: number | null }) {
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [checklist, setChecklist] = useState<MoaChecklist | null>(null)
@@ -226,7 +226,7 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
   const [err, setErr] = useState('')
   const [retryHint, setRetryHint] = useState('')
 
-  // 挂载/切项目:回查最新一次会诊(可回查)
+  // 挂载/切项目:回查最新一次评图(可回查)
   const loadLatest = useCallback(() => {
     if (projectId == null) {
       setPhase('idle')
@@ -238,7 +238,7 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
       .then((d) => {
         if (d.success && d.checklist) {
           setChecklist(d.checklist)
-          // 回查只还原最终评审结论;会诊过程(三专家原话/成本)不持久化,故回查不展示。
+          // 回查只还原最终评审结论;评图过程(三位评图人原话/成本)不持久化,故回查不展示。
           setDetails(null)
           setCost(null)
           setCreatedAt(d.created_at || null)
@@ -265,7 +265,7 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
       const r = await api.runMoaReview(projectId)
       if (!r.success) {
         // 后端聚合失败时返回可读错误 + 重试建议(不是 500、不是假数据)
-        setErr(r.error || '会诊失败')
+        setErr(r.error || '评图失败')
         setRetryHint(r.retry_suggestion || '')
         setPhase('error')
         return
@@ -286,15 +286,15 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
     <div className="card mt">
       <div className="ct" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span>
-          专家会诊 · 方案评审{' '}
-          <span className="statpill live">功能 / 甲方 / 成本 三专家 + 主审</span>
+          设计委员会 · 方案评审{' '}
+          <span className="statpill live">功能 / 甲方 / 成本 三位评图人 + 主审</span>
         </span>
         <button className="btn" type="button" disabled={projectId == null || phase === 'loading'} onClick={run}>
-          {phase === 'loading' ? '会诊中…' : checklist ? '重新会诊' : '开始专家会诊'}
+          {phase === 'loading' ? '评图中…' : checklist ? '重新评图' : '召集设计委员会'}
         </button>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--mut)', marginTop: 4 }}>
-        功能 / 甲方 / 成本三位 AI 专家分别评审本项目认知，再由主审整合出检查清单与跨维度冲突项。单模型容易把多视角混在一起判断，会诊能把矛盾显式标出来。
+        功能 / 甲方 / 成本三位 AI 专家分别评审本项目认知，再由主审整合出检查清单与跨维度冲突项。单模型容易把多视角混在一起判断，评图能把矛盾显式标出来。
       </div>
 
       {projectId == null && (
@@ -303,13 +303,13 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
 
       {phase === 'loading' && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--terra)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '8px 10px' }}>
-          ⏳ 专家会诊进行中…（约 40–60 秒）。三位专家正分别分析，随后由主审整合输出，请勿离开本页。
+          ⏳ 设计委员会进行中…（约 40–60 秒）。三位评图人正分别分析，随后由主审整合输出，请勿离开本页。
         </div>
       )}
 
       {phase === 'error' && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--red)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '8px 10px' }}>
-          <div>会诊失败：{err || '未知错误'}（不展示假数据）</div>
+          <div>评图失败：{err || '未知错误'}（不展示假数据）</div>
           {retryHint && <div style={{ color: 'var(--ink2)', marginTop: 4 }}>{retryHint}</div>}
           <button className="anbtn" type="button" onClick={run} style={{ marginTop: 8 }}>重试</button>
         </div>
