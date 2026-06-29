@@ -4,7 +4,15 @@ import type { ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import RichText from '@/components/RichText'
-import type { Skill, SkillRun } from '@/types/schemas'
+import type { Skill, SkillRun, KnowledgeHit, ProjectCognition } from '@/types/schemas'
+
+// caselib/condition/slang 接真实端点(非技能执行),各自渲染
+const SPECIAL_SKILLS = new Set(['caselib', 'condition', 'slang'])
+type SlangItem = { term: string; meaning: string; impact: string; action: string }
+type Special =
+  | { type: 'knowledge'; hits: KnowledgeHit[] }
+  | { type: 'cognition'; items: ProjectCognition[] }
+  | { type: 'slang'; items: SlangItem[] }
 
 /* 共创营地 · 暗色重写（Phase 2）。
    视觉对齐 DC 暗色霓虹；数据由 /api/skills 驱动；执行接真 runSkill。
@@ -121,6 +129,46 @@ function MoaDark({ cl }: { cl: Record<string, unknown> }) {
   )
 }
 
+// caselib/condition/slang 的真实端点结果暗色渲染
+function SpecialView({ s }: { s: Special }) {
+  const card = (children: ReactNode, key?: number) => (
+    <div key={key} style={{ marginTop: 8, border: '1px solid ' + C.line, borderRadius: 10, padding: '10px 12px', background: 'rgba(255,255,255,.03)' }}>{children}</div>
+  )
+  if (s.type === 'knowledge') {
+    if (!s.hits.length) return <div style={{ color: C.mut }}>知识库无命中。可先到数据基地补充 / 索引资料。</div>
+    return (<>
+      <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 6 }}>知识库检索命中 {s.hits.length} 条：</div>
+      {s.hits.map((h, i) => card(<>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{h.title}{h.locator ? <span style={{ color: C.mut, fontWeight: 400, fontSize: 11 }}> · {h.locator}</span> : null}</div>
+        {h.snippet && <div style={{ fontSize: 12, color: C.ink2, marginTop: 3 }}>{h.snippet}</div>}
+      </>, i))}
+    </>)
+  }
+  if (s.type === 'cognition') {
+    const conf = s.items.filter((c) => c.summary_md || (c.fields && c.fields.length))
+    if (!conf.length) return <div style={{ color: C.mut }}>本项目暂无已抽取的结构化认知。可到项目中心「结构化认知」做 AI 抽取。</div>
+    return (<>
+      <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 6 }}>项目结构化认知 {conf.length} 个模块：</div>
+      {conf.map((c) => card(<>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.module_label || c.module}
+          <span style={{ marginLeft: 8, fontSize: 10.5, color: c.module_status === 'confirmed' ? C.cyan : C.amber, border: '1px solid ' + C.line, borderRadius: 6, padding: '1px 6px' }}>{c.module_status === 'confirmed' ? '已确认' : '草案'}</span>
+        </div>
+        {c.summary_md && <div style={{ fontSize: 12, color: C.ink2, marginTop: 3 }}>{c.summary_md}</div>}
+      </>, c.id))}
+    </>)
+  }
+  if (!s.items.length) return <div style={{ color: C.mut }}>词典无匹配条目。</div>
+  return (<>
+    <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 6 }}>甲方黑话翻译 {s.items.length} 条：</div>
+    {s.items.map((it, i) => card(<>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>「{it.term}」</div>
+      <div style={{ fontSize: 12, color: C.ink2, marginTop: 3 }}>真实含义：{it.meaning}</div>
+      {it.impact && <div style={{ fontSize: 12, color: C.mut, marginTop: 2 }}>设计影响：{it.impact}</div>}
+      {it.action && <div style={{ fontSize: 12, color: C.mut, marginTop: 2 }}>建议动作：{it.action}</div>}
+    </>, i))}
+  </>)
+}
+
 export default function CampPage() {
   const { cur } = useProject()
   const [skills, setSkills] = useState<Skill[]>([])
@@ -134,6 +182,7 @@ export default function CampPage() {
   const [picker, setPicker] = useState(false)             // 方案评审「快速/设计委员会」选择
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [special, setSpecial] = useState<Special | null>(null)
 
   useEffect(() => { api.listSkills().then((d) => setSkills(d.items)).catch(() => setSkills([])) }, [])
 
@@ -147,7 +196,7 @@ export default function CampPage() {
   const run = useCallback(async (skillId: string, mode = '') => {
     const realId = RUN_AS[skillId] || skillId
     setActive(byId[skillId] || byId[realId] || null)
-    setView('run'); setResult(null); setErr(''); setMoaMode(mode === 'moa'); setPicker(false)
+    setView('run'); setResult(null); setSpecial(null); setErr(''); setMoaMode(mode === 'moa'); setPicker(false)
     if (!cur) { setErr('请先在顶部选择作用项目，再共创。'); return }
     setBusy(true)
     try {
@@ -159,8 +208,34 @@ export default function CampPage() {
     }
   }, [cur, text, byId])
 
-  // 子技能点击：方案评审 → 弹模式选择;其余直接跑
-  const handleSub = (skillId: string) => { if (skillId === 'review') setPicker(true); else run(skillId) }
+  // caselib/condition/slang 接真实端点(知识检索/认知读取/黑话词典),不走技能执行
+  const runSpecial = useCallback(async (skillId: string) => {
+    setActive(byId[skillId] || null)
+    setView('run'); setResult(null); setSpecial(null); setErr(''); setMoaMode(false); setPicker(false)
+    if (!cur) { setErr('请先在顶部选择作用项目，再共创。'); return }
+    setBusy(true)
+    try {
+      if (skillId === 'caselib') {
+        const r = await api.searchKnowledge(text.trim() || cur.name, 8)
+        setSpecial({ type: 'knowledge', hits: r.hits })
+      } else if (skillId === 'condition') {
+        setSpecial({ type: 'cognition', items: await api.listCognition(cur.id) })
+      } else {
+        setSpecial({ type: 'slang', items: await api.querySlang(cur.id, text.trim()) })
+      }
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }, [cur, text, byId])
+
+  // 子技能点击：方案评审 → 弹模式选择;caselib/condition/slang → 真实端点;其余跑技能
+  const handleSub = (skillId: string) => {
+    if (skillId === 'review') setPicker(true)
+    else if (SPECIAL_SKILLS.has(skillId)) runSpecial(skillId)
+    else run(skillId)
+  }
 
   const composer = (big: boolean) => (
     <div style={{ padding: 2, borderRadius: 22, background: 'linear-gradient(120deg,rgba(124,92,255,.85),rgba(66,165,255,.6) 42%,rgba(215,168,110,.7))', boxShadow: '0 0 50px rgba(124,92,255,.22)' }}>
@@ -298,7 +373,8 @@ export default function CampPage() {
         <div style={{ flex: 1, overflowY: 'auto', padding: 26 }}>
           <div style={{ maxWidth: 760, margin: '0 auto', color: C.ink2, fontSize: 14, lineHeight: 1.7 }}>
             {busy && <div style={{ color: C.cyan }}>⏳ {moaMode ? '正在召集设计委员会（三位评图人 + 主审，约 15–60 秒）…' : `正在共创「${active?.title}」…`}</div>}
-            {!busy && err && <div style={{ color: C.red }}>执行失败：{err}<button type="button" onClick={() => active && run(active.id, moaMode ? 'moa' : '')} style={{ marginLeft: 10, cursor: 'pointer', background: 'transparent', border: '1px solid ' + C.line, color: C.ink2, borderRadius: 8, padding: '2px 10px' }}>重试</button></div>}
+            {!busy && err && <div style={{ color: C.red }}>执行失败：{err}<button type="button" onClick={() => { if (!active) return; if (SPECIAL_SKILLS.has(active.id)) runSpecial(active.id); else run(active.id, moaMode ? 'moa' : '') }} style={{ marginLeft: 10, cursor: 'pointer', background: 'transparent', border: '1px solid ' + C.line, color: C.ink2, borderRadius: 8, padding: '2px 10px' }}>重试</button></div>}
+            {!busy && special && <SpecialView s={special} />}
             {!busy && result && result.status !== 'ok' && (
               <div style={{ color: C.mut }}>
                 {result.status === 'not_configured' && '未配置 AI（不伪造）。请在设置中配置后重试。'}
