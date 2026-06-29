@@ -25,8 +25,38 @@ const STAGE_CHIP: Record<string, string> = {
   completed: '已完成',
 }
 
-/** 可折叠分区外壳(复用 .sec/data-open 折叠骨架):点标题展开/收起,默认折叠。
- *  纯包裹,不改内部任何功能。 */
+// DC 暗色基元（与 BossPage/CampPage/HubPage 同一套色板，跨页一致）
+const C = {
+  purple: '#7c5cff', blue: '#42a5ff', gold: '#d7a86e', cyan: '#36e6d4', red: '#ff5e66', amber: '#fdab3d', green: '#49d18d',
+  ink: '#f4f1ea', ink2: '#d8d4cc', mut: '#8f96a5', mut2: '#5f6674', line: 'rgba(255,255,255,.08)',
+  glass: 'linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032))',
+}
+const cardBase: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 18, background: C.glass }
+
+/** DC 玻璃 KPI 卡（发光角 + 图标标签 + 大数字）。值为 '—' 时不伪造。 */
+function Kpi({ icon, label, value, color, glow }: { icon: string; label: string; value: React.ReactNode; color?: string; glow: string }) {
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden', ...cardBase, padding: '15px 16px', minHeight: 92 }}>
+      <div style={{ position: 'absolute', right: -30, top: -30, width: 100, height: 100, borderRadius: '50%', background: `radial-gradient(circle, ${glow}, transparent 68%)` }} />
+      <div style={{ position: 'relative', color: C.mut, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
+      <div style={{ position: 'relative', marginTop: 12, fontSize: 30, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, color: color || C.ink }}>{value}</div>
+    </div>
+  )
+}
+
+/** 分组标题（核心 / 判断解析 / 资料）——竖条 + 标题 + 渐隐分隔线。 */
+function GroupLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '24px 0 12px' }}>
+      <span style={{ width: 4, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#7c5cff,#42a5ff)', flexShrink: 0 }} />
+      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-.02em', flexShrink: 0 }}>{children}</h2>
+      {hint && <span style={{ fontSize: 11.5, color: C.mut }}>{hint}</span>}
+      <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${C.line},transparent)` }} />
+    </div>
+  )
+}
+
+/** 可折叠分区外壳(复用 .sec/data-open 折叠骨架)：点标题展开/收起。纯包裹，不改内部功能。 */
 function Collapsible({
   open,
   onToggle,
@@ -55,17 +85,18 @@ function Collapsible({
   )
 }
 
-/** 项目中心：原 ROM-AI 五段布局。项目下拉 / KPI 接新后端真实数据。
- *  当前项目走共享上下文（useProject）→ 共创营地/数据基地随之联动。 */
+/** 项目中心：单项目工作台（借 DC 版面：概览 KPI 卡 + 主/侧两栏 + 资料降权）。
+ *  核心 = 前期判断解析 + 会议链路；资料读取/清理归数据基地（此处降权收底）。
+ *  数据全接真实后端，逻辑不动；当前项目走共享上下文（useProject）。 */
 export default function ProjectCenterPage() {
   const { projects, curId, setCurId, cur, err, reload } = useProject()
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const [renameErr, setRenameErr] = useState<string | null>(null)
-  // 各内容块折叠状态;这 6 块默认展开,其余(未列=undefined)默认折叠。点标题切换。
+  // 折叠状态；核心块默认展开，资料块（files/workspace 未列）默认折叠。
   const [open, setOpen] = useState<Record<string, boolean>>({
-    tencent: true, meeting: true, tasks: true, overview: true, stage: true, cognition: true, analysis: true,
+    tencent: true, meeting: true, tasks: true, stage: true, cognition: true, analysis: true,
   })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
@@ -85,7 +116,7 @@ export default function ProjectCenterPage() {
   const [risks, setRisks] = useState<ProjectRisk[]>([])
   const [reuseTags, setReuseTags] = useState<ReusableAsset[]>([])
   const [progress, setProgress] = useState<ProjectProgress | null>(null)
-  // 会议纪要「回流」或「确认」后 +1：触发 KPI/里程碑/进度重取，并驱动任务看板重拉（确认会落成看板任务，同页即时刷新）
+  // 会议纪要「回流」或「确认」后 +1：触发 KPI/里程碑/进度重取，并驱动任务看板重拉
   const [refreshKey, setRefreshKey] = useState(0)
   // 任务看板风险计数（过期/卡住）——折叠时也在 section hint 上显示徽章
   const [taskRisk, setTaskRisk] = useState<{ overdue: number; stale: number }>({ overdue: 0, stale: 0 })
@@ -106,10 +137,7 @@ export default function ProjectCenterPage() {
     setRisks([])
     setReuseTags([])
     setProgress(null)
-    api
-      .getProjectOverview(curId)
-      .then((d) => alive && setOverview(d))
-      .catch(() => {})
+    api.getProjectOverview(curId).then((d) => alive && setOverview(d)).catch(() => {})
     api.getProjectMilestones(curId).then((d) => alive && setMilestones(d)).catch(() => {})
     api.getProjectRisks(curId).then((d) => alive && setRisks(d)).catch(() => {})
     api.getProjectReusableAssets(curId).then((d) => alive && setReuseTags(d)).catch(() => {})
@@ -119,10 +147,13 @@ export default function ProjectCenterPage() {
     }
   }, [curId, refreshKey])
 
+  const taskCount = taskRisk.overdue + taskRisk.stale
+
   return (
-    <>
+    <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+      {/* HEADER：项目下拉 / 改名 / chip */}
       <div className="ptitle">
-        <h1>项目中心</h1>
+        <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>项目中心</h1>
         <div className="projsel">
           <div className="pick" onClick={() => setMenuOpen((v) => !v)}>
             ▾ 当前项目 · <b>{cur?.name ?? '（暂无项目）'}</b>
@@ -132,10 +163,7 @@ export default function ProjectCenterPage() {
               <button
                 key={p.id}
                 className={'projitem' + (p.id === curId ? ' on' : '')}
-                onClick={() => {
-                  setCurId(p.id)
-                  setMenuOpen(false)
-                }}
+                onClick={() => { setCurId(p.id); setMenuOpen(false) }}
               >
                 <div>
                   <div className="pi-name">{p.name}</div>
@@ -145,35 +173,19 @@ export default function ProjectCenterPage() {
               </button>
             ))}
             {projects.length === 0 && (
-              <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--mut)' }}>
-                暂无项目，可在「新建项目」接口创建
-              </div>
+              <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--mut)' }}>暂无项目，可在「新建项目」接口创建</div>
             )}
           </div>
         </div>
-        {/* 手动改名:文件夹原名太长时,用户自己精简(取名是人的判断,不靠规则猜) */}
         {cur && !renaming && (
-          <span
-            className="act"
-            style={{ marginLeft: 6, color: 'var(--terra)', cursor: 'pointer', fontSize: 12 }}
-            title="重命名当前项目"
-            onClick={() => { setRenameVal(cur.name); setRenaming(true) }}
-          >
-            ✎ 改名
-          </span>
+          <span className="act" style={{ marginLeft: 6, color: C.purple, cursor: 'pointer', fontSize: 12 }} title="重命名当前项目" onClick={() => { setRenameVal(cur.name); setRenaming(true) }}>✎ 改名</span>
         )}
         {cur && renaming && (
           <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 6 }}>
-            <input
-              value={renameVal}
-              autoFocus
-              onChange={(e) => setRenameVal(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') setRenaming(false) }}
-              style={{ fontSize: 13, padding: '2px 6px', border: '1px solid var(--line2)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--ink)' }}
-            />
+            <input value={renameVal} autoFocus onChange={(e) => setRenameVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') setRenaming(false) }} style={{ fontSize: 13, padding: '2px 6px', border: `1px solid ${C.line}`, borderRadius: 6, background: 'rgba(255,255,255,.045)', color: C.ink }} />
             <button className="anbtn" disabled={!renameVal.trim()} onClick={doRename}>存</button>
             <button className="anbtn" onClick={() => setRenaming(false)}>取消</button>
-            {renameErr && <span style={{ fontSize: 11, color: 'var(--red)' }}>{renameErr}</span>}
+            {renameErr && <span style={{ fontSize: 11, color: C.red }}>{renameErr}</span>}
           </span>
         )}
         <div style={{ display: 'flex', gap: 5, marginLeft: 6 }}>
@@ -183,148 +195,102 @@ export default function ProjectCenterPage() {
         </div>
       </div>
 
-      {err && (
-        <div className="card" style={{ marginBottom: 16, color: 'var(--red)' }}>
-          项目数据加载失败：{err}
+      {err && <div style={{ ...cardBase, padding: 16, marginBottom: 16, color: C.red }}>项目数据加载失败：{err}</div>}
+
+      {/* HERO：概览 KPI 玻璃卡（真实数据，去掉后端恒 0 的「成果缺口」）+ 阶段进度 */}
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
+        <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} glow="rgba(124,92,255,.26)" />
+        <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} glow="rgba(66,165,255,.22)" />
+        <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} glow="rgba(215,168,110,.24)" />
+        <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} color={C.cyan} glow="rgba(54,230,212,.22)" />
+        <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} glow="rgba(255,94,102,.24)" />
+        <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} glow="rgba(124,92,255,.2)" />
+      </section>
+      <div style={{ ...cardBase, padding: '14px 16px', marginTop: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: C.ink2 }}>阶段进度</span>
+          <span style={{ fontSize: 11.5, color: C.gold }}>{progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'}</span>
         </div>
-      )}
-
-      <Collapsible open={!!open.progress} onToggle={() => toggle('progress')} title="阶段进度"
-        hint={progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'}>
-        <div className="prog">
-          <i style={{ width: `${progress?.pct ?? 0}%` }}></i>
+        <div style={{ height: 9, borderRadius: 6, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${progress?.pct ?? 0}%`, background: 'linear-gradient(90deg,#7c5cff,#42a5ff)', transition: 'width .3s' }} />
         </div>
-      </Collapsible>
+      </div>
 
-      <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
-        <TencentMeetingCard projectId={curId} />
-      </Collapsible>
+      {/* 主（核心：会议链路 + 判断解析）+ 侧（状态：里程碑/风险/资产）两栏 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 18, alignItems: 'start', marginTop: 4 }}>
+        <main style={{ minWidth: 0 }}>
+          <GroupLabel hint="腾讯会议 → 会议纪要 → 任务看板">会议链路</GroupLabel>
+          <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
+            <TencentMeetingCard projectId={curId} />
+          </Collapsible>
+          <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
+            <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} onConfirmed={() => setRefreshKey((k) => k + 1)} />
+          </Collapsible>
+          <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板"
+            count={taskCount > 0 ? `⚠ ${taskCount}` : undefined}
+            hint={taskCount > 0 ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住` : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
+            <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} refreshSignal={refreshKey} />
+          </Collapsible>
 
-      <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
-        <MeetingPanel
-          projectId={curId}
-          onReflowed={() => setRefreshKey((k) => k + 1)}
-          onConfirmed={() => setRefreshKey((k) => k + 1)}
-        />
-      </Collapsible>
+          <GroupLabel hint="任务书 / 场地 / 概念 … AI 解读 + 研判">判断解析</GroupLabel>
+          <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} title="项目解读" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
+            <CognitionSection projectId={curId} />
+          </Collapsible>
+          <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} title="智能研判"
+            count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
+            <ProjectAnalysisPanel projectId={curId} />
+          </Collapsible>
+          <Collapsible open={!!open.stage} onToggle={() => toggle('stage')} title="阶段拆解">
+            <StageProgressPanel projectId={curId} />
+          </Collapsible>
+        </main>
 
-      <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} title="任务看板"
-        count={taskRisk.overdue + taskRisk.stale > 0 ? `⚠ ${taskRisk.overdue + taskRisk.stale}` : undefined}
-        hint={taskRisk.overdue + taskRisk.stale > 0
-          ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住`
-          : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
-        <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} refreshSignal={refreshKey} />
-      </Collapsible>
-
-      <Collapsible open={!!open.overview} onToggle={() => toggle('overview')} title="项目概览" hint="文件 / 会议 / 待办 / 风险 / 资产">
-        <div className="grid4">
-          <div className="metric">
-            <div className="l">📄 文件</div>
-            <div className="v">{overview ? overview.files : '—'}</div>
-          </div>
-          <div className="metric">
-            <div className="l">📅 会议</div>
-            <div className="v">{overview ? overview.meetings : '—'}</div>
-          </div>
-          <div className="metric">
-            <div className="l">✓ 待办</div>
-            <div className="v t">{overview ? overview.todos : '—'}</div>
-          </div>
-          <div className="metric">
-            <div className="l">🔊 会议纪要</div>
-            <div className="v t">{overview ? overview.minutes : '—'}</div>
-          </div>
-        </div>
-        <div className="grid3 mt">
-          <div className="metric">
-            <div className="l">⚠ 风险</div>
-            <div className="v r">{overview ? overview.risks : '—'}</div>
-          </div>
-          <div className="metric">
-            <div className="l">◎ 成果缺口</div>
-            <div className="v">{overview ? overview.gaps : '—'}</div>
-          </div>
-          <div className="metric">
-            <div className="l">⟳ 可复用资产</div>
-            <div className="v">{overview ? overview.assets : '—'}</div>
-          </div>
-        </div>
-      </Collapsible>
-
-      <Collapsible open={!!open.stage} onToggle={() => toggle('stage')} title="阶段拆解">
-        <StageProgressPanel projectId={curId} />
-      </Collapsible>
-
-      <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} title="项目解读" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
-        <CognitionSection projectId={curId} />
-      </Collapsible>
-
-      <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} title="智能研判"
-        count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
-        <ProjectAnalysisPanel projectId={curId} />
-      </Collapsible>
-
-      {/* 甲方黑话词典:作为 ROM-AI 内在解读能力(后端研判/解读时使用),项目中心不再单独显示。 */}
-
-      <Collapsible open={!!open.files} onToggle={() => toggle('files')} title="项目文件" hint="拖拽 / 选择上传 · txt/md/pdf/docx/pptx">
-        <ProjectFilesPanel projectId={curId} />
-      </Collapsible>
-
-      <Collapsible open={!!open.milestones} onToggle={() => toggle('milestones')} title="里程碑 · 风险看板">
-        <div className="grid2">
-          <div className="card">
-            <div className="ct">下一步 · 里程碑</div>
-            <div id="pj-steps">
-              {milestones.length === 0 ? (
-                <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
-                  暂无里程碑。接入项目任务后在此显示（负责人 · 截止）。
+        <aside style={{ display: 'grid', gap: 14, position: 'sticky', top: 14 }}>
+          <div style={{ ...cardBase, padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>下一步 · 里程碑</div>
+            {milestones.length === 0 ? (
+              <div style={{ color: C.mut, fontSize: 12.5, padding: '6px 0' }}>暂无里程碑。接入项目任务后在此显示（负责人 · 截止）。</div>
+            ) : (
+              milestones.map((m, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12.5, color: C.ink2, padding: '6px 0' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: m.urgent ? C.red : C.gold, boxShadow: `0 0 8px ${m.urgent ? C.red : C.gold}`, transform: 'translateY(-1px)' }} />
+                  <span style={{ flex: 1 }}>{m.title}</span>
+                  <span style={{ fontSize: 11, color: C.mut, whiteSpace: 'nowrap' }}>{m.owner} · {m.due}</span>
                 </div>
-              ) : (
-                milestones.map((m, i) => (
-                  <div className="li" key={i}>
-                    <span className="b" style={{ background: m.urgent ? 'var(--red)' : 'var(--terra)' }}></span>
-                    {m.title}
-                    <span className="who">{m.owner} · {m.due}</span>
-                  </div>
-                ))
-              )}
-            </div>
+              ))
+            )}
           </div>
-          <div className="card">
-            <div className="ct">风险看板 · 可复用资产</div>
-            <div id="pj-riskboard">
-              {risks.length === 0 ? (
-                <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
-                  暂无风险项。接入 AI 研判风险后在此显示。
+          <div style={{ ...cardBase, padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>风险看板 · 可复用资产</div>
+            {risks.length === 0 ? (
+              <div style={{ color: C.mut, fontSize: 12.5, padding: '6px 0' }}>暂无风险项。接入 AI 研判风险后在此显示。</div>
+            ) : (
+              risks.map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12.5, color: C.ink2, padding: '6px 0' }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 6, padding: '1px 7px', flexShrink: 0, color: r.level === 'high' ? '#ff9b9b' : '#e2c07a', border: `1px solid ${r.level === 'high' ? 'rgba(255,94,102,.4)' : 'rgba(215,168,110,.4)'}`, background: r.level === 'high' ? 'rgba(255,94,102,.12)' : 'rgba(215,168,110,.12)' }}>{r.level === 'high' ? '高' : '中'}</span>
+                  <span style={{ flex: 1 }}>{r.text}</span>
                 </div>
-              ) : (
-                risks.map((r, i) => (
-                  <div className="li" key={i}>
-                    <span className={'pill ' + (r.level === 'high' ? 'h' : 'm')}>
-                      {r.level === 'high' ? '高' : '中'}
-                    </span>
-                    {r.text}
-                  </div>
-                ))
-              )}
-            </div>
+              ))
+            )}
             {reuseTags.length > 0 && (
-              <div className="tags" style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
                 {reuseTags.map((t, i) => (
-                  <span className="tg" key={i}>
-                    <span className="k">{t.kind}</span>
-                    {t.name}
-                  </span>
+                  <span key={i} style={{ fontSize: 11, color: C.ink2, border: `1px solid ${C.line}`, borderRadius: 7, padding: '2px 8px' }}><span style={{ color: C.mut, marginRight: 4 }}>{t.kind}</span>{t.name}</span>
                 ))}
               </div>
             )}
           </div>
-        </div>
-      </Collapsible>
+        </aside>
+      </div>
 
+      {/* 资料区降权（职能区分：读取/清理归数据基地，此处默认折叠、低权重，不删） */}
+      <GroupLabel hint="读取 / 清理归数据基地 · 此处仅本项目入口">资料</GroupLabel>
+      <Collapsible open={!!open.files} onToggle={() => toggle('files')} title="项目文件" hint="拖拽 / 选择上传 · txt/md/pdf/docx/pptx">
+        <ProjectFilesPanel projectId={curId} />
+      </Collapsible>
       <Collapsible open={!!open.workspace} onToggle={() => toggle('workspace')} title="项目目录 · 读取与安全清理">
         <WorkspacePanel />
       </Collapsible>
-    </>
+    </div>
   )
 }
