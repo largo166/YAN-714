@@ -152,7 +152,7 @@ export default function HubPage() {
           <div style={{ color: C.mut, fontSize: 13, padding: '4px 2px' }}>暂无团队成员。点「添加成员」录入，或在共创营地录入人员后生成卡片。</div>
         )}
         {members.map((m) => (
-          <div key={m.id} style={{ ...cardBase, padding: 16, display: 'flex', flexDirection: 'column', gap: 11 }}>
+          <div key={m.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
               <Avatar text={m.name?.[0] || '人'} kind="human" />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -252,7 +252,7 @@ export default function HubPage() {
         {agents.map((a) => {
           const ok = a.status === 'ok'
           return (
-            <div key={a.id} style={{ ...cardBase, padding: 16, display: 'flex', flexDirection: 'column', gap: 11 }}>
+            <div key={a.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#d7a86e,#36e6d4)', ['--gl']: 'rgba(215,168,110,.2)' } as React.CSSProperties}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <Avatar text={a.name?.[0] || 'A'} kind="agent" />
                 <div style={{ flex: 1, minWidth: 0 }}>

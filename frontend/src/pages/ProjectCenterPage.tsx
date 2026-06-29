@@ -33,13 +33,27 @@ const C = {
 }
 const cardBase: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 18, background: C.glass }
 
-/** DC 玻璃 KPI 卡（发光角 + 图标标签 + 大数字）。值为 '—' 时不伪造。 */
-function Kpi({ icon, label, value, color, glow }: { icon: string; label: string; value: React.ReactNode; color?: string; glow: string }) {
+/** 驾驶舱 KPI 卡（.ckcard：顶边光条 + 发光角 + hover）。ac=顶条色 gl=角辉光。值 '—' 不伪造。 */
+function Kpi({ icon, label, value, color, ac, gl }: { icon: string; label: string; value: React.ReactNode; color?: string; ac: string; gl: string }) {
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', ...cardBase, padding: '15px 16px', minHeight: 92 }}>
-      <div style={{ position: 'absolute', right: -30, top: -30, width: 100, height: 100, borderRadius: '50%', background: `radial-gradient(circle, ${glow}, transparent 68%)` }} />
-      <div style={{ position: 'relative', color: C.mut, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
-      <div style={{ position: 'relative', marginTop: 12, fontSize: 30, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, color: color || C.ink }}>{value}</div>
+    <div className="ckcard" style={{ padding: '15px 16px', minHeight: 92, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
+      <div style={{ color: C.mut, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
+      <div style={{ marginTop: 12, fontSize: 30, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
+    </div>
+  )
+}
+
+/** 阶段进度环形仪表（pct 真实，发光 conic 环 + 中心大号 %）。 */
+function Gauge({ pct }: { pct: number }) {
+  const p = Math.max(0, Math.min(100, Math.round(pct)))
+  return (
+    <div style={{ width: 168, height: 168, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `conic-gradient(#7c5cff 0% ${p}%, rgba(255,255,255,.06) ${p}% 100%)`, boxShadow: '0 0 46px rgba(124,92,255,.26)' }}>
+      <div style={{ width: 126, height: 126, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center', border: `1px solid ${C.line}` }}>
+        <div>
+          <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{p}<span style={{ fontSize: 15, color: C.mut }}>%</span></div>
+          <div style={{ fontSize: 11, color: C.mut, marginTop: 4 }}>阶段进度</div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -197,22 +211,21 @@ export default function ProjectCenterPage() {
 
       {err && <div style={{ ...cardBase, padding: 16, marginBottom: 16, color: C.red }}>项目数据加载失败：{err}</div>}
 
-      {/* HERO：概览 KPI 玻璃卡（真实数据，去掉后端恒 0 的「成果缺口」）+ 阶段进度 */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
-        <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} glow="rgba(124,92,255,.26)" />
-        <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} glow="rgba(66,165,255,.22)" />
-        <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} glow="rgba(215,168,110,.24)" />
-        <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} color={C.cyan} glow="rgba(54,230,212,.22)" />
-        <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} glow="rgba(255,94,102,.24)" />
-        <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} glow="rgba(124,92,255,.2)" />
-      </section>
-      <div style={{ ...cardBase, padding: '14px 16px', marginTop: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: C.ink2 }}>阶段进度</span>
-          <span style={{ fontSize: 11.5, color: C.gold }}>{progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'}</span>
+      {/* HERO：阶段进度环形仪表(左) + 概览 KPI 簇(右)，主次错落（去掉后端恒 0 的「成果缺口」）。 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,280px) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
+        <div className="ckcard" style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.28)' } as React.CSSProperties}>
+          <Gauge pct={progress?.pct ?? 0} />
+          <div style={{ fontSize: 12, color: C.gold, textAlign: 'center', lineHeight: 1.5 }}>
+            {progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'}
+          </div>
         </div>
-        <div style={{ height: 9, borderRadius: 6, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progress?.pct ?? 0}%`, background: 'linear-gradient(90deg,#7c5cff,#42a5ff)', transition: 'width .3s' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12 }}>
+          <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
+          <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} ac="#42a5ff" gl="rgba(66,165,255,.26)" />
+          <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
+          <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} color={C.cyan} ac="#36e6d4" gl="rgba(54,230,212,.24)" />
+          <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
+          <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} ac="linear-gradient(90deg,#7c5cff,#36e6d4)" gl="rgba(124,92,255,.22)" />
         </div>
       </div>
 

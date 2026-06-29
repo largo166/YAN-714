@@ -34,13 +34,12 @@ function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: st
   )
 }
 
-function Kpi({ label, value, caption, color, glow }: { label: string; value: string; caption: string; color?: string; glow: string }) {
+function Kpi({ label, value, caption, color, ac, gl }: { label: string; value: string; caption: string; color?: string; ac: string; gl: string }) {
   return (
-    <div style={{ ...cardBase, position: 'relative', overflow: 'hidden', padding: 18, minHeight: 128 }}>
-      <div style={{ position: 'absolute', right: -34, top: -34, width: 120, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${glow}, transparent 68%)` }} />
-      <div style={{ position: 'relative', color: C.mut, fontSize: 12.5 }}>{label}</div>
-      <div style={{ position: 'relative', marginTop: 16, fontSize: 36, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, color: color || C.ink }}>{value}</div>
-      <div style={{ position: 'relative', marginTop: 10, color: C.mut, fontSize: 12, lineHeight: 1.5 }}>{caption}</div>
+    <div className="ckcard" style={{ padding: 18, minHeight: 128, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
+      <div style={{ color: C.mut, fontSize: 12.5 }}>{label}</div>
+      <div style={{ marginTop: 16, fontSize: 36, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
+      <div style={{ marginTop: 10, color: C.mut, fontSize: 12, lineHeight: 1.5 }}>{caption}</div>
     </div>
   )
 }
@@ -151,10 +150,10 @@ export default function BossPage() {
 
       {/* KPI row */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
-        <Kpi label="进行中项目" value={v(dash?.active_projects)} caption="跨项目聚合" color={C.ink} glow="rgba(124,92,255,.30)" />
-        <Kpi label="临近交付" value={v(dash?.near_delivery)} caption="14 天内到节点" color={C.amber} glow="rgba(215,168,110,.30)" />
-        <Kpi label="高风险项" value={v(dash?.high_risks)} caption="需负责人介入" color={C.red} glow="rgba(255,94,102,.28)" />
-        <Kpi label="AI 使用 · 本周" value={v(dash?.ai_usage_week)} caption="次成果生成" color={C.cyan} glow="rgba(54,230,212,.26)" />
+        <Kpi label="进行中项目" value={v(dash?.active_projects)} caption="跨项目聚合" color={C.ink} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.30)" />
+        <Kpi label="临近交付" value={v(dash?.near_delivery)} caption="14 天内到节点" color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.30)" />
+        <Kpi label="高风险项" value={v(dash?.high_risks)} caption="需负责人介入" color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.28)" />
+        <Kpi label="AI 使用 · 本周" value={v(dash?.ai_usage_week)} caption="次成果生成" color={C.cyan} ac="#36e6d4" gl="rgba(54,230,212,.26)" />
       </section>
 
       {/* charts row */}
