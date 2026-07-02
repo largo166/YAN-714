@@ -97,6 +97,25 @@ def workload(db: Session = Depends(get_db)) -> schemas.WorkloadListOut:
                 if owner in counts:
                     counts[owner] += 1
 
+    # 任务看板负荷:技能成果/手工落库的未完成任务(source_minute_id==0)。
+    # 纪要派生的任务(source_minute_id>0)已由上面纪要 todos 计入,这里排除以免双计。
+    active_ids = [project.id for project in projects]
+    if active_ids:
+        member_name_by_id = {member.id: member.name for member in members}
+        assignments = (
+            db.query(models.TeamAssignment)
+            .filter(
+                models.TeamAssignment.project_id.in_(active_ids),
+                models.TeamAssignment.status != "done",
+                models.TeamAssignment.source_minute_id == 0,
+            )
+            .all()
+        )
+        for assignment in assignments:
+            name = member_name_by_id.get(assignment.member_id) or (assignment.owner_name or "").strip()
+            if name in counts:
+                counts[name] += 1
+
     max_count = max(counts.values(), default=0)
     if max_count == 0:
         return schemas.WorkloadListOut(items=[])

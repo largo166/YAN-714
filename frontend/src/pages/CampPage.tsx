@@ -36,8 +36,7 @@ const ENTRIES: Record<string, { title: string; subs: string[] }> = {
   brief: { title: '汇报提纲', subs: ['brief', 'writer', 'poster', 'slang'] },
 }
 const ENTRY_IDS = ['concept', 'review', 'flow', 'brief']
-// 子技能 → 实际跑的底层技能（不新增空壳）
-const RUN_AS: Record<string, string> = { brief: 'ppt', judge: 'task' }
+// 声明即所跑：judge/brief 后端已是独立真实技能(各有专属 prompt),不再映射到 task/ppt(拆掉早期兼容串台)。
 
 const AGENTS = [
   { sid: 'concept', av: '领', avc: C.purple, title: '方案领航员', sub: '从任务书引导到体量概念' },
@@ -228,13 +227,12 @@ export default function CampPage() {
   }, [skills])
 
   const run = useCallback(async (skillId: string, mode = '') => {
-    const realId = RUN_AS[skillId] || skillId
-    setActive(byId[skillId] || byId[realId] || null)
+    setActive(byId[skillId] || null)
     setView('run'); setResult(null); setSpecial(null); setErr(''); setMoaMode(mode === 'moa'); setPicker(false)
     if (!cur) { setErr('请先在顶部选择作用项目，再共创。'); return }
     setBusy(true)
     try {
-      setResult(await api.runSkill(cur.id, realId, text.trim(), '', 0, '', '', mode))
+      setResult(await api.runSkill(cur.id, skillId, text.trim(), '', 0, '', '', mode))
     } catch (e) {
       setErr((e as Error).message)
     } finally {
