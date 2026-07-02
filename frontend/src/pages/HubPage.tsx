@@ -194,7 +194,7 @@ export default function HubPage() {
       </div>
 
       {/* 甲方画像库 */}
-      <SecLabel title="甲方画像库" sub="同一甲方的项目 / 诉求 / 历史聚合（仅汇已确认认知，不伪造）" />
+      <SecLabel title="甲方画像库" sub="同一甲方的项目 / 诉求 / 历史，一处聚合（只汇入已确认的认知）" />
       <div style={{ ...cardBase, padding: 18, marginBottom: 28 }}>
         {clients.length === 0 ? (
           <div style={{ color: C.mut, fontSize: 13 }}>暂无甲方。给项目填上「甲方」后，这里按甲方聚合其项目与诉求/历史。</div>
@@ -252,7 +252,7 @@ export default function HubPage() {
         {agents.map((a) => {
           const ok = a.status === 'ok'
           return (
-            <div key={a.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#d7a86e,#36e6d4)', ['--gl']: 'rgba(215,168,110,.2)' } as React.CSSProperties}>
+            <div key={a.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <Avatar text={a.name?.[0] || 'A'} kind="agent" />
                 <div style={{ flex: 1, minWidth: 0 }}>

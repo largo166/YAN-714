@@ -60,7 +60,7 @@ export default function CrossProjectLibrary() {
       </div>
       {items.length === 0 ? (
         <div style={{ color: 'var(--mut)', fontSize: 13 }}>
-          暂无沉淀条目。在项目中心确认某模块认知后，可「沉淀到跨项目库」供其它项目复用（只沉淀已确认内容，不伪造）。
+          暂无沉淀条目。在项目中心确认某模块认知后，点「沉淀到跨项目库」，这条经验就能被其它项目复用。
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 6 }}>

@@ -84,7 +84,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
           setByTask((m) => ({ ...m, [t.key]: r }))
           if (r.status === 'ok') done++
           else if (r.status === 'not_configured') {
-            setProgress('AI 未配置,请到设置页配置 DeepSeek API Key 后再分析(不会伪造)。')
+            setProgress('尚未配置 AI 引擎。到「设置」填入 DeepSeek API Key 后即可一键研判。')
             return
           } else skipped++ // no_material / error:如实跳过,继续下一个
         } catch {
@@ -105,7 +105,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
       const r = await api.reflowAnalysis(current.id)
       if (r.status === 'ok') setReflowNote(`已回流到数据基地：${r.title}（可被其它项目检索复用）`)
       else if (r.status === 'already') setReflowNote('该研判已回流，未重复写入。')
-      else if (r.status === 'not_confirmed') setReflowNote(r.message || '该研判无有效结论，不能回流（不伪造）。')
+      else if (r.status === 'not_confirmed') setReflowNote(r.message || '该研判还没有有效结论，暂时不能回流入库。')
       else if (r.status === 'empty') setReflowNote(r.message || '无可回流内容。')
       else setReflowNote(r.message || '无法回流')
     } catch (e) {
@@ -144,7 +144,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
       </div>
 
       <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
-        研判基于「本项目已解析文件 + 知识库检索」生成并带出处；完整段落级溯源将在检索升级（P6）后增强。
+        研判基于「本项目已解析文件 + 知识库检索」生成，每条结论都带出处。
       </div>
       {progress && (
         <div style={{ fontSize: 12, color: batchRunning ? 'var(--terra)' : 'var(--mut)', marginBottom: 8 }}>{progress}</div>

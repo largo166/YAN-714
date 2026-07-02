@@ -409,7 +409,7 @@ export default function CampPage() {
             {!busy && special && <SpecialView s={special} />}
             {!busy && result && result.status !== 'ok' && (
               <div style={{ color: C.mut }}>
-                {result.status === 'not_configured' && '未配置 AI（不伪造）。请在设置中配置后重试。'}
+                {result.status === 'not_configured' && '尚未配置 AI 引擎。到「设置」填入 DeepSeek API Key 后即可共创。'}
                 {result.status === 'no_material' && '本项目暂无可用材料。请先到数据基地上传/索引资料。'}
                 {result.status === 'error' && `执行失败：${result.error_message || result.content}`}
               </div>

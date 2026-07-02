@@ -299,7 +299,7 @@ export default function ProjectCenterPage() {
             <div style={{ display: 'flex', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
               {mini(overview ? overview.files : '—', '文件')}
               {mini(overview ? overview.meetings : '—', '会议')}
-              {mini(overview ? overview.minutes : '—', '会议纪要', C.cyan)}
+              {mini(overview ? overview.minutes : '—', '会议纪要')}
             </div>
           </div>
         </div>
@@ -323,11 +323,11 @@ export default function ProjectCenterPage() {
       {/* KPI 指标带（真实数据，去掉后端恒 0 的「成果缺口」） */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 14 }}>
         <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
-        <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} ac="#42a5ff" gl="rgba(66,165,255,.26)" />
+        <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
         <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
-        <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} color={C.cyan} ac="#36e6d4" gl="rgba(54,230,212,.24)" />
+        <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
         <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
-        <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} ac="linear-gradient(90deg,#7c5cff,#36e6d4)" gl="rgba(124,92,255,.22)" />
+        <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
       </div>
 
       {/* 快速跳转 */}

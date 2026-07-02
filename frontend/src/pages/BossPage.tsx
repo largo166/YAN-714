@@ -153,7 +153,7 @@ export default function BossPage() {
         <Kpi label="进行中项目" value={v(dash?.active_projects)} caption="跨项目聚合" color={C.ink} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.30)" />
         <Kpi label="临近交付" value={v(dash?.near_delivery)} caption="14 天内到节点" color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.30)" />
         <Kpi label="高风险项" value={v(dash?.high_risks)} caption="需负责人介入" color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.28)" />
-        <Kpi label="AI 使用 · 本周" value={v(dash?.ai_usage_week)} caption="次成果生成" color={C.cyan} ac="#36e6d4" gl="rgba(54,230,212,.26)" />
+        <Kpi label="AI 使用 · 本周" value={v(dash?.ai_usage_week)} caption="次成果生成" ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
       </section>
 
       {/* charts row */}

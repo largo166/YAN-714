@@ -452,12 +452,13 @@ export default function KnowledgePage() {
         <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>数据基地</h1>
         <span className="statpill live" style={{ marginLeft: 8 }}>本地索引 · 已接入</span>
       </div>
+      <p style={{ margin: '-6px 0 14px', color: C.mut, fontSize: 13 }}>让公司的每一份材料，都变成 AI 能引用的记忆。</p>
 
       {/* HERO：库存脉搏(索引完成率环 + reindex) + 全文检索 */}
       <GroupLabel hint="读进来 → 索引 → 查得到">库存脉搏 · 检索</GroupLabel>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)', gap: 16 }}>
-        <div className="ckcard" style={{ padding: 20, display: 'grid', gridTemplateColumns: '148px 1fr', gap: 18, alignItems: 'center', ['--ac']: 'linear-gradient(90deg,#36e6d4,#42a5ff)', ['--gl']: 'rgba(54,230,212,.22)' } as React.CSSProperties}>
-          <Gauge pct={idxPct} label="索引完成率" color={C.cyan} />
+        <div className="ckcard" style={{ padding: 20, display: 'grid', gridTemplateColumns: '148px 1fr', gap: 18, alignItems: 'center', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.24)' } as React.CSSProperties}>
+          <Gauge pct={idxPct} label="索引完成率" color={C.purple} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
               {miniStat(stats ? stats.documents : '—', '受管文件')}
@@ -472,7 +473,7 @@ export default function KnowledgePage() {
           </div>
         </div>
 
-        <div className="ckcard" style={{ padding: 18, ['--ac']: '#36e6d4', ['--gl']: 'rgba(54,230,212,.2)' } as React.CSSProperties}>
+        <div className="ckcard" style={{ padding: 18, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>全文检索 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>本地 · 出处精确到页{searchEngine ? ` · ${searchEngine}` : ''}</span></div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
@@ -482,7 +483,7 @@ export default function KnowledgePage() {
               placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…"
               style={{ flex: 1, padding: '9px 12px', border: `1px solid ${C.line}`, borderRadius: 10, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink, fontFamily: 'inherit', outline: 'none' }}
             />
-            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 38, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#36e6d4,#42a5ff)', color: '#06221f', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>{searching ? '搜索中…' : '🔍 搜索'}</button>
+            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 38, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>{searching ? '搜索中…' : '🔍 搜索'}</button>
             {searchHits !== null && <button type="button" className="anbtn" onClick={() => { setSearchHits(null); setSearchQ('') }}>清空</button>}
           </div>
           {searchHits !== null && (
@@ -587,7 +588,7 @@ export default function KnowledgePage() {
       </div>
 
       {/* 收件箱监听 */}
-      <div className="ckcard" style={{ padding: 18, marginTop: 12, ['--ac']: '#49d18d', ['--gl']: 'rgba(73,209,141,.18)' } as React.CSSProperties}>
+      <div className="ckcard" style={{ padding: 18, marginTop: 12, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
           收件箱监听 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>丢进文件夹的文件自动入库</span>
           {inboxInfo?.accessible && <span style={{ fontSize: 10.5, color: C.amber, border: `1px solid ${C.amber}66`, background: `${C.amber}1f`, borderRadius: 99, padding: '2px 8px' }}>待处理 {inboxInfo.pending}</span>}
@@ -614,8 +615,8 @@ export default function KnowledgePage() {
       {/* ② 知识库：已入库文档(主) + 可复用资产 / 库存健康(侧) 两栏 */}
       <GroupLabel hint="已入库文档 · 可复用资产">② 知识库</GroupLabel>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 18, alignItems: 'start' }}>
-        <div className="ckcard" style={{ padding: '16px 18px', ['--ac']: '#42a5ff', ['--gl']: 'rgba(66,165,255,.18)' } as React.CSSProperties}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 8 }}>已入库文档 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{docs.length} · 点条目展开 · SQLite 落库</span></div>
+        <div className="ckcard" style={{ padding: '16px 18px', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 8 }}>已入库文档 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{docs.length} · 点条目展开详情</span></div>
           {loading && <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>加载中…</div>}
           {!loading && docs.length === 0 && (
             <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>暂无已入库文档。先「选择来源」再「一键整理」接入本地文件后会出现在这里。</div>
@@ -693,7 +694,7 @@ export default function KnowledgePage() {
 
       {/* ③ 图片资产：生图素材 + img2img + 效果图画廊 */}
       <GroupLabel hint={cur ? `当前项目 · ${cur.name} · 上传 / 文档抽取 / AI 生图` : '未选择项目'}>③ 图片资产</GroupLabel>
-      <div className="ckcard" style={{ padding: 18, ['--ac']: 'linear-gradient(90deg,#7c5cff,#36e6d4)' } as React.CSSProperties}>
+      <div className="ckcard" style={{ padding: 18, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
         {!cur ? (
           <div className="gallery"><div className="gempty">请先选择项目。</div></div>
         ) : (() => {

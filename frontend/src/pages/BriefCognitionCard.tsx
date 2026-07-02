@@ -140,7 +140,7 @@ export default function BriefCognitionCard({
       if (r.status === 'ok' && r.item) {
         setNote(`已沉淀到跨项目库「${r.item.label}」：${r.item.title}（其它项目可检索复用）`)
       } else if (r.status === 'empty') {
-        setNote('无已确认字段可沉淀。请先确认事实/判断字段再沉淀（不伪造）。')
+        setNote('还没有已确认的字段。先确认几条事实/判断，再沉淀到跨项目库。')
       } else {
         setNote(r.message || '沉淀失败')
       }
