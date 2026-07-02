@@ -1,14 +1,21 @@
 """管理驾驶舱 · 只读聚合端点。"""
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from .. import models, safe_json, schemas
 from ..database import get_db
-from .projects import _latest_minutes_for_project, _project_risks
+from .projects import (
+    _latest_minutes_for_project,
+    _milestones_from_minutes,
+    _project_risks,
+)
 
 router = APIRouter(prefix="/api/boss", tags=["boss"])
+
+# 生图技能(与 skills._IMAGE_SKILLS 一致):AI 使用统计里的「生图」按这些技能的成果数计。
+_IMAGE_SKILL_IDS = ("img", "facade", "moodboard")
 
 
 def _week_start() -> datetime:
@@ -16,6 +23,26 @@ def _week_start() -> datetime:
     now = datetime.utcnow()
     monday = now - timedelta(days=now.weekday())
     return monday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _near_delivery_count(db: Session, days: int = 14) -> int:
+    """跨活跃项目,统计 14 天内到期的里程碑(来自最新纪要待办的 due,可解析绝对日期才计)。
+    口径:与项目中心里程碑同源(_milestones_from_minutes);解析不出的中文相对日期不计,不伪造。"""
+    today = date.today()
+    horizon = today + timedelta(days=days)
+    n = 0
+    projects = db.query(models.Project).filter(models.Project.status == "active").all()
+    for project in projects:
+        _, minutes = _latest_minutes_for_project(db, project.id)
+        for milestone in _milestones_from_minutes(minutes):
+            due = (milestone.due or "").strip()
+            try:
+                d = date.fromisoformat(due[:10])
+            except ValueError:
+                continue
+            if today <= d <= horizon:
+                n += 1
+    return n
 
 
 @router.get("/dashboard", response_model=schemas.BossDashboardOut)
@@ -38,7 +65,7 @@ def dashboard(db: Session = Depends(get_db)) -> schemas.BossDashboardOut:
     )
     return schemas.BossDashboardOut(
         active_projects=active_projects,
-        near_delivery=0,
+        near_delivery=_near_delivery_count(db),
         high_risks=high_risks,
         ai_usage_week=analysis_count + minute_count,
     )
@@ -107,6 +134,13 @@ def ai_usage(db: Session = Depends(get_db)) -> schemas.AiUsageListOut:
             counts["评审"] += 1
         elif row.task == "plan":
             counts["任务"] += 1
+
+    # 生图:统计真实生图技能成果(SkillResult),原来恒 0(无自增来源)。
+    counts["生图"] = (
+        db.query(models.SkillResult)
+        .filter(models.SkillResult.skill_id.in_(_IMAGE_SKILL_IDS))
+        .count()
+    )
 
     return schemas.AiUsageListOut(
         items=[

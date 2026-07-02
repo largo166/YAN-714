@@ -124,26 +124,13 @@ def _risk_text(item: dict[str, Any]) -> str:
     return ""
 
 
-def _extract_structured_risks(content: str) -> list[schemas.ProjectRiskOut]:
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        return []
+# 风险类关键点识别(从研判 points 抽风险);强信号 → high,否则 medium。
+_RISK_HINTS = ("难", "风险", "矛盾", "约束", "缺", "问题", "挑战", "瓶颈", "冲突", "逾期", "不足", "限制", "超", "卡", "隐患", "不确定", "待确认")
+_RISK_HIGH = ("严重", "致命", "紧急", "重大", "关键矛盾", "逾期", "冲突", "不满足", "超标", "无法", "隐患", "红线")
 
-    if isinstance(data, dict):
-        candidates = None
-        for key in ("risks", "risk_items", "items", "风险", "风险项"):
-            value = data.get(key)
-            if isinstance(value, list):
-                candidates = value
-                break
-        if candidates is None:
-            candidates = [data]
-    elif isinstance(data, list):
-        candidates = data
-    else:
-        return []
 
+def _risks_from_leveled(candidates: list[Any]) -> list[schemas.ProjectRiskOut]:
+    """显式带 level 的风险结构(未来若真产出 risks[].level 即走这条)。"""
     items: list[schemas.ProjectRiskOut] = []
     for item in candidates:
         if not isinstance(item, dict):
@@ -155,6 +142,45 @@ def _extract_structured_risks(content: str) -> list[schemas.ProjectRiskOut]:
         if level and text:
             items.append(schemas.ProjectRiskOut(level=level, text=text))
     return items
+
+
+def _risks_from_points(points: list[Any]) -> list[schemas.ProjectRiskOut]:
+    """研判判断卡结构 {points:[{label,text}]} → 风险项:只取风险类关键点,过滤中性点(如项目定位)。
+    端点意图本就是从难点/总览研判抽风险;文本用真实研判内容,level 保守推断,不伪造。"""
+    items: list[schemas.ProjectRiskOut] = []
+    for p in points:
+        if not isinstance(p, dict):
+            continue
+        label = str(p.get("label") or "").strip()
+        text = str(p.get("text") or "").strip()
+        if not text:
+            continue
+        blob = label + text
+        if not any(h in blob for h in _RISK_HINTS):
+            continue  # 过滤"项目定位"等中性关键点,只留风险类
+        level = "high" if any(h in blob for h in _RISK_HIGH) else "medium"
+        display = f"{label}：{text}" if label and label != "要点" else text
+        items.append(schemas.ProjectRiskOut(level=level, text=display))
+    return items
+
+
+def _extract_structured_risks(text: str) -> list[schemas.ProjectRiskOut]:
+    """从研判 output_json 抽风险。注意:传入的应是 output_json(结构化 JSON),不是 content(markdown)。"""
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if isinstance(data, dict):
+        for key in ("risks", "risk_items", "items", "风险", "风险项"):
+            value = data.get(key)
+            if isinstance(value, list):
+                return _risks_from_leveled(value)
+        if isinstance(data.get("points"), list):  # 研判判断卡结构
+            return _risks_from_points(data["points"])
+        return _risks_from_leveled([data])
+    if isinstance(data, list):
+        return _risks_from_leveled(data)
+    return []
 
 
 def _project_risks(db: Session, project_id: int) -> list[schemas.ProjectRiskOut]:
@@ -172,7 +198,9 @@ def _project_risks(db: Session, project_id: int) -> list[schemas.ProjectRiskOut]
     )
     if not rows:
         return []
-    return _extract_structured_risks(rows[0].content)
+    row = rows[0]
+    # 之前的 bug:对 content(markdown)做 json.loads 永远失败 → 恒空。改读 output_json(结构化)。
+    return _extract_structured_risks(row.output_json or row.content)
 
 
 def _asset_kind(doc: models.KnowledgeDocument) -> str:
