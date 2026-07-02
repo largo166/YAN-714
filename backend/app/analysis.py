@@ -132,6 +132,48 @@ def gather_cognition(db: Session, project_id: int) -> tuple[List[str], List[Sour
     return cog_block, sources
 
 
+def gather_judgments(db: Session, project_id: int, *, max_tasks: int = 3, core_chars: int = 220) -> List[str]:
+    """上下文供给协议·路0.5：本项目最近的【AI 研判结论】（每 task 最新一条 ok 的判断卡）。
+
+    让技能/共创站在已有判断上想，而不是每次从零。红线：研判是 AI 生成、未经人工确认——
+    注入时明确标注来源属性，只取 core+前 3 条 points（短、可溯），绝不当"已确认事实"。
+    """
+    import json as _json
+
+    rows = (
+        db.query(models.ProjectAnalysis)
+        .filter(
+            models.ProjectAnalysis.project_id == project_id,
+            models.ProjectAnalysis.status == "ok",
+            models.ProjectAnalysis.output_json != "",
+            models.ProjectAnalysis.task.in_(tuple(TASKS.keys())),
+        )
+        .order_by(models.ProjectAnalysis.created_at.desc(), models.ProjectAnalysis.id.desc())
+        .all()
+    )
+    block: List[str] = []
+    seen: set[str] = set()
+    for r in rows:
+        if r.task in seen:
+            continue
+        try:
+            d = _json.loads(r.output_json)
+        except (ValueError, TypeError):
+            continue
+        core = str((d or {}).get("core") or "").strip()
+        if not core:
+            continue
+        seen.add(r.task)
+        label = TASKS.get(r.task, (r.task, ""))[0]
+        block.append(f"【AI 研判·{label}（AI 生成，未经人工确认）】{core[:core_chars]}")
+        for p in (d.get("points") or [])[:3]:
+            if isinstance(p, dict) and str(p.get("text") or "").strip():
+                block.append(f"  - {p.get('label') or '要点'}：{str(p['text'])[:120]}")
+        if len(seen) >= max_tasks:
+            break
+    return block
+
+
 def cognition_system_prompt(db: Session, project_id: int) -> tuple[str, List[Source]]:
     """供对话路径（chat）用：把已确认认知组装成一段 system 提示文本 + 出处。
     无已确认认知 → ("", [])，调用方据此决定是否注入（不造空壳）。"""
@@ -189,11 +231,18 @@ def gather_material(db: Session, project_id: int, query: str, *, top_k: int = 5)
                    snippet=h.snippet, engine=h.engine)
         )
 
-    # 装配喂模型的上下文（已确认认知置顶，带编号引用）
+    # 路0.5：最近的 AI 研判结论（判断层回流——技能/共创站在已有判断上想,不从零开始）
+    judg_block = gather_judgments(db, project_id)
+
+    # 装配喂模型的上下文（已确认认知置顶 → AI 研判次之 → 材料引用带编号）
     if sources:
         if cog_block:
             lines.append("以下是本项目【已确认的结构化认知】，请优先据此分析：")
             lines.extend(cog_block)
+            lines.append("")
+        if judg_block:
+            lines.append("以下是本项目最近的【AI 研判结论】（AI 生成、未经人工确认，作参考判断，与材料冲突时以材料为准）：")
+            lines.extend(judg_block)
             lines.append("")
         lines.append("以下是检索到的项目材料与知识库资料，请仅基于这些材料分析，并在结论中引用来源标题：")
         lines.append("")
@@ -239,6 +288,6 @@ def render_markdown(task: str, project_name: str, content: str, sources: List[di
         out.append("")
         out.append("## 出处")
         for i, s in enumerate(sources, 1):
-            tag = "项目文件" if s.get("kind") == "project_file" else "知识库"
+            tag = {"cognition": "已确认认知", "project_file": "项目文件"}.get(s.get("kind"), "知识库")
             out.append(f"{i}. （{tag}）《{s.get('title', '')}》 — {s.get('snippet', '')}")
     return "\n".join(out)
