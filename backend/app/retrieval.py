@@ -96,6 +96,28 @@ def fts_tags(doc) -> str:
     return " ".join(filter(None, [doc.tags, doc.type, doc.description]))
 
 
+def _fts_text(s: str) -> str:
+    """FTS 影子文本：连续中文串展开成 2 字 bigram（空格分隔），ASCII 词保持原样。
+
+    背景（2026-07 实测）：FTS5 unicode61 把连续 CJK 当【一个】token（无中文分词），
+    查询侧 _terms 切出的 bigram 根本对不上长中文 token → 中文召回残缺。
+    修法：写入侧同样 bigram 化（只影响 FTS 镜像列；权威表/摘要/展示不动）。
+    查询词 "森林" ↔ 影子文本 token "森林" 即可命中。"""
+    if not s:
+        return ""
+    out: List[str] = []
+    for chunk in re.findall(r"[A-Za-z0-9]+|[一-鿿]+|[^A-Za-z0-9一-鿿]+", s):
+        if re.match(r"^[A-Za-z0-9]+$", chunk):
+            out.append(chunk)
+        elif re.match(r"^[一-鿿]+$", chunk):
+            if len(chunk) <= 2:
+                out.append(chunk)
+            else:
+                out.extend(chunk[i : i + 2] for i in range(len(chunk) - 1))
+        # 其它（标点/空白）：作分隔，不入索引
+    return " ".join(out)
+
+
 def reindex_all(db: Session) -> int:
     """重建 FTS 索引；返回索引文档数。FTS 不可用时返回文档总数（LIKE 模式无需索引）。"""
     from . import models
@@ -111,7 +133,7 @@ def reindex_all(db: Session) -> int:
                 "INSERT INTO knowledge_documents_fts(rowid, title, content_text, tags) "
                 "VALUES (:id, :t, :c, :g)"
             ),
-            {"id": d.id, "t": d.title, "c": d.content_text, "g": fts_tags(d)},
+            {"id": d.id, "t": _fts_text(d.title), "c": _fts_text(d.content_text), "g": _fts_text(fts_tags(d))},
         )
     db.commit()
     return len(docs)
@@ -127,7 +149,7 @@ def index_one(db: Session, doc_id: int, title: str, content: str, tags: str) -> 
             "INSERT INTO knowledge_documents_fts(rowid, title, content_text, tags) "
             "VALUES (:id, :t, :c, :g)"
         ),
-        {"id": doc_id, "t": title, "c": content, "g": tags},
+        {"id": doc_id, "t": _fts_text(title), "c": _fts_text(content), "g": _fts_text(tags)},
     )
     db.commit()
 

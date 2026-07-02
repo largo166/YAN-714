@@ -519,6 +519,38 @@ def index_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     return schemas.IndexFileOut(file_id=f.id, document_id=doc.id, title=doc.title)
 
 
+@router.post("/{project_id}/files/{file_id}/reparse", response_model=schemas.ProjectFileDetailOut)
+def reparse_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
+    """重新解析已入库文件（OCR 补齐存量：老的图片/扫描件当时没提字，装上 OCR 后重跑）。
+    覆盖 parse_status/content_text/chunks；若已入知识库则同步更新文档正文并重建该条索引。"""
+    f = _file_or_404(db, project_id, file_id)
+    try:
+        abs_path = uploads.abs_of(f.stored_path, f.storage_root)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "受管副本不存在或不可访问，无法重新解析")
+    if not abs_path.is_file():
+        raise HTTPException(400, "受管副本不存在或不可访问，无法重新解析")
+
+    pr = parsing.parse_file(abs_path)
+    f.parse_status = pr.status
+    f.parse_error = pr.error
+    f.content_text = pr.text
+    f.content_chunks_json = safe_json.dumps_safe(pr.chunks) if pr.chunks else ""
+    f.truncated_at_page = pr.truncated_at_page
+    f.total_pages = pr.total_pages
+
+    # 已入知识库 → 同步新正文 + 重建该条 FTS（检索立即可见）
+    if f.indexed_doc_id:
+        doc = db.get(models.KnowledgeDocument, f.indexed_doc_id)
+        if doc is not None:
+            doc.content_text = pr.text
+            db.commit()
+            retrieval.index_one(db, doc.id, doc.title, doc.content_text, retrieval.fts_tags(doc))
+    db.commit()
+    db.refresh(f)
+    return f
+
+
 # ── 图片资产层：从文件抽图（PPT/PDF/Word 嵌入图 + 直接上传图）成「一等资产」 ──
 _IMG_EXTS = ("png", "jpg", "jpeg", "gif", "bmp", "webp")
 

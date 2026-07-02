@@ -21,12 +21,17 @@
 - unsupported       非支持格式。
 - failed            提取过程未预期异常（捕获分级，不阻断批量里的其它文件）。
 
-支持格式：.txt .md（内建）/ .pdf（PyMuPDF/fitz 文字层）/ .docx（python-docx）/ .pptx（python-pptx 文本框+备注）/
-.xlsx（轻量 XML 抽取）/ 图片资产元数据（png/jpg/jpeg，不做 OCR）。
+支持格式：.txt .md（内建）/ .pdf（PyMuPDF/fitz 文字层；无文字层的扫描件走本地 OCR）/
+.docx（python-docx）/ .pptx（python-pptx 文本框+备注）/ .xlsx（轻量 XML 抽取）/
+图片（png/jpg/jpeg：本地 OCR 提文字入索引；OCR 不可用或无文字时回落元数据登记）。
+
+OCR（2026-07 P0）：RapidOCR 本地推理（见 ocr.py）。扫描件 PDF 按页 OCR，受页数+耗时双预算
+保护（超预算如实标 ok_truncated）；OCR 不可用时保持原「登记元数据 + needs_ocr」行为，不伪造。
 """
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
@@ -34,6 +39,8 @@ import re
 import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
+
+from . import ocr
 
 SUPPORTED_EXTS = {".txt", ".md", ".pdf", ".docx", ".pptx", ".xlsx", ".png", ".jpg", ".jpeg"}
 
@@ -122,7 +129,7 @@ def _dispatch(p: Path, ext: str) -> ParseResult:
         if ext == ".pdf":
             return _read_pdf(p)  # 自行判定 ok / metadata_only(needs_ocr|encrypted|unreadable)
         if ext in (".png", ".jpg", ".jpeg"):
-            return ParseResult(status="ok", text=_read_image_asset(p))  # 图片资产登记（保持原行为）
+            return _read_image(p)  # 本地 OCR 提文字；OCR 不可用/无文字 → 元数据登记（不伪造）
         if ext in (".txt", ".md"):
             text = _read_text(p)
         elif ext == ".docx":
@@ -206,18 +213,65 @@ def _read_pdf(p: Path) -> ParseResult:
     # 截断判定基于归一化后真实长度（含 join 的换行、NFKC 展开），不把截断值当全文报
     truncated_at = last_page_read if len(full) > MAX_TEXT_CHARS else 0
     if not text:
-        # 有效 PDF 但无文字层 → 扫描件/图片型，需 OCR（如实标记，不伪造正文）
+        # 有效 PDF 但无文字层 → 扫描件/图片型：尝试本地 OCR（页数+耗时双预算）；
+        # OCR 不可用或没识别出文字 → 保持原「登记元数据 + needs_ocr」（不伪造）。
+        if ocr.available():
+            ocr_text, ocr_chunks, pages_done, hit_budget = _ocr_pdf_pages(p, total_pages)
+            if ocr_text:
+                if hit_budget and pages_done < total_pages:
+                    # 如实标截断：OCR 只做到第 N 页 / 共 M 页，不把部分结果当全文
+                    return ParseResult(status="ok_truncated", text=ocr_text, chunks=ocr_chunks,
+                                       truncated_at_page=pages_done, total_pages=total_pages)
+                return ParseResult(status="ok", text=ocr_text, chunks=ocr_chunks, total_pages=total_pages)
         return ParseResult(
             status="metadata_only", reason="needs_ocr", total_pages=total_pages,
             text=_register_note(p, ".pdf", "需OCR",
                                 f"未检测到文字层（可能为扫描件/图片型 PDF，共 {total_pages} 页），"
-                                "需 OCR 才能提取正文；已登记元数据，不伪造正文。"),
+                                + ("OCR 未识别出文字；" if ocr.available() else "OCR 组件不可用；")
+                                + "已登记元数据，不伪造正文。"),
         )
     if truncated_at:
         # 如实告知截断：停在第 N 页 / 共 M 页，不把截断值当全文
         return ParseResult(status="ok_truncated", text=text, chunks=chunks,
                            truncated_at_page=truncated_at, total_pages=total_pages)
     return ParseResult(status="ok", text=text, chunks=chunks, total_pages=total_pages)
+
+
+def _ocr_pdf_pages(p: Path, total_pages: int) -> tuple[str, List[dict], int, bool]:
+    """扫描件 PDF 按页 OCR。返回 (归一化全文, 按页 chunks, 已处理页数, 是否触预算)。
+    双预算保护（页数 OCR_MAX_PAGES / 耗时 OCR_TIME_BUDGET_SECONDS）：CPU 推理约 1-2s/页，
+    预算内不触发外层解析超时；超预算由调用方如实标 ok_truncated。"""
+    import fitz  # PyMuPDF
+
+    parts: list[str] = []
+    chunks: List[dict] = []
+    pages_done = 0
+    hit_budget = False
+    started = time.monotonic()
+    try:
+        doc = fitz.open(str(p))
+    except Exception:  # noqa: BLE001
+        return "", [], 0, False
+    try:
+        n = min(total_pages, doc.page_count)
+        for i in range(n):
+            if pages_done >= ocr.OCR_MAX_PAGES or (time.monotonic() - started) > ocr.OCR_TIME_BUDGET_SECONDS:
+                hit_budget = True
+                break
+            t = ocr.ocr_pdf_page(doc.load_page(i))
+            pages_done = i + 1
+            if t:
+                parts.append(t)
+                chunks.append({"text": t, "page_no": i + 1, "slide_no": 0})
+            if len("\n".join(parts)) >= MAX_TEXT_CHARS:
+                hit_budget = True
+                break
+    finally:
+        doc.close()
+    text = unicodedata.normalize("NFKC", "\n".join(parts))[:MAX_TEXT_CHARS].strip()
+    if text:
+        text = f"【OCR 识别（扫描件 PDF，已处理 {pages_done}/{total_pages} 页）】\n" + text
+    return text, chunks, pages_done, hit_budget
 
 
 def _read_docx(p: Path) -> str:
@@ -327,9 +381,23 @@ def _read_xlsx(p: Path) -> str:
     return "\n\n".join(parts)
 
 
-def _read_image_asset(p: Path) -> str:
+def _read_image(p: Path) -> ParseResult:
+    """图片：本地 OCR 提文字（规划条件截图/扫描页/PPT 导出图是设计院常见材料）。
+    识别到文字 → ok，正文=登记头+OCR 文字（可进全文索引）；
+    OCR 不可用 → metadata_only(needs_ocr)；OCR 跑了但无文字（照片/效果图） → 元数据登记（如实说明）。"""
     st = p.stat()
-    return (
-        f"图片资产：{p.name}\n格式：{p.suffix.lower().lstrip('.')}\n大小：{st.st_size} bytes\n"
-        f"说明：该文件已登记为项目图片资产；当前未做 OCR 或图像内容识别。"
-    )
+    head = f"图片资产：{p.name}\n格式：{p.suffix.lower().lstrip('.')}\n大小：{st.st_size} bytes"
+    if not ocr.available():
+        return ParseResult(
+            status="metadata_only", reason="needs_ocr",
+            text=head + "\n说明：该文件已登记为项目图片资产；OCR 组件不可用，未提取文字（不伪造）。",
+        )
+    text = ocr.ocr_image(str(p))
+    if not text:
+        # OCR 真跑了但没识别出文字（纯图像/照片/效果图）——如实登记，不算 needs_ocr
+        return ParseResult(
+            status="ok",
+            text=head + "\n说明：已做 OCR，未检测到文字内容（图像类资产），登记元数据。",
+        )
+    body = unicodedata.normalize("NFKC", text)[:MAX_TEXT_CHARS].strip()
+    return ParseResult(status="ok", text=f"{head}\n【OCR 识别文字】\n{body}"[:MAX_TEXT_CHARS])
