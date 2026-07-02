@@ -583,8 +583,10 @@ def _extract_and_store_assets(db: Session, project: models.Project, pf: models.P
         sp = _save(name, data)
         thumb = image_assets.make_thumb(data)
         tp = _save("thumb_" + name + ".jpg", thumb) if thumb else ""
+        # 自动分类(P1):按文件名/图注强关键词猜类型;无命中保持 image(不硬猜),画廊可随时改
+        a_type = image_assets.classify_by_name(caption) or "image"
         db.add(models.FileAsset(
-            project_id=pid, source_file_id=int(pf.id), asset_type="image",
+            project_id=pid, source_file_id=int(pf.id), asset_type=a_type,
             stored_path=sp, thumb_path=tp, ext=a_ext, page_no=page_no, slide_no=slide_no,
             shape_index=shape_index, caption=caption, width=w, height=h,
         ))

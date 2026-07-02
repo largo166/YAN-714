@@ -122,6 +122,40 @@ export default function KnowledgePage() {
   const [reindexing, setReindexing] = useState(false)
   const [reindexMsg, setReindexMsg] = useState<string | null>(null)
 
+  // 批量 AI 元数据（P1）：只跑缺摘要的文档,逐条顺序调用(复用单条端点,不开新管线);
+  // 属花钱动作——只由用户点按钮触发,可随时停;未配 Key 立即停并引导。
+  const [batchBusy, setBatchBusy] = useState(false)
+  const batchStop = useRef(false)
+  const [batchNote, setBatchNote] = useState<string | null>(null)
+  const metaMissing = useMemo(() => docs.filter((d) => !(d.description || '').trim()), [docs])
+  const runBatchMeta = async () => {
+    if (batchBusy || metaMissing.length === 0) return
+    setBatchBusy(true)
+    batchStop.current = false
+    let ok = 0
+    let skip = 0
+    let fail = 0
+    const list = [...metaMissing]
+    for (let i = 0; i < list.length; i++) {
+      if (batchStop.current) break
+      setBatchNote(`批量生成中… ${i + 1}/${list.length}（成功 ${ok}${skip ? ` · 跳过 ${skip}` : ''}）`)
+      try {
+        const r = await api.generateDocMetadata(list[i].id)
+        if (r.status === 'ok') ok++
+        else if (r.status === 'not_configured') {
+          setBatchNote('尚未配置 AI 引擎。到「设置」填入 DeepSeek API Key 后再批量生成。')
+          setBatchBusy(false)
+          return
+        } else skip++ // no_material / error:如实跳过,继续下一条
+      } catch {
+        fail++
+      }
+    }
+    setBatchNote(`批量完成：成功 ${ok} · 跳过 ${skip}${fail ? ` · 失败 ${fail}` : ''}${batchStop.current ? '（已手动停止）' : ''}`)
+    setBatchBusy(false)
+    loadDocs()
+  }
+
   // 可复用资产:按知识文档真实 tags 聚合(无标签 → 空态,不塞 mock)
   const assetGroups = useMemo(() => {
     const m = new Map<string, string[]>()
@@ -618,7 +652,21 @@ export default function KnowledgePage() {
       <GroupLabel hint="已入库文档 · 可复用资产">② 知识库</GroupLabel>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 18, alignItems: 'start' }}>
         <div className="ckcard" style={{ padding: '16px 18px', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 8 }}>已入库文档 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{docs.length} · 点条目展开详情</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>已入库文档 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{docs.length} · 点条目展开详情</span></div>
+            <span style={{ flex: 1 }} />
+            {metaMissing.length > 0 && !batchBusy && (
+              <button type="button" onClick={runBatchMeta} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '5px 12px' }}>
+                ⚡ 批量生成元数据（{metaMissing.length} 条缺摘要）
+              </button>
+            )}
+            {batchBusy && (
+              <button type="button" onClick={() => { batchStop.current = true }} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#ff9b9b', border: '1px solid rgba(255,94,102,.4)', background: 'rgba(255,94,102,.1)', borderRadius: 9, padding: '5px 12px' }}>
+                ■ 停止
+              </button>
+            )}
+          </div>
+          {batchNote && <div style={{ fontSize: 11.5, color: C.mut, margin: '0 0 8px' }}>{batchNote}</div>}
           {loading && <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>加载中…</div>}
           {!loading && docs.length === 0 && (
             <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>暂无已入库文档。先「选择来源」再「一键整理」接入本地文件后会出现在这里。</div>

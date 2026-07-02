@@ -162,3 +162,27 @@ def extract(path: Path, ext: str) -> list[ExtractedAsset]:
     except Exception:  # noqa: BLE001  抽取整体失败不阻塞上传
         return []
     return []
+
+
+# ── 自动分类(P1 解冻,2026-07)：按文件名/图注的【强关键词】猜资产类型 ──
+# 保守红线：只认强信号,无命中一律回落 ""(调用方保持默认 image),绝不硬猜;
+# 分类结果用户可随时在画廊「分类…」改,猜错零成本。
+_CLASS_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("plan", ("总图", "总平", "平面", "彩平", "plan", "layout", "siteplan")),
+    ("model", ("白模", "体块", "massing", "模型照片", "工作模型")),
+    ("material", ("材质", "贴图", "material", "texture")),
+    ("logo", ("logo", "标志", "图标", "icon")),
+    ("render", ("效果图", "鸟瞰", "人视", "透视", "夜景", "render", "rendering")),
+    ("reference", ("参考", "意向", "对标", "案例", "reference", "moodboard")),
+]
+
+
+def classify_by_name(name: str) -> str:
+    """按名字/图注的强关键词分类;无命中返回 ""(不猜)。"""
+    low = (name or "").lower()
+    if not low:
+        return ""
+    for asset_type, keywords in _CLASS_RULES:
+        if any(k in low for k in keywords):
+            return asset_type
+    return ""
