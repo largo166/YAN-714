@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
+import { CountNum } from '@/lib/useCountUp'
 import type { AiUsageItem, BossDashboard, Broadcast, WorkloadItem } from '@/types/schemas'
 
 /* 管理驾驶舱 · 暗色重写（吸取 DC 暗色霓虹 / 图标卡片 / 数据可视化）。
@@ -34,7 +35,7 @@ function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: st
   )
 }
 
-function Kpi({ label, value, caption, color, ac, gl }: { label: string; value: string; caption: string; color?: string; ac: string; gl: string }) {
+function Kpi({ label, value, caption, color, ac, gl }: { label: string; value: React.ReactNode; caption: string; color?: string; ac: string; gl: string }) {
   return (
     <div className="ckcard" style={{ padding: 18, minHeight: 128, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
       <div style={{ color: C.mut, fontSize: 12.5 }}>{label}</div>
@@ -133,8 +134,6 @@ export default function BossPage() {
     }
   }
 
-  const v = (n: number | undefined) => (dash ? String(n) : '—')
-
   return (
     <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
       {/* header */}
@@ -150,10 +149,10 @@ export default function BossPage() {
 
       {/* KPI row */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
-        <Kpi label="进行中项目" value={v(dash?.active_projects)} caption="跨项目聚合" color={C.ink} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.30)" />
-        <Kpi label="临近交付" value={v(dash?.near_delivery)} caption="14 天内到节点" color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.30)" />
-        <Kpi label="高风险项" value={v(dash?.high_risks)} caption="需负责人介入" color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.28)" />
-        <Kpi label="AI 使用 · 本周" value={v(dash?.ai_usage_week)} caption="次成果生成" ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
+        <Kpi label="进行中项目" value={dash ? <CountNum n={dash.active_projects} /> : '—'} caption="跨项目聚合" color={C.ink} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.30)" />
+        <Kpi label="临近交付" value={dash ? <CountNum n={dash.near_delivery} /> : '—'} caption="14 天内到节点" color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.30)" />
+        <Kpi label="高风险项" value={dash ? <CountNum n={dash.high_risks} /> : '—'} caption="需负责人介入" color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.28)" />
+        <Kpi label="AI 使用 · 本周" value={dash ? <CountNum n={dash.ai_usage_week} /> : '—'} caption="次成果生成" ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
       </section>
 
       {/* charts row */}

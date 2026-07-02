@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
+import { CountNum, useCountUp } from '@/lib/useCountUp'
 import { useProject } from '@/contexts/useProject'
 import type {
   ProjectMilestone,
@@ -46,14 +47,15 @@ function Kpi({ icon, label, value, color, ac, gl }: { icon: string; label: strin
   )
 }
 
-/** 阶段进度环形仪表（pct 真实，发光 conic 环 + 中心大号 %）。 */
+/** 阶段进度环形仪表（pct 真实，发光 conic 环 + 充能动画 + 中心数字滚动）。 */
 function Gauge({ pct }: { pct: number }) {
   const p = Math.max(0, Math.min(100, Math.round(pct)))
+  const shown = useCountUp(p, 900)
   return (
-    <div style={{ width: 156, height: 156, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, background: `conic-gradient(#7c5cff 0% ${p}%, rgba(255,255,255,.06) ${p}% 100%)`, boxShadow: '0 0 44px rgba(124,92,255,.26)' }}>
+    <div className="gauge-anim" style={{ width: 156, height: 156, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, ['--gp']: `${p}%`, background: 'conic-gradient(#7c5cff 0% var(--gp), rgba(255,255,255,.06) var(--gp) 100%)', boxShadow: '0 0 44px rgba(124,92,255,.26)' } as React.CSSProperties}>
       <div style={{ width: 118, height: 118, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center', border: `1px solid ${C.line}` }}>
         <div>
-          <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{p}<span style={{ fontSize: 14, color: C.mut }}>%</span></div>
+          <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{shown}<span style={{ fontSize: 14, color: C.mut }}>%</span></div>
           <div style={{ fontSize: 11, color: C.mut, marginTop: 4 }}>阶段进度</div>
         </div>
       </div>
@@ -297,9 +299,9 @@ export default function ProjectCenterPage() {
             <div style={{ fontSize: 18, fontWeight: 700 }}>{cur ? (STAGE_CHIP[cur.status] ?? cur.status) : '—'}</div>
             <div style={{ fontSize: 12, color: C.gold, marginTop: 6, lineHeight: 1.5 }}>{nextNode}</div>
             <div style={{ display: 'flex', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
-              {mini(overview ? overview.files : '—', '文件')}
-              {mini(overview ? overview.meetings : '—', '会议')}
-              {mini(overview ? overview.minutes : '—', '会议纪要')}
+              {mini(overview ? <CountNum n={overview.files} /> : '—', '文件')}
+              {mini(overview ? <CountNum n={overview.meetings} /> : '—', '会议')}
+              {mini(overview ? <CountNum n={overview.minutes} /> : '—', '会议纪要')}
             </div>
           </div>
         </div>
@@ -322,12 +324,12 @@ export default function ProjectCenterPage() {
 
       {/* KPI 指标带（真实数据，去掉后端恒 0 的「成果缺口」） */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Kpi icon="📄" label="文件" value={overview ? overview.files : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
-        <Kpi icon="📅" label="会议" value={overview ? overview.meetings : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
-        <Kpi icon="✓" label="待办" value={overview ? overview.todos : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
-        <Kpi icon="🔊" label="会议纪要" value={overview ? overview.minutes : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
-        <Kpi icon="⚠" label="风险" value={overview ? overview.risks : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
-        <Kpi icon="⟳" label="可复用资产" value={overview ? overview.assets : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
+        <Kpi icon="📄" label="文件" value={overview ? <CountNum n={overview.files} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
+        <Kpi icon="📅" label="会议" value={overview ? <CountNum n={overview.meetings} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
+        <Kpi icon="✓" label="待办" value={overview ? <CountNum n={overview.todos} /> : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
+        <Kpi icon="🔊" label="会议纪要" value={overview ? <CountNum n={overview.minutes} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
+        <Kpi icon="⚠" label="风险" value={overview ? <CountNum n={overview.risks} /> : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
+        <Kpi icon="⟳" label="可复用资产" value={overview ? <CountNum n={overview.assets} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
       </div>
 
       {/* 快速跳转 */}

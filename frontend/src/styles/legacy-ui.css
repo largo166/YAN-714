@@ -644,10 +644,31 @@ body.darkui{
     linear-gradient(180deg,#030406 0%,#07080c 44%,#030406 100%);
   color:var(--ink);
 }
-/* 招牌 HUD 底：48px 网格(顶部渐隐) + 斜光扫；内容 z-index 抬到 1 盖在上面 */
-body.darkui::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);opacity:.5}
-body.darkui::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:linear-gradient(115deg,transparent 0 38%,rgba(255,255,255,.022) 39% 41%,transparent 42% 100%);opacity:.7}
+/* 招牌 HUD 底：48px 网格(顶部渐隐,缓慢漂移) + 斜光扫(呼吸摆动)；内容 z-index 抬到 1 盖在上面。
+   动效三层·层1(氛围)：网格 36s 对角漂移一格(48px 周期无缝循环)+ 光扫 22s 缓摆;
+   prefers-reduced-motion 时全部静止。 */
+body.darkui::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);opacity:.5;animation:huddrift 36s linear infinite}
+body.darkui::after{content:"";position:fixed;inset:-10% 0;pointer-events:none;z-index:0;background:linear-gradient(115deg,transparent 0 38%,rgba(255,255,255,.022) 39% 41%,transparent 42% 100%);opacity:.7;animation:hudsweep 22s ease-in-out infinite alternate}
+@keyframes huddrift{from{background-position:0 0}to{background-position:48px 48px}}
+@keyframes hudsweep{from{transform:translateX(-2.5%)}to{transform:translateX(2.5%)}}
 body.darkui .topbar,body.darkui .wrap{position:relative;z-index:1}
+/* 层2(入场编排)：切板块时 ckcard 错峰渐入(60ms stagger,只播一次) */
+body.darkui .page.on .ckcard{animation:ckin .5s cubic-bezier(.2,.7,.3,1) both}
+body.darkui .page.on .ckcard:nth-child(2){animation-delay:60ms}
+body.darkui .page.on .ckcard:nth-child(3){animation-delay:120ms}
+body.darkui .page.on .ckcard:nth-child(4){animation-delay:180ms}
+body.darkui .page.on .ckcard:nth-child(5){animation-delay:240ms}
+body.darkui .page.on .ckcard:nth-child(6){animation-delay:300ms}
+body.darkui .page.on .ckcard:nth-child(n+7){animation-delay:360ms}
+@keyframes ckin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* 层3(数据动效)：环形仪表充能(conic 从 0% 转到目标,@property 让 --gp 可动画) */
+@property --gp{syntax:'<percentage>';initial-value:0%;inherits:false}
+body.darkui .gauge-anim{animation:gaugein .9s cubic-bezier(.25,.7,.3,1) both}
+@keyframes gaugein{from{--gp:0%}}
+/* 克制红线：用户偏好减少动效 → 全部静止(网格/光扫/入场/仪表) */
+@media (prefers-reduced-motion: reduce){
+  body.darkui::before,body.darkui::after,body.darkui .page.on .ckcard,body.darkui .gauge-anim{animation:none !important}
+}
 /* 顶栏 */
 body.darkui .topbar{background:rgba(3,4,6,.72);border-bottom-color:rgba(255,255,255,.07)}
 body.darkui .brand svg{stroke:#f4f1ea}

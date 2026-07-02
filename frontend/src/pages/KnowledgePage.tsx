@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api, type FileAsset } from '@/lib/api'
+import { CountNum, useCountUp } from '@/lib/useCountUp'
 import { useProject } from '@/contexts/useProject'
 import { renderInline } from '@/components/RichText'
 import CrossProjectLibrary from './CrossProjectLibrary'
@@ -49,14 +50,15 @@ const C = {
   glass: 'linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032))',
 }
 
-/** 环形仪表（pct 真实，发光 conic 环 + 中心大号 %）。 */
+/** 环形仪表（pct 真实，发光 conic 环 + 充能动画 + 中心数字滚动）。 */
 function Gauge({ pct, label, color }: { pct: number; label: string; color: string }) {
   const p = Math.max(0, Math.min(100, Math.round(pct)))
+  const shown = useCountUp(p, 900)
   return (
-    <div style={{ width: 148, height: 148, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, background: `conic-gradient(${color} 0% ${p}%, rgba(255,255,255,.06) ${p}% 100%)`, boxShadow: `0 0 42px ${color}38` }}>
+    <div className="gauge-anim" style={{ width: 148, height: 148, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, ['--gp']: `${p}%`, background: `conic-gradient(${color} 0% var(--gp), rgba(255,255,255,.06) var(--gp) 100%)`, boxShadow: `0 0 42px ${color}38` } as React.CSSProperties}>
       <div style={{ width: 112, height: 112, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center', border: `1px solid ${C.line}` }}>
         <div>
-          <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{p}<span style={{ fontSize: 13, color: C.mut }}>%</span></div>
+          <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{shown}<span style={{ fontSize: 13, color: C.mut }}>%</span></div>
           <div style={{ fontSize: 10.5, color: C.mut, marginTop: 3 }}>{label}</div>
         </div>
       </div>
@@ -461,9 +463,9 @@ export default function KnowledgePage() {
           <Gauge pct={idxPct} label="索引完成率" color={C.purple} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
-              {miniStat(stats ? stats.documents : '—', '受管文件')}
-              {miniStat(stats ? stats.indexed : '—', '已索引', C.cyan)}
-              {miniStat(stats ? stats.cjk_chunks : '—', '索引块·CJK')}
+              {miniStat(stats ? <CountNum n={stats.documents} /> : '—', '受管文件')}
+              {miniStat(stats ? <CountNum n={stats.indexed} /> : '—', '已索引', C.cyan)}
+              {miniStat(stats ? <CountNum n={stats.cjk_chunks} /> : '—', '索引块·CJK')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10.5, color: C.gold, border: `1px solid ${C.gold}66`, background: `${C.gold}1f`, borderRadius: 7, padding: '2px 8px' }}>{stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}</span>
