@@ -176,7 +176,7 @@ export default function ProjectCenterPage() {
     }
   }, [curId, refreshKey])
 
-  const nextNode = progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '下一节点 · 待接入项目里程碑'
+  const nextNode = progress?.next_node ? `下一节点 · ${progress.next_node}${progress.next_due ? ' · ' + progress.next_due : ''}` : '生成并确认会议纪要后，下一节点会出现在这里'
 
   // 本周聚焦：实时聚合「需负责人介入」（全部来自已取真实数据，不伪造）
   const highRisks = risks.filter((r) => r.level === 'high')

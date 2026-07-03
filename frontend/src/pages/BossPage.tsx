@@ -49,7 +49,7 @@ function Kpi({ label, value, caption, color, ac, gl }: { label: string; value: R
 function AiDonut({ items }: { items: AiUsageItem[] }) {
   const total = items.reduce((s, a) => s + a.count, 0)
   if (items.length === 0 || total === 0) {
-    return <div style={{ color: C.mut, fontSize: 13, padding: '14px 0' }}>暂无 AI 使用记录。</div>
+    return <div style={{ color: C.mut, fontSize: 13, padding: '14px 0' }}>暂无 AI 使用记录。在共创营地跑一次技能（研判 / PPT / 生图…），这里就会开始统计。</div>
   }
   let acc = 0
   const stops = items
@@ -164,7 +164,7 @@ export default function BossPage() {
         <div style={{ ...cardBase, padding: 20 }}>
           <SectionTitle hint="本周进行中任务">成员工作量 · 人工 / AI</SectionTitle>
           {workload.length === 0 ? (
-            <div style={{ color: C.mut, fontSize: 13, padding: '14px 0' }}>暂无工作量数据。</div>
+            <div style={{ color: C.mut, fontSize: 13, padding: '14px 0' }}>暂无工作量数据。到「协作平台」录入团队成员，纪要待办和任务分派会自动计入负荷。</div>
           ) : (
             <div style={{ display: 'grid', gap: 14 }}>
               {workload.map((w) => {

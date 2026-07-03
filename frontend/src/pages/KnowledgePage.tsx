@@ -636,6 +636,7 @@ export default function KnowledgePage() {
           <input value={inboxInput} onChange={(e) => setInboxInput(e.target.value)} placeholder="收件箱文件夹的完整路径，如 C:\Users\…\ROM-AI收件箱" style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
           <button className="btn" onClick={saveInbox} disabled={inboxBusy} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{inboxBusy ? '处理中…' : '保存'}</button>
           <button className="anbtn" onClick={scanInboxNow} disabled={inboxBusy || !inboxInfo?.accessible} title={inboxInfo?.accessible ? '立即扫描收件箱并入库' : '请先保存一个可访问的收件箱路径'}>立即扫描</button>
+          {!inboxInfo?.accessible && <span style={{ fontSize: 11, color: C.mut2 }}>（先在左侧填好路径并保存，扫描才可用）</span>}
         </div>
         <div style={{ fontSize: 11.5, marginTop: 6 }}>
           {inboxInfo && (
