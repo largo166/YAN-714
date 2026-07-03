@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useProject } from '@/contexts/useProject'
 import RichText from '@/components/RichText'
-import type { Skill, SkillRun, KnowledgeHit, ProjectCognition } from '@/types/schemas'
+import type { Skill, SkillRun, SkillResult, KnowledgeHit, ProjectCognition } from '@/types/schemas'
 
 // caselib/condition/slang 接真实端点(非技能执行),各自渲染
 const SPECIAL_SKILLS = new Set(['caselib', 'condition', 'slang'])
@@ -19,7 +19,8 @@ type Special =
 /* 共创营地 · 暗色重写（Phase 2）。
    视觉对齐 DC 暗色霓虹；数据由 /api/skills 驱动；执行接真 runSkill。
    Phase 2：4 入口→子技能展开 + 方案评审「快速评审/设计委员会(MoA)」模式选择 + MoA 暗色渲染。
-   未做（Phase 3+）：富对话追问、对话流历史、退役 AgentPage。 */
+   已并入：成果归档回查(自 AgentPage 移植;AgentPage 已退役删除,对话流/外发等在 git 历史,
+   追问系统立项时再复活)。未做（Phase 3+）：富对话追问、对话流历史。 */
 
 const C = {
   purple: '#7c5cff', blue: '#42a5ff', gold: '#d7a86e', cyan: '#36e6d4', red: '#ff5e66', amber: '#fdab3d',
@@ -174,7 +175,7 @@ export default function CampPage() {
   const { cur } = useProject()
   const [skills, setSkills] = useState<Skill[]>([])
   const [tab, setTab] = useState<'ask' | 'agents'>('ask')
-  const [view, setView] = useState<'hero' | 'entry' | 'skills' | 'run'>('hero')
+  const [view, setView] = useState<'hero' | 'entry' | 'skills' | 'run' | 'archive'>('hero')
   const [entry, setEntry] = useState<string>('')          // 当前展开的入口
   const [text, setText] = useState('')
   const [active, setActive] = useState<Skill | null>(null)
@@ -184,6 +185,20 @@ export default function CampPage() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [special, setSpecial] = useState<Special | null>(null)
+  // 成果归档(自 AgentPage 移植)：项目历史成果回查——过几天翻出上次的评图/PPT/图
+  const [archItems, setArchItems] = useState<SkillResult[]>([])
+  const [archBusy, setArchBusy] = useState(false)
+  const [archOpenId, setArchOpenId] = useState<number | null>(null)
+  const openArchive = useCallback(() => {
+    setView('archive')
+    setArchOpenId(null)
+    if (!cur) { setArchItems([]); return }
+    setArchBusy(true)
+    api.listSkillResults(cur.id)
+      .then((d) => setArchItems(d.items))
+      .catch(() => setArchItems([]))
+      .finally(() => setArchBusy(false))
+  }, [cur])
   // 拖拽接入：把文件拖进营地 → 上传到当前作用项目(建索引+抽图)→ 成为该项目材料
   const dragDepth = useRef(0)
   const [drag, setDrag] = useState(false)
@@ -318,7 +333,10 @@ export default function CampPage() {
                   )
                 })}
           </div>
-          <button type="button" onClick={() => setView('skills')} style={{ marginTop: 16, width: '100%', fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}>▤ 浏览全部技能 <span style={{ color: C.purple }}>→</span></button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button type="button" onClick={() => setView('skills')} style={{ flex: 1.4, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}>▤ 浏览全部技能 <span style={{ color: C.purple }}>→</span></button>
+            <button type="button" onClick={openArchive} style={{ flex: 1, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}>🗂 历史成果</button>
+          </div>
         </div>
       </div>
     )
@@ -356,6 +374,59 @@ export default function CampPage() {
       </div>
     )
   }
+
+  // 成果归档视图(自 AgentPage 移植)：真实历史成果列表,点条目展开;MoA 成果用暗色评图面板渲染
+  const archiveView = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '22px 30px 14px' }}>
+        <BrandMark size={30} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.02em' }}>历史成果</div>
+          <div style={{ fontSize: 12.5, color: C.mut, marginTop: 2 }}>{cur ? `${cur.name} · ${archItems.length} 条成果 · 点条目展开` : '未选择项目'}</div>
+        </div>
+        <button type="button" onClick={() => setView('hero')} style={{ fontFamily: 'inherit', cursor: 'pointer', height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.05)', color: C.ink2, fontSize: 13 }}>✕ 关闭</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 30px 40px' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {archBusy && <div style={{ color: C.mut, fontSize: 13 }}>加载中…</div>}
+          {!archBusy && !cur && <div style={{ color: C.mut, fontSize: 13 }}>请先在顶部选择作用项目。</div>}
+          {!archBusy && cur && archItems.length === 0 && (
+            <div style={{ color: C.mut, fontSize: 13 }}>本项目还没有成果。跑一次技能（方案评审 / PPT / 生图…），成果会自动归档到这里。</div>
+          )}
+          {archItems.map((r) => {
+            const open = archOpenId === r.id
+            let cl: Record<string, unknown> | null = null
+            if (open && r.output_json) {
+              try { const d = JSON.parse(r.output_json); cl = (d && (d as Record<string, unknown>).checklist) as Record<string, unknown> | null } catch { cl = null }
+            }
+            const sk = byId[r.skill_id]
+            return (
+              <div key={r.id} style={{ border: '1px solid ' + (open ? 'rgba(124,92,255,.4)' : C.line), borderRadius: 14, background: C.glass, overflow: 'hidden' }}>
+                <button type="button" onClick={() => setArchOpenId(open ? null : r.id)}
+                  style={{ width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', color: C.ink }}>
+                  <span style={{ color: C.mut }}>{open ? '▾' : '▸'}</span>
+                  <span style={{ fontSize: 15 }}>{sk?.icon || '✦'}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title || sk?.title || r.skill_id}</span>
+                  {r.status !== 'ok' && <span style={{ fontSize: 10.5, color: '#ff9b9b', border: '1px solid rgba(255,94,102,.4)', background: 'rgba(255,94,102,.12)', borderRadius: 6, padding: '1px 7px' }}>{r.status}</span>}
+                  <span style={{ fontSize: 11, color: C.mut2, whiteSpace: 'nowrap' }}>{(r.created_at || '').slice(0, 16).replace('T', ' ')}</span>
+                </button>
+                {open && (
+                  <div style={{ padding: '4px 16px 16px', color: C.ink2, fontSize: 13.5, lineHeight: 1.7 }}>
+                    {cl ? <MoaDark cl={cl} />
+                      : r.image_path && cur ? (
+                        <a href={api.projectImageUrl(cur.id, r.image_path)} target="_blank" rel="noreferrer">
+                          <img src={api.projectImageUrl(cur.id, r.image_path)} alt={r.title} style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid ' + C.line }} />
+                        </a>
+                      ) : <RichText text={r.content} />}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 
   const skillsView = () => (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -436,7 +507,7 @@ export default function CampPage() {
       onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
       onDrop={onDrop}
       style={{ minHeight: '100%', position: 'relative', color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 18% -6%, rgba(124,92,255,.28), transparent 31%), radial-gradient(circle at 86% 4%, rgba(66,165,255,.16), transparent 28%), radial-gradient(circle at 64% 108%, rgba(215,168,110,.11), transparent 32%), linear-gradient(180deg, #030406 0%, #07080c 44%, #030406 100%)' }}>
-      {view === 'skills' ? skillsView() : view === 'run' ? runView() : view === 'entry' ? entryView() : hero()}
+      {view === 'skills' ? skillsView() : view === 'run' ? runView() : view === 'archive' ? archiveView() : view === 'entry' ? entryView() : hero()}
 
       {/* 拖拽接入：发光虚线遮罩 + 接入结果 toast */}
       {drag && (
