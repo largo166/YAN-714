@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FileText, Folder, Package } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import type { DirEntry } from '@/types/schemas'
@@ -161,7 +162,7 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
                 onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = 'transparent' }}
                 title={it.is_dir ? '双击进入' : (foldersOnly ? '仓库根只能选文件夹' : (it.supported ? '可接入文件' : '不可解析(整理时会跳过)'))}
               >
-                <span>{it.is_dir ? '📁' : it.supported ? '📄' : '📦'}</span>
+                <span style={{ display: 'inline-flex' }}>{it.is_dir ? <Folder size={14} /> : it.supported ? <FileText size={14} /> : <Package size={14} />}</span>
                 <span style={{ flex: 1, wordBreak: 'break-all' }}>{it.name}</span>
                 {!it.is_dir && !it.supported && (
                   <span style={{ fontSize: 10, color: isSel ? '#fff' : 'var(--mut)' }}>不可解析</span>

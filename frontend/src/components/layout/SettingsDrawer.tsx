@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Eye, EyeOff, Lock, Settings } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import FolderPicker from '@/components/FolderPicker'
@@ -44,8 +45,8 @@ function KeyInput({
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
       />
-      <span className="eye" onClick={() => setShow((s) => !s)}>
-        👁
+      <span className="eye" onClick={() => setShow((s) => !s)} style={{ display: 'inline-flex' }}>
+        {show ? <EyeOff size={14} /> : <Eye size={14} />}
       </span>
     </span>
   )
@@ -154,7 +155,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
       <div className={'setmask' + (open ? ' show' : '')} onClick={onClose} />
       <aside className={'setdrawer' + (open ? ' show' : '')} aria-label="设置">
         <div className="sethead">
-          <div className="sett">⚙ 设置</div>
+          <div className="sett" style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Settings size={15} /> 设置</div>
           <button className="setx" onClick={onClose}>
             ✕
           </button>
@@ -165,7 +166,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
             <div className="setsech">AI 引擎与密钥</div>
             <div className="setsecd">研判、共创、纪要等 AI 能力由此点亮</div>
             <div className="setnote">
-              🔒 密钥仅存本机，不写入源码、不上传云端。界面只掩码显示，后端不回吐明文。
+              <Lock size={12} style={{ verticalAlign: -2, marginRight: 4 }} />密钥仅存本机，不写入源码、不上传云端。界面只掩码显示，后端不回吐明文。
             </div>
             <div className="engrow">
               <span className="en">DeepSeek</span>

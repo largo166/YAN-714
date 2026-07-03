@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
+import { Archive, Zap } from 'lucide-react'
+
 import { api } from '@/lib/api'
+import { SkillGlyph } from '@/lib/icons'
 import { useProject } from '@/contexts/useProject'
 import RichText from '@/components/RichText'
 import type { Skill, SkillRun, SkillResult, KnowledgeHit, ProjectCognition } from '@/types/schemas'
@@ -327,7 +330,7 @@ export default function CampPage() {
                   const s = byId[id]
                   return (
                     <Card key={id} onClick={() => { setEntry(id); setView('entry') }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', color: C.ink2, display: 'grid', placeItems: 'center', fontSize: 16 }}>{s?.icon || '✦'}</div>
+                      <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', color: C.ink2, display: 'grid', placeItems: 'center', fontSize: 16 }}><SkillGlyph id={id} fallback={s?.icon} /></div>
                       <div><div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{ENTRIES[id].title}</div><div style={{ fontSize: 12, color: C.mut, marginTop: 4, lineHeight: 1.4 }}>{ENTRIES[id].subs.length} 个子技能 · 点击展开</div></div>
                     </Card>
                   )
@@ -335,7 +338,7 @@ export default function CampPage() {
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button type="button" onClick={() => setView('skills')} style={{ flex: 1.4, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}>▤ 浏览全部技能 <span style={{ color: C.purple }}>→</span></button>
-            <button type="button" onClick={openArchive} style={{ flex: 1, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}>🗂 历史成果</button>
+            <button type="button" onClick={openArchive} style={{ flex: 1, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}><Archive size={15} /> 历史成果</button>
           </div>
         </div>
       </div>
@@ -360,7 +363,7 @@ export default function CampPage() {
               return (
                 <Card key={sid + i} onClick={() => handleSub(sid)}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: (s.color || C.purple) + '22', border: '1px solid ' + (s.color || C.purple) + '55', color: s.color || C.purple, display: 'grid', placeItems: 'center', fontSize: 16 }}>{s.icon}</div>
+                    <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: (s.color || C.purple) + '22', border: '1px solid ' + (s.color || C.purple) + '55', color: s.color || C.purple, display: 'grid', placeItems: 'center', fontSize: 16 }}><SkillGlyph id={sid} fallback={s.icon} /></div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{s.title}{isReview && <span style={{ fontSize: 10.5, color: C.purple, marginLeft: 6 }}>✦ 可设计委员会</span>}</div>
                       <div style={{ fontSize: 12, color: C.mut, marginTop: 3, lineHeight: 1.45 }}>{s.source}</div>
@@ -405,7 +408,7 @@ export default function CampPage() {
                 <button type="button" onClick={() => setArchOpenId(open ? null : r.id)}
                   style={{ width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', color: C.ink }}>
                   <span style={{ color: C.mut }}>{open ? '▾' : '▸'}</span>
-                  <span style={{ fontSize: 15 }}>{sk?.icon || '✦'}</span>
+                  <span style={{ fontSize: 15, display: 'inline-flex', color: C.ink2 }}><SkillGlyph id={r.skill_id} fallback={sk?.icon} size={15} /></span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title || sk?.title || r.skill_id}</span>
                   {r.status !== 'ok' && <span style={{ fontSize: 10.5, color: '#ff9b9b', border: '1px solid rgba(255,94,102,.4)', background: 'rgba(255,94,102,.12)', borderRadius: 6, padding: '1px 7px' }}>{r.status}</span>}
                   <span style={{ fontSize: 11, color: C.mut2, whiteSpace: 'nowrap' }}>{(r.created_at || '').slice(0, 16).replace('T', ' ')}</span>
@@ -448,7 +451,7 @@ export default function CampPage() {
                 {list.map((s) => (
                   <Card key={s.id} onClick={() => handleSub(s.id)}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: (s.color || C.purple) + '22', border: '1px solid ' + (s.color || C.purple) + '55', color: s.color || C.purple, display: 'grid', placeItems: 'center', fontSize: 16 }}>{s.icon}</div>
+                      <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: (s.color || C.purple) + '22', border: '1px solid ' + (s.color || C.purple) + '55', color: s.color || C.purple, display: 'grid', placeItems: 'center', fontSize: 16 }}><SkillGlyph id={s.id} fallback={s.icon} /></div>
                       <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{s.title}</div><div style={{ fontSize: 12, color: C.mut, marginTop: 3, lineHeight: 1.45 }}>{s.source}</div></div>
                     </div>
                   </Card>
@@ -533,7 +536,7 @@ export default function CampPage() {
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>方案评审 · 选模式</div>
             <div style={{ fontSize: 12, color: C.mut, marginBottom: 16 }}>同一份项目认知，两种评图方式。</div>
             <button type="button" onClick={() => run('review', '')} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: C.ink, border: '1px solid ' + C.line, borderRadius: 14, padding: '14px 16px', background: C.glass, marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>🔥 快速评审</div><div style={{ fontSize: 12, color: C.mut, marginTop: 3 }}>单模型，约 3 秒。对话式评审意见。</div>
+              <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><Zap size={14} /> 快速评审</div><div style={{ fontSize: 12, color: C.mut, marginTop: 3 }}>单模型，约 3 秒。对话式评审意见。</div>
             </button>
             <button type="button" onClick={() => run('review', 'moa')} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: C.ink, border: '1px solid rgba(124,92,255,.5)', borderRadius: 14, padding: '14px 16px', background: 'linear-gradient(145deg,rgba(124,92,255,.16),rgba(124,92,255,.04))' }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>✦ 设计委员会</div><div style={{ fontSize: 12, color: C.mut, marginTop: 3 }}>三位评图人（设计总监 / 空间 / 形式）+ 主审整合，约 15–60 秒。出评分 + 检查清单 + 跨维度问题。</div>

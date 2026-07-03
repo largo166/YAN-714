@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { Building2, Cake, Megaphone } from 'lucide-react'
+
 import { api, type ClientPortrait } from '@/lib/api'
 import type { Agent, TeamMember, TickerItem } from '@/types/schemas'
 
@@ -120,7 +122,7 @@ export default function HubPage() {
             ) : (
               tickerItems.map((t, i) => (
                 <span className="tickitem" key={i} style={{ color: t.kind === 'broadcast' ? '#a98bff' : C.gold }}>
-                  {t.kind === 'broadcast' ? '📢 ' : '🎂 '}
+                  {t.kind === 'broadcast' ? <Megaphone size={12} style={{ verticalAlign: -2, marginRight: 5 }} /> : <Cake size={12} style={{ verticalAlign: -2, marginRight: 5 }} />}
                   {t.text}
                 </span>
               ))
@@ -219,7 +221,7 @@ export default function HubPage() {
               <div>
                 <div style={{ fontSize: 13, marginBottom: 8 }}>
                   <b style={{ color: '#fff' }}>{portrait.client}</b> · {portrait.project_count} 个项目
-                  {portrait.cities.length > 0 && <span style={{ color: C.mut }}>　🏙 {portrait.cities.join('、')}</span>}
+                  {portrait.cities.length > 0 && <span style={{ color: C.mut }}>　<Building2 size={12} style={{ verticalAlign: -2 }} /> {portrait.cities.join('、')}</span>}
                 </div>
                 {portrait.projects.map((p) => (
                   <div key={p.id} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9 }}>

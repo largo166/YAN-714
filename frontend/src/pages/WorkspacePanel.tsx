@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FileText, Folder, HardDrive, Lock } from 'lucide-react'
 
 import { api, type CleanupPreview, type WorkspaceScan } from '@/lib/api'
 
@@ -155,7 +156,7 @@ export default function WorkspacePanel() {
       </div>
 
       <div className="setnote" style={{ marginTop: 10 }}>
-        🔒 安全清理：不会永久删除，只把文件移动到隔离区 <code>_ROMAI_CLEANUP_QUARANTINE/</code>，并写
+        <Lock size={12} style={{ verticalAlign: -2, marginRight: 4 }} />安全清理：不会永久删除，只把文件移动到隔离区 <code>_ROMAI_CLEANUP_QUARANTINE/</code>，并写
         manifest，可一键恢复。对真实项目目录执行 apply 前需用户单独确认。
       </div>
 
@@ -165,15 +166,15 @@ export default function WorkspacePanel() {
         <>
           <div className="grid4 mt">
             <div className="metric">
-              <div className="l">📄 文件</div>
+              <div className="l"><FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />文件</div>
               <div className="v">{scan.total_files}</div>
             </div>
             <div className="metric">
-              <div className="l">📁 文件夹</div>
+              <div className="l"><Folder size={12} style={{ verticalAlign: -2, marginRight: 4 }} />文件夹</div>
               <div className="v">{scan.total_dirs}</div>
             </div>
             <div className="metric">
-              <div className="l">💾 总大小</div>
+              <div className="l"><HardDrive size={12} style={{ verticalAlign: -2, marginRight: 4 }} />总大小</div>
               <div className="v" style={{ fontSize: 20 }}>
                 {fmtSize(scan.total_size)}
               </div>

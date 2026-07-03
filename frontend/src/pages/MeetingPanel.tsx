@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Volume2 } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import type { Meeting, MeetingMinute } from '@/types/schemas'
@@ -281,7 +282,7 @@ export default function MeetingPanel({
             {minute.gen_status === 'ok' && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button className="anbtn" onClick={toggleSpeak} title="用浏览器语音朗读纪要要点">
-                  {speaking ? '■ 停止播报' : '🔊 语音播报'}
+                  {speaking ? '■ 停止播报' : <><Volume2 size={13} style={{ verticalAlign: -2, marginRight: 4 }} />语音播报</>}
                 </button>
                 {minute.review_status !== 'confirmed' && <button className="anbtn" onClick={confirm}>人工审定</button>}
                 {minute.review_status === 'confirmed' &&

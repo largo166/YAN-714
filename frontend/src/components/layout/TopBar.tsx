@@ -1,3 +1,5 @@
+import { Lock } from 'lucide-react'
+
 import { BOARDS, type BoardKey } from '@/types/boards'
 
 interface Props {
@@ -44,7 +46,7 @@ export default function TopBar({ board, onBoard, online, onOpenSettings, adminVi
                 onClick={() => onBoard(b.key)}
               >
                 {b.label}
-                {b.adminOnly && <span className="lock">🔒</span>}
+                {b.adminOnly && <span className="lock" style={{ display: 'inline-flex' }}><Lock size={10} /></span>}
               </button>
             )
           })}

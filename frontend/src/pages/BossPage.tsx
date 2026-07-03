@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { Lock, Megaphone } from 'lucide-react'
+
 import { api } from '@/lib/api'
 import { CountNum } from '@/lib/useCountUp'
 import type { AiUsageItem, BossDashboard, Broadcast, WorkloadItem } from '@/types/schemas'
@@ -141,7 +143,7 @@ export default function BossPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: '-.03em' }}>管理驾驶舱</h1>
-            <span style={{ fontSize: 11.5, color: C.gold, border: `1px solid ${C.gold}55`, background: `${C.gold}1a`, borderRadius: 99, padding: '4px 10px' }}>🔒 仅管理员可见</span>
+            <span style={{ fontSize: 11.5, color: C.gold, border: `1px solid ${C.gold}55`, background: `${C.gold}1a`, borderRadius: 99, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Lock size={11} /> 仅管理员可见</span>
           </div>
           <p style={{ margin: '8px 0 0', color: C.mut, fontSize: 13 }}>面向负责人的跨项目只读聚合 —— 进行中项目、交付节点、风险与 AI 产能一屏掌握。</p>
         </div>
@@ -207,7 +209,7 @@ export default function BossPage() {
           {broadcasts.length === 0 && <div style={{ fontSize: 12.5, color: C.mut, padding: '7px 0' }}>暂无已发布通知。</div>}
           {broadcasts.map((b) => (
             <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5, color: C.ink2, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
-              <span>📢</span>
+              <span style={{ display: 'inline-flex' }}><Megaphone size={13} /></span>
               <span style={{ flex: 1 }}>{b.text}</span>
               <span style={{ fontSize: 10.5, color: C.mut }}>{b.created_at.slice(0, 10)}</span>
             </div>

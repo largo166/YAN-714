@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { FileText } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import type { ProjectFile } from '@/types/schemas'
@@ -184,7 +185,7 @@ export default function ProjectFilesPanel({
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    📄 {f.filename} <span className={'statpill ' + p.cls}>{p.text}</span>
+                    <FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{f.filename} <span className={'statpill ' + p.cls}>{p.text}</span>
                     {f.indexed_doc_id > 0 && <span className="statpill live">已入库</span>}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--mut)' }}>

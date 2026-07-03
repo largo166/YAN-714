@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { FileText, Files, FolderOpen, Search, Zap, ZoomIn } from 'lucide-react'
+
 import { api, type FileAsset } from '@/lib/api'
 import { CountNum, useCountUp } from '@/lib/useCountUp'
 import { useProject } from '@/contexts/useProject'
@@ -519,7 +521,7 @@ export default function KnowledgePage() {
               placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…"
               style={{ flex: 1, padding: '9px 12px', border: `1px solid ${C.line}`, borderRadius: 10, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink, fontFamily: 'inherit', outline: 'none' }}
             />
-            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 38, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>{searching ? '搜索中…' : '🔍 搜索'}</button>
+            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 38, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{searching ? '搜索中…' : <><Search size={14} /> 搜索</>}</button>
             {searchHits !== null && <button type="button" className="anbtn" onClick={() => { setSearchHits(null); setSearchQ('') }}>清空</button>}
           </div>
           {searchHits !== null && (
@@ -531,7 +533,7 @@ export default function KnowledgePage() {
                   <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 4 }}>命中 {searchHits.length} 条</div>
                   {searchHits.map((h) => (
                     <div key={h.document_id} style={{ fontSize: 12, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
-                      <span><b style={{ color: '#fff' }}>📄 {h.title}</b>{h.locator && <span style={{ color: C.cyan, fontSize: 11, marginLeft: 4 }}>· {h.locator}</span>}</span>
+                      <span><b style={{ color: '#fff' }}><FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{h.title}</b>{h.locator && <span style={{ color: C.cyan, fontSize: 11, marginLeft: 4 }}>· {h.locator}</span>}</span>
                       <span style={{ display: 'block', color: C.ink2, marginTop: 2 }}>{h.snippet}</span>
                     </div>
                   ))}
@@ -568,10 +570,10 @@ export default function KnowledgePage() {
         <input ref={folderInputRef} type="file" style={{ display: 'none' }} onChange={(e) => { onNativePicked(e.target.files, true); e.target.value = '' }} />
         <input ref={filesInputRef} type="file" multiple accept=".txt,.md,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={(e) => { onNativePicked(e.target.files, false); e.target.value = '' }} />
         <div className="btnrow" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn" onClick={() => folderInputRef.current?.click()} disabled={busy}>📁 选择文件夹</button>
-          <button className="btn" onClick={() => filesInputRef.current?.click()} disabled={busy}>📄 选择文件(可多选)</button>
-          <button className="btn" onClick={organize} disabled={busy || !picked} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>
-            {ingesting ? (ingestProg ? `整理中… ${ingestProg.done}/${ingestProg.total}` : '整理中…') : '⚡ 一键整理'}
+          <button className="btn" onClick={() => folderInputRef.current?.click()} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FolderOpen size={15} /> 选择文件夹</button>
+          <button className="btn" onClick={() => filesInputRef.current?.click()} disabled={busy} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Files size={15} /> 选择文件(可多选)</button>
+          <button className="btn" onClick={organize} disabled={busy || !picked} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {ingesting ? (ingestProg ? `整理中… ${ingestProg.done}/${ingestProg.total}` : '整理中…') : <><Zap size={15} /> 一键整理</>}
           </button>
           <span style={{ marginLeft: 'auto', fontSize: 11.5, color: C.mut }}>
             整理目标：{repoRoot ? <b style={{ color: C.gold }}>仓库 {repoRoot}</b> : <>程序内部目录（默认）</>}
@@ -595,7 +597,7 @@ export default function KnowledgePage() {
             </div>
             {picked.files.slice(0, 10).map((f, i) => (
               <div className="kbrow" key={i}>
-                <span className="pth">📄 {(f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name}</span>
+                <span className="pth"><FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{(f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name}</span>
                 <span className="meta">{fmtSize(f.size)}</span>
               </div>
             ))}
@@ -658,7 +660,7 @@ export default function KnowledgePage() {
             <span style={{ flex: 1 }} />
             {metaMissing.length > 0 && !batchBusy && (
               <button type="button" onClick={runBatchMeta} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '5px 12px' }}>
-                ⚡ 批量生成元数据（{metaMissing.length} 条缺摘要）
+                <Zap size={13} style={{ verticalAlign: -2, marginRight: 4 }} />批量生成元数据（{metaMissing.length} 条缺摘要）
               </button>
             )}
             {batchBusy && (
@@ -818,7 +820,7 @@ export default function KnowledgePage() {
                           <option value="">分类…</option>
                           {RECLASS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                         </select>
-                        <a href={api.assetImageUrl(cur.id, a.id)} target="_blank" rel="noreferrer" title="查看原图" style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,22,30,.92)', color: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>🔍</a>
+                        <a href={api.assetImageUrl(cur.id, a.id)} target="_blank" rel="noreferrer" title="查看原图" style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,22,30,.92)', color: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}><ZoomIn size={14} /></a>
                         <a href={api.assetImageUrl(cur.id, a.id)} download title="下载原图" style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,22,30,.92)', color: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>⬇</a>
                         <button className="gx" title="移除(软隐藏,可恢复,不删原文件)" onClick={() => removeAsset(a.id)}>✕</button>
                       </div>

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { AlertTriangle, Calendar, FileAudio, FileText, ListChecks, RefreshCw } from 'lucide-react'
+
 import { api } from '@/lib/api'
 import { CountNum, useCountUp } from '@/lib/useCountUp'
 import { useProject } from '@/contexts/useProject'
@@ -38,7 +40,7 @@ const C = {
 const cardBase: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 18, background: C.glass }
 
 /** 驾驶舱 KPI 卡（.ckcard：顶边光条 + 发光角 + hover）。ac=顶条色 gl=角辉光。值 '—' 不伪造。 */
-function Kpi({ icon, label, value, color, ac, gl }: { icon: string; label: string; value: React.ReactNode; color?: string; ac: string; gl: string }) {
+function Kpi({ icon, label, value, color, ac, gl }: { icon: React.ReactNode; label: string; value: React.ReactNode; color?: string; ac: string; gl: string }) {
   return (
     <div className="ckcard" style={{ padding: '14px 15px', minHeight: 84, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
       <div style={{ color: C.mut, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }}><span>{icon}</span>{label}</div>
@@ -324,12 +326,12 @@ export default function ProjectCenterPage() {
 
       {/* KPI 指标带（真实数据，去掉后端恒 0 的「成果缺口」） */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Kpi icon="📄" label="文件" value={overview ? <CountNum n={overview.files} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
-        <Kpi icon="📅" label="会议" value={overview ? <CountNum n={overview.meetings} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
-        <Kpi icon="✓" label="待办" value={overview ? <CountNum n={overview.todos} /> : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
-        <Kpi icon="🔊" label="会议纪要" value={overview ? <CountNum n={overview.minutes} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
-        <Kpi icon="⚠" label="风险" value={overview ? <CountNum n={overview.risks} /> : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
-        <Kpi icon="⟳" label="可复用资产" value={overview ? <CountNum n={overview.assets} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
+        <Kpi icon={<FileText size={13} />} label="文件" value={overview ? <CountNum n={overview.files} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
+        <Kpi icon={<Calendar size={13} />} label="会议" value={overview ? <CountNum n={overview.meetings} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
+        <Kpi icon={<ListChecks size={13} />} label="待办" value={overview ? <CountNum n={overview.todos} /> : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
+        <Kpi icon={<FileAudio size={13} />} label="会议纪要" value={overview ? <CountNum n={overview.minutes} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
+        <Kpi icon={<AlertTriangle size={13} />} label="风险" value={overview ? <CountNum n={overview.risks} /> : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
+        <Kpi icon={<RefreshCw size={13} />} label="可复用资产" value={overview ? <CountNum n={overview.assets} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
       </div>
 
       {/* 快速跳转 */}
