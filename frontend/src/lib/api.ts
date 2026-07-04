@@ -51,8 +51,6 @@ import {
   BossDashboardSchema,
   WorkloadListSchema,
   AiUsageListSchema,
-  BatchIngestImportSchema,
-  BatchIngestPreviewSchema,
   DirListSchema,
   type DirList,
   NotConfiguredListSchema,
@@ -90,8 +88,6 @@ import {
   type BossDashboard,
   type WorkloadItem,
   type AiUsageItem,
-  type BatchIngestImport,
-  type BatchIngestPreview,
   type KnowledgeStats,
   type ProjectFileDetail,
   type ProjectInput,
@@ -655,22 +651,6 @@ export const api = {
   },
   async scanInbox(): Promise<{ accessible: boolean; scanned?: number; imported?: number; indexed?: number; skipped?: number; failed?: number; reason?: string }> {
     return request('/api/inbox/scan', { method: 'POST', body: '{}' })
-  },
-  async previewBatchIngest(rootPath: string): Promise<BatchIngestPreview> {
-    return BatchIngestPreviewSchema.parse(
-      await request('/api/projects/batch-ingest/preview', {
-        method: 'POST',
-        body: JSON.stringify({ root_path: rootPath }),
-      }),
-    )
-  },
-  async importBatchIngest(rootPath: string, mode = 'collection'): Promise<BatchIngestImport> {
-    return BatchIngestImportSchema.parse(
-      await request('/api/projects/batch-ingest/import', {
-        method: 'POST',
-        body: JSON.stringify({ root_path: rootPath, index_to_knowledge: true, mode }),
-      }),
-    )
   },
   /** 把现有【落在内部 uploads 的项目文件】整理进已配置的仓库 {仓库}/{项目名}/(存量迁移,幂等)。 */
   async organizeToRepository(): Promise<{

@@ -15,83 +15,8 @@ from ..safe_paths import sanitize_filename
 
 router = APIRouter(prefix="/api/projects", tags=["project-files"])
 
-# 项目名直接用一级文件夹原名,不做自动切分——中文地名(如"石家庄市庄")用规则无法消歧,
-# 取名是人的判断不是匹配题。建项目后由用户在项目中心手动改名(PUT /projects/{id})。
-
-
-def _project_name(pdir: Path) -> str:
-    """项目单元显示名:单文件→去扩展名(如 任务书.pdf→任务书);目录→文件夹原名。"""
-    return pdir.stem if pdir.is_file() else pdir.name
-
-
-def _unit_files(pdir: Path) -> list[Path]:
-    """一个项目单元包含的文件:单文件单元就是它自己;目录单元则递归取其下所有文件。"""
-    if pdir.is_file():
-        return [pdir]
-    return [p for p in sorted(pdir.rglob("*"), key=lambda x: str(x)) if p.is_file()]
-
-
-def _project_dirs(root_path: str, mode: str = "collection") -> tuple[Path, list[Path]]:
-    root = Path(root_path)
-    # 单个文件:把它自己当作唯一项目单元,父目录作 root(rel 路径据此计算)。与 mode 无关。
-    if root.is_file():
-        return root.parent, [root]
-    if not root.exists() or not root.is_dir():
-        raise HTTPException(400, "路径不存在或不可访问")
-    # 单项目模式:整个所选文件夹 = 1 个项目(子文件夹只是它的资料分类,_unit_files 已 rglob 全收)。
-    # 用户明确"这个文件夹本身是一个项目"时选此,避免把分类子文件夹误建成独立项目。
-    if mode == "single":
-        return root, [root]
-    # 项目集合模式(默认):一级子文件夹各=一个项目。
-    # 排除清理隔离区(_ROMAI_CLEANUP_QUARANTINE)——它是 workspace 安全清理的隔离目录,
-    # 不是项目,否则会把已隔离文件当项目误接入(与 workspace.scan 的过滤口径一致)。
-    subdirs = sorted(
-        [p for p in root.iterdir() if p.is_dir() and p.name != "_ROMAI_CLEANUP_QUARANTINE"],
-        key=lambda p: p.name,
-    )
-    # 若根目录是【扁平文件夹】(无子目录、仅散落文件)→ 把根目录本身当作一个项目,
-    # 否则散落在根的文件永远不会被接入(数据基地"选文件夹整理"对扁平文件夹就成了空操作)。
-    if not subdirs:
-        return root, [root]
-    return root, subdirs
-
-
-def _mode_hint(root: Path) -> str:
-    """是否值得提示用户考虑"单个项目"解读。零猜测原则:不看子文件夹名,
-    只要目录【有子文件夹】(即集合解读会拆成多个项目),就提示用户确认是集合还是单项目——
-    因为只有用户知道这个文件夹是"装着多个项目"还是"本身一个项目、子文件夹是资料分类"。"""
-    try:
-        if root.is_file():
-            return ""
-        subs = [p for p in root.iterdir() if p.is_dir() and p.name != "_ROMAI_CLEANUP_QUARANTINE"]
-    except OSError:
-        return ""
-    # 有子文件夹 → 两种解读都成立,提示用户选(单文件/扁平文件夹无歧义,不提示)
-    return "choose_mode" if subs else ""
-
-
-def _scan_project_dir(root: Path, pdir: Path) -> schemas.BatchIngestProjectPreviewOut:
-    supported: list[schemas.BatchIngestFileOut] = []
-    unsupported: list[schemas.BatchIngestFileOut] = []
-    for path in _unit_files(pdir):
-        rel = str(path.relative_to(root))
-        item = schemas.BatchIngestFileOut(
-            path=rel,
-            size=path.stat().st_size,
-            ext=path.suffix.lower(),
-        )
-        if parsing.is_supported(path.name):
-            supported.append(item)
-        else:
-            unsupported.append(item)
-    return schemas.BatchIngestProjectPreviewOut(
-        project_name=_project_name(pdir),  # 文件夹原名/文件去扩展名,不自动切分(用户后续可手动改名)
-        path=str(pdir),
-        supported_count=len(supported),
-        unsupported_count=len(unsupported),
-        files=supported,
-        unsupported=unsupported,
-    )
+# batch-ingest 批量接入管线已删除(2026-07,前端全站零调用;数据基地走浏览器选文件回环上传)。
+# 需要时从 git 历史找回:endpoints batch-ingest/preview|import 及其 helpers。
 
 
 def _norm_source(p) -> str:
@@ -117,7 +42,7 @@ def _managed_layout(db: Session, project: models.Project) -> tuple:
 
 
 def _store_file(db: Session, project: models.Project, path) -> tuple:
-    """把单个源文件复制进受管根,返回 (StoredFile, storage_root)。"""
+    """把单个源文件复制进受管根,返回 (StoredFile, storage_root)。(收件箱 inbox.py 复用)"""
     base, subdir, storage_root = _managed_layout(db, project)
     stored = uploads.copy_into_root(base, subdir, path)
     return stored, storage_root
@@ -165,7 +90,7 @@ def _migrate_project_to_repo(db: Session, project: models.Project, repo_root: Pa
 
 def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> models.Project:
     """按【源文件夹路径】去重(可靠键,支持重新整理):同 source_path 已存在→复用(不改名,
-    保留用户在项目中心可能做过的手动改名);否则用文件夹原名新建并记录来源路径。"""
+    保留用户在项目中心可能做过的手动改名);否则用文件夹原名新建并记录来源路径。(收件箱复用)"""
     source_path = _norm_source(source_path) if source_path else source_path
     if source_path:
         row = db.query(models.Project).filter(models.Project.source_path == source_path).first()
@@ -179,6 +104,7 @@ def _find_or_create_project(db: Session, folder_name: str, source_path: str) -> 
 
 
 def _already_imported(db: Session, project_id: int, filename: str, size: int) -> bool:
+    """同名同大小的活动文件已存在 → 视为已接入(幂等去重)。(收件箱复用)"""
     return (
         db.query(models.ProjectFile)
         .filter(
@@ -208,8 +134,9 @@ def _doc_from_file(db: Session, f: models.ProjectFile, tags: str) -> models.Know
 
 
 def _index_project_file(db: Session, f: models.ProjectFile) -> int:
-    # ok/ok_truncated=真实正文（截断也是真材料）；metadata_only=登记说明（靠 title/type 检索）。
-    # extraction_timeout 是待人工状态，不入库。
+    """把项目文件回流入知识库(幂等)。(收件箱 inbox.py 复用)
+    ok/ok_truncated=真实正文（截断也是真材料）；metadata_only=登记说明（靠 title/type 检索）。
+    extraction_timeout 是待人工状态，不入库。"""
     if f.parse_status not in ("ok", "ok_truncated", "metadata_only") or not f.content_text.strip():
         return 0
     if f.indexed_doc_id:
@@ -224,125 +151,6 @@ def _index_project_file(db: Session, f: models.ProjectFile) -> int:
     f.indexed_doc_id = doc.id
     db.commit()
     return doc.id
-
-
-def _mode_summary(root_path: str, mode: str) -> schemas.BatchIngestModeSummaryOut:
-    root, project_dirs = _project_dirs(root_path, mode)
-    projects = [_scan_project_dir(root, pdir) for pdir in project_dirs]
-    return schemas.BatchIngestModeSummaryOut(
-        mode=mode,
-        total_projects=len(projects),
-        total_supported=sum(p.supported_count for p in projects),
-        total_unsupported=sum(p.unsupported_count for p in projects),
-        projects=projects,
-    )
-
-
-@router.post("/batch-ingest/preview", response_model=schemas.BatchIngestPreviewOut)
-def batch_ingest_preview(payload: schemas.BatchIngestRequest) -> schemas.BatchIngestPreviewOut:
-    root = Path(payload.root_path)
-    is_file = root.is_file()
-    collection = _mode_summary(payload.root_path, "collection")
-    # 单文件无"集合/单项目"之分;目录才算两种解读
-    single = None if is_file else _mode_summary(payload.root_path, "single")
-    return schemas.BatchIngestPreviewOut(
-        accessible=True,
-        root=str(root if is_file else _project_dirs(payload.root_path, "collection")[0]),
-        # 顶层沿用 collection 解读(向后兼容旧前端)
-        total_projects=collection.total_projects,
-        total_supported=collection.total_supported,
-        total_unsupported=collection.total_unsupported,
-        projects=collection.projects,
-        is_single_file=is_file,
-        collection=collection,
-        single_project=single,
-        mode_hint=_mode_hint(root),
-    )
-
-
-@router.post("/batch-ingest/import", response_model=schemas.BatchIngestImportOut)
-def batch_ingest_import(
-    payload: schemas.BatchIngestImportRequest, db: Session = Depends(get_db)
-) -> schemas.BatchIngestImportOut:
-    root, project_dirs = _project_dirs(payload.root_path, payload.mode)
-    allowed = set(payload.project_names or [])
-    results: list[schemas.BatchIngestProjectImportOut] = []
-
-    # 仓库模式:导入前预检仓库根可访问(掉线→整体 400,不留半截);未配置则回退 uploads 不预检。
-    cfg = db.get(models.AppSetting, 1)
-    repo_path = (cfg.repository_root_path if cfg else "") or ""
-    if repo_path and not Path(repo_path).is_dir():
-        raise HTTPException(400, f"仓库不可访问,请检查仓库文件夹是否存在:{repo_path}")
-
-    for pdir in project_dirs:
-        if allowed and _project_name(pdir) not in allowed:
-            continue
-        unit_files = _unit_files(pdir)
-        # 预检:无任何可解析文件的单元直接跳过,不创建空项目(避免污染项目列表)
-        if not any(parsing.is_supported(p.name) for p in unit_files):
-            continue
-        project = _find_or_create_project(db, _project_name(pdir), str(pdir))
-        copied = indexed = failed = skipped = 0
-
-        for path in unit_files:
-            if not parsing.is_supported(path.name):
-                continue
-            size = path.stat().st_size
-            if _already_imported(db, project.id, path.name, size):
-                skipped += 1
-                continue
-            try:
-                stored, storage_root = _store_file(db, project, path)
-                pr = parsing.parse_file(stored.abs_path)
-                pf = models.ProjectFile(
-                    project_id=project.id,
-                    filename=stored.filename,
-                    stored_path=stored.stored_path,
-                    storage_root=storage_root,
-                    file_type=stored.filename.rsplit(".", 1)[-1].lower()
-                    if "." in stored.filename
-                    else "",
-                    size=stored.size,
-                    parse_status=pr.status,
-                    parse_error=pr.error,
-                    content_text=pr.text,
-                    content_chunks_json=safe_json.dumps_safe(pr.chunks) if pr.chunks else "",
-                    truncated_at_page=pr.truncated_at_page,
-                    total_pages=pr.total_pages,
-                    status="active",
-                )
-                db.add(pf)
-                db.commit()
-                db.refresh(pf)
-                copied += 1
-                if payload.index_to_knowledge and _index_project_file(db, pf):
-                    indexed += 1
-            except Exception as exc:  # noqa: BLE001  批量接入单文件失败不阻断其它文件
-                db.rollback()
-                failed += 1
-                print(f"batch ingest failed: {path}: {exc}")
-
-        results.append(
-            schemas.BatchIngestProjectImportOut(
-                project_id=project.id,
-                project_name=project.name,
-                copied=copied,
-                indexed=indexed,
-                failed=failed,
-                skipped_existing=skipped,
-            )
-        )
-
-    return schemas.BatchIngestImportOut(
-        status="ok",
-        root=str(root),
-        total_projects=len(results),
-        copied=sum(x.copied for x in results),
-        indexed=sum(x.indexed for x in results),
-        failed=sum(x.failed for x in results),
-        skipped_existing=sum(x.skipped_existing for x in results),
-        projects=results,
-    )
 
 
 @router.post("/repository/organize")

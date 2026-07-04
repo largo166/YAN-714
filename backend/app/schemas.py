@@ -576,10 +576,6 @@ class KnowledgeSearchOut(BaseModel):
     hits: List[KnowledgeHitOut]
 
 
-class BatchIngestRequest(BaseModel):
-    root_path: str = Field(min_length=1)
-
-
 # ── 文件系统:只读列目录(目录选择弹窗) ──
 class DirEntryOut(BaseModel):
     name: str
@@ -639,73 +635,7 @@ class IndexFileOut(BaseModel):
     title: str
 
 
-class BatchIngestRequest(BaseModel):
-    root_path: str = Field(min_length=1)
-
-
-class BatchIngestFileOut(BaseModel):
-    path: str
-    size: int
-    ext: str
-
-
-class BatchIngestProjectPreviewOut(BaseModel):
-    project_name: str
-    path: str
-    supported_count: int
-    unsupported_count: int
-    files: List[BatchIngestFileOut] = []
-    unsupported: List[BatchIngestFileOut] = []
-
-
-class BatchIngestModeSummaryOut(BaseModel):
-    """一种解读(集合/单项目)下的汇总,供前端预览卡两选一。"""
-    mode: str                       # "collection" | "single"
-    total_projects: int = 0
-    total_supported: int = 0
-    total_unsupported: int = 0
-    projects: List[BatchIngestProjectPreviewOut] = []
-
-
-class BatchIngestPreviewOut(BaseModel):
-    accessible: bool
-    root: str = ""
-    error: str = ""
-    total_projects: int = 0          # 向后兼容:继续填 collection 解读
-    total_supported: int = 0
-    total_unsupported: int = 0
-    projects: List[BatchIngestProjectPreviewOut] = []
-    # 新增(旧前端忽略):两种解读 + 单文件标记 + 结构提示
-    is_single_file: bool = False
-    collection: Optional[BatchIngestModeSummaryOut] = None
-    single_project: Optional[BatchIngestModeSummaryOut] = None
-    mode_hint: str = ""              # "" | "maybe_single"
-
-
-class BatchIngestImportRequest(BatchIngestRequest):
-    project_names: Optional[List[str]] = None
-    index_to_knowledge: bool = True
-    mode: str = "collection"        # "collection"(子文件夹各=项目) | "single"(整夹=1项目);不传=现有行为
-
-
-class BatchIngestProjectImportOut(BaseModel):
-    project_id: int
-    project_name: str
-    copied: int = 0
-    indexed: int = 0
-    failed: int = 0
-    skipped_existing: int = 0
-
-
-class BatchIngestImportOut(BaseModel):
-    status: str
-    root: str
-    total_projects: int = 0
-    copied: int = 0
-    indexed: int = 0
-    failed: int = 0
-    skipped_existing: int = 0
-    projects: List[BatchIngestProjectImportOut] = []
+# batch-ingest 批量接入 schema 已删除(2026-07,前端零调用,管线一并移除;git 历史可找回)
 
 
 # ── 4D: AI 研判 ──

@@ -531,42 +531,7 @@ export const IndexFileOutSchema = z.object({
   title: z.string(),
 })
 
-export const BatchIngestFileSchema = z.object({
-  path: z.string(),
-  size: z.number(),
-  ext: z.string(),
-})
-export const BatchIngestProjectPreviewSchema = z.object({
-  project_name: z.string(),
-  path: z.string(),
-  supported_count: z.number(),
-  unsupported_count: z.number(),
-  files: z.array(BatchIngestFileSchema),
-  unsupported: z.array(BatchIngestFileSchema),
-})
-export const BatchIngestModeSummarySchema = z.object({
-  mode: z.string(),
-  total_projects: z.number().default(0),
-  total_supported: z.number().default(0),
-  total_unsupported: z.number().default(0),
-  projects: z.array(BatchIngestProjectPreviewSchema).default([]),
-})
-export type BatchIngestModeSummary = z.infer<typeof BatchIngestModeSummarySchema>
-export const BatchIngestPreviewSchema = z.object({
-  accessible: z.boolean(),
-  root: z.string(),
-  error: z.string().default(''),
-  total_projects: z.number(),
-  total_supported: z.number(),
-  total_unsupported: z.number(),
-  projects: z.array(BatchIngestProjectPreviewSchema),
-  // 新增(后端旧响应缺这些字段也能 parse)
-  is_single_file: z.boolean().default(false),
-  collection: BatchIngestModeSummarySchema.nullable().default(null),
-  single_project: BatchIngestModeSummarySchema.nullable().default(null),
-  mode_hint: z.string().default(''),
-})
-export type BatchIngestPreview = z.infer<typeof BatchIngestPreviewSchema>
+// batch-ingest 批量接入 schema 已删除(2026-07,前端零调用,前后端管线一并移除;git 历史可找回)
 
 // ── 文件系统:只读列目录(目录选择弹窗) ──
 export const DirEntrySchema = z.object({
@@ -590,26 +555,6 @@ export const DirListSchema = z.object({
   error: z.string().default(''),
 })
 export type DirList = z.infer<typeof DirListSchema>
-
-export const BatchIngestProjectImportSchema = z.object({
-  project_id: z.number(),
-  project_name: z.string(),
-  copied: z.number(),
-  indexed: z.number(),
-  failed: z.number(),
-  skipped_existing: z.number(),
-})
-export const BatchIngestImportSchema = z.object({
-  status: z.string(),
-  root: z.string(),
-  total_projects: z.number(),
-  copied: z.number(),
-  indexed: z.number(),
-  failed: z.number(),
-  skipped_existing: z.number(),
-  projects: z.array(BatchIngestProjectImportSchema),
-})
-export type BatchIngestImport = z.infer<typeof BatchIngestImportSchema>
 
 // ── 4D: AI 研判 ──
 export const ANALYSIS_TASKS = [
