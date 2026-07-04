@@ -46,23 +46,26 @@ const RECLASS = [
   { key: 'material', label: '材质' }, { key: 'logo', label: 'logo/图标' },
 ]
 
-// DC 暗色基元（与 BossPage/CampPage/HubPage/ProjectCenterPage 同一套色板，跨页一致）
+// DC 暗色基元——P2 收口后只剩动态场景(仪表/状态点/悬停还原)仍引用的键;静态样式全走 Tailwind token
 const C = {
-  purple: '#7c5cff', blue: '#42a5ff', gold: '#d7a86e', cyan: '#36e6d4', red: '#ff5e66', amber: '#fdab3d', green: '#49d18d',
-  ink: '#f4f1ea', ink2: '#d8d4cc', mut: '#8f96a5', mut2: '#5f6674', line: 'rgba(255,255,255,.08)',
-  glass: 'linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032))',
+  purple: '#7c5cff', cyan: '#36e6d4', green: '#49d18d',
+  line: 'rgba(255,255,255,.08)', mut: '#8f96a5', mut2: '#5f6674',
 }
+// 玻璃输入框(跨节复用)
+const fieldCls = 'border border-solid border-line rounded-[8px] text-[13px] bg-[rgba(255,255,255,.045)] text-ink [font-family:inherit] outline-none'
+// 钦定主渐变按钮底(DESIGN.md §3)
+const gradBtn = 'bg-[linear-gradient(135deg,#7c5cff,#42a5ff)] text-white'
 
 /** 环形仪表（pct 真实，发光 conic 环 + 充能动画 + 中心数字滚动）。 */
 function Gauge({ pct, label, color }: { pct: number; label: string; color: string }) {
   const p = Math.max(0, Math.min(100, Math.round(pct)))
   const shown = useCountUp(p, 900)
   return (
-    <div className="gauge-anim" style={{ width: 148, height: 148, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, ['--gp']: `${p}%`, background: `conic-gradient(${color} 0% var(--gp), rgba(255,255,255,.06) var(--gp) 100%)`, boxShadow: `0 0 42px ${color}38` } as React.CSSProperties}>
-      <div style={{ width: 112, height: 112, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center', border: `1px solid ${C.line}` }}>
+    <div className="gauge-anim w-[148px] h-[148px] rounded-full grid place-items-center shrink-0" style={{ ['--gp']: `${p}%`, background: `conic-gradient(${color} 0% var(--gp), rgba(255,255,255,.06) var(--gp) 100%)`, boxShadow: `0 0 42px ${color}38` } as React.CSSProperties}>
+      <div className="w-28 h-28 rounded-full grid place-items-center text-center border border-solid border-line" style={{ background: '#0a0c12' }}>
         <div>
-          <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{shown}<span style={{ fontSize: 13, color: C.mut }}>%</span></div>
-          <div style={{ fontSize: 10.5, color: C.mut, marginTop: 3 }}>{label}</div>
+          <div className="text-[32px] font-bold tracking-[-.03em] leading-none tabular-nums">{shown}<span className="text-[13px] text-mut">%</span></div>
+          <div className="text-[10.5px] text-mut mt-[3px]">{label}</div>
         </div>
       </div>
     </div>
@@ -72,11 +75,11 @@ function Gauge({ pct, label, color }: { pct: number; label: string; color: strin
 /** 分组标题——竖条 + 标题 + 渐隐分隔线。 */
 function GroupLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '22px 0 12px' }}>
-      <span style={{ width: 4, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#7c5cff,#42a5ff)', flexShrink: 0 }} />
-      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-.02em', flexShrink: 0 }}>{children}</h2>
-      {hint && <span style={{ fontSize: 11.5, color: C.mut }}>{hint}</span>}
-      <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${C.line},transparent)` }} />
+    <div className="flex items-center gap-[10px] mt-[22px] mx-0 mb-3">
+      <span className="w-1 h-4 rounded-[2px] bg-[linear-gradient(180deg,#7c5cff,#42a5ff)] shrink-0" />
+      <h2 className="m-0 text-[16px] font-bold text-white tracking-[-.02em] shrink-0">{children}</h2>
+      {hint && <span className="text-[11.5px] text-mut">{hint}</span>}
+      <span className="flex-1 h-px bg-[linear-gradient(90deg,rgba(255,255,255,.08),transparent)]" />
     </div>
   )
 }
@@ -493,7 +496,7 @@ export default function KnowledgePage() {
 
   const idxPct = stats && stats.documents > 0 ? (stats.indexed / stats.documents) * 100 : 0
   const miniStat = (n: React.ReactNode, label: string, color?: string) => (
-    <div><div style={{ fontSize: 19, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{n}</div><div style={{ fontSize: 11, color: C.mut, marginTop: 2 }}>{label}</div></div>
+    <div><div className="text-[19px] font-bold tabular-nums text-ink" style={color ? { color } : undefined}>{n}</div><div className="text-[11px] text-mut mt-[2px]">{label}</div></div>
   )
 
   return (
@@ -502,70 +505,70 @@ export default function KnowledgePage() {
       onDragOver={(e) => { e.preventDefault() }}
       onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
       onDrop={(e) => { e.preventDefault(); dragDepth.current = 0; setDrag(false); const fl = e.dataTransfer?.files; if (fl && fl.length) { onNativePicked(fl, false); setTimeout(() => document.getElementById('sec-ingest')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40) } }}
-      style={{ color: C.ink }}>
+      className="text-ink">
       {drag && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(8,10,16,.7)', display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-          <div style={{ border: `2px dashed ${C.purple}`, borderRadius: 24, padding: '40px 64px', background: 'rgba(124,92,255,.08)', color: '#fff', fontSize: 18, fontWeight: 700, textAlign: 'center', boxShadow: '0 0 60px rgba(124,92,255,.4)' }}>
+        <div className="fixed inset-0 z-[80] bg-[rgba(8,10,16,.7)] grid place-items-center pointer-events-none">
+          <div className="border-2 border-dashed border-brand-purple rounded-[24px] py-10 px-16 bg-brand-purple/[.08] text-white text-[18px] font-bold text-center shadow-[0_0_60px_rgba(124,92,255,.4)]">
             ⬇ 松手加入「待整理」
-            <div style={{ fontSize: 12, fontWeight: 400, color: C.ink2, marginTop: 8 }}>txt/md/pdf/docx/pptx/xlsx/图片 → 命名项目后「一键整理」入库</div>
+            <div className="text-[12px] font-normal text-ink-2 mt-2">txt/md/pdf/docx/pptx/xlsx/图片 → 命名项目后「一键整理」入库</div>
           </div>
         </div>
       )}
       {/* HERO 区:板块动态背景(数据流)只罩 头部+库存脉搏/检索 双卡(按小样,不铺全页) */}
-      <section style={{ position: 'relative' }}>
+      <section className="relative">
         <BoardBackdrop mode="aurora" />
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div className="relative z-[1]">
       <div className="ptitle">
-        <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>数据基地</h1>
-        <span className="statpill live" style={{ marginLeft: 8 }}>本地索引 · 已接入</span>
+        <h1 className="bg-[linear-gradient(95deg,#fff,#c8bcff_55%,#80c9ff)] bg-clip-text text-transparent">数据基地</h1>
+        <span className="statpill live ml-2">本地索引 · 已接入</span>
       </div>
-      <p style={{ margin: '-6px 0 14px', color: C.mut, fontSize: 13 }}>让公司的每一份材料，都变成 AI 能引用的记忆。</p>
+      <p className="mt-[-6px] mx-0 mb-[14px] text-mut text-[13px]">让公司的每一份材料，都变成 AI 能引用的记忆。</p>
 
       {/* HERO：库存脉搏(索引完成率环 + reindex) + 全文检索 */}
       <GroupLabel hint="读进来 → 索引 → 查得到">库存脉搏 · 检索</GroupLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)', gap: 16 }}>
+      <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-4">
         <div className="gshell">
-          <div className="gshell-in" style={{ padding: 20, display: 'grid', gridTemplateColumns: '148px 1fr', gap: 18, alignItems: 'center' }}>
+          <div className="gshell-in p-5 grid grid-cols-[148px_1fr] gap-[18px] items-center">
           <Gauge pct={idxPct} label="索引完成率" color={C.purple} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div className="min-w-0">
+            <div className="flex gap-4 flex-wrap mb-3">
               {miniStat(stats ? <CountNum n={stats.documents} /> : '—', '受管文件')}
               {miniStat(stats ? <CountNum n={stats.indexed} /> : '—', '已索引', C.cyan)}
               {miniStat(stats ? <CountNum n={stats.cjk_chunks} /> : '—', '索引块·CJK')}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10.5, color: C.gold, border: `1px solid ${C.gold}66`, background: `${C.gold}1f`, borderRadius: 7, padding: '2px 8px' }}>{stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}</span>
-              <button type="button" onClick={doReindex} disabled={reindexing} style={{ fontFamily: 'inherit', cursor: reindexing ? 'default' : 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '6px 12px' }}>{reindexing ? '重建中…' : '⟳ 重建索引'}</button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10.5px] text-brand-gold border border-solid border-brand-gold/40 bg-brand-gold/[.12] rounded-[7px] py-[2px] px-2">{stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}</span>
+              <button type="button" onClick={doReindex} disabled={reindexing} className="[font-family:inherit] cursor-pointer disabled:cursor-default text-[12px] border border-solid border-brand-purple/40 bg-brand-purple/10 rounded-[9px] py-[6px] px-3" style={{ color: '#c8bcff' }}>{reindexing ? '重建中…' : '⟳ 重建索引'}</button>
             </div>
-            {reindexMsg && <div style={{ fontSize: 11.5, color: C.mut, marginTop: 6 }}>{reindexMsg}</div>}
+            {reindexMsg && <div className="text-[11.5px] text-mut mt-[6px]">{reindexMsg}</div>}
           </div>
           </div>
         </div>
 
-        <div className="ckcard" style={{ padding: 18, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>全文检索 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>本地 · 出处精确到页{searchEngine ? ` · ${searchEngine}` : ''}</span></div>
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div className="ckcard p-[18px]" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
+          <div className="text-[14px] font-bold text-white mb-[10px]">全文检索 <span className="text-[11px] text-mut font-normal">本地 · 出处精确到页{searchEngine ? ` · ${searchEngine}` : ''}</span></div>
+          <div className="flex gap-2">
             <input
               value={searchQ}
               onChange={(e) => setSearchQ(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doSearch() }}
               placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…"
-              style={{ flex: 1, padding: '9px 12px', border: `1px solid ${C.line}`, borderRadius: 10, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink, fontFamily: 'inherit', outline: 'none' }}
+              className={`flex-1 py-[9px] px-3 rounded-[10px] ${fieldCls}`}
             />
-            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 36, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.02em', fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{searching ? '搜索中…' : <><Search size={14} /> 搜索</>}</button>
+            <button type="button" onClick={doSearch} disabled={searching} className={`h-9 py-0 px-[15px] border-0 rounded-[10px] ${gradBtn} font-bold text-[13px] tracking-[.02em] [font-family:inherit] cursor-pointer inline-flex items-center gap-[6px]`}>{searching ? '搜索中…' : <><Search size={14} /> 搜索</>}</button>
             {searchHits !== null && <button type="button" className="anbtn" onClick={() => { setSearchHits(null); setSearchQ('') }}>清空</button>}
           </div>
           {searchHits !== null && (
-            <div style={{ marginTop: 10 }}>
+            <div className="mt-[10px]">
               {searchHits.length === 0 ? (
-                <div style={{ fontSize: 12, color: C.mut, padding: 6 }}>没有命中。换个关键词试试。</div>
+                <div className="text-[12px] text-mut p-[6px]">没有命中。换个关键词试试。</div>
               ) : (
                 <>
-                  <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 4 }}>命中 {searchHits.length} 条</div>
+                  <div className="text-[11.5px] text-mut mb-1">命中 {searchHits.length} 条</div>
                   {searchHits.map((h) => (
-                    <div key={h.document_id} style={{ fontSize: 12, padding: '8px 0', borderTop: `1px solid ${C.line}` }}>
-                      <span><b style={{ color: '#fff' }}><FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{h.title}</b>{h.locator && <span style={{ color: C.cyan, fontSize: 11, marginLeft: 4 }}>· {h.locator}</span>}</span>
-                      <span style={{ display: 'block', color: C.ink2, marginTop: 2 }}>{h.snippet}</span>
+                    <div key={h.document_id} className="text-[12px] py-2 border-t border-solid border-line">
+                      <span><b className="text-white"><FileText size={12} className="align-[-2px] mr-1" />{h.title}</b>{h.locator && <span className="text-brand-cyan text-[11px] ml-1">· {h.locator}</span>}</span>
+                      <span className="block text-ink-2 mt-[2px]">{h.snippet}</span>
                     </div>
                   ))}
                 </>
@@ -579,20 +582,20 @@ export default function KnowledgePage() {
 
       {/* ① 读取与整理：状态机发光管线 + 选择/整理 + 收件箱 */}
       <GroupLabel hint="本地来源 → 一键整理入库 · 收件箱自动入库">① 读取与整理</GroupLabel>
-      <div id="sec-ingest" className="ckcard" style={{ padding: 18, scrollMarginTop: 14, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
+      <div id="sec-ingest" className="ckcard p-[18px] scroll-mt-[14px]" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
         {/* 状态机发光管线 */}
         {(() => {
           const curStep = ingestResult ? 3 : ingesting ? 2 : picked ? 1 : 0
           const steps = ['选择来源', picked ? `已选 ${picked.files.length} 个` : '已选择待整理', ingesting && ingestProg ? `整理中 ${ingestProg.done}/${ingestProg.total}` : '整理中', '已整理']
           return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div className="flex items-center gap-[6px] flex-wrap mb-3">
               {steps.map((s, i) => {
                 const failHere = ingestFailed && i === 2
                 const on = i === curStep
                 return (
-                  <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {i > 0 && <span style={{ color: C.mut2 }}>→</span>}
-                    <span style={{ fontSize: 12, borderRadius: 99, padding: '5px 12px', whiteSpace: 'nowrap', border: `1px solid ${on ? (failHere ? 'rgba(255,94,102,.6)' : 'rgba(124,92,255,.6)') : C.line}`, background: i < curStep ? 'rgba(73,209,141,.1)' : on ? (failHere ? 'rgba(255,94,102,.14)' : 'rgba(124,92,255,.16)') : 'rgba(255,255,255,.03)', color: i < curStep ? '#9be6c4' : on ? '#fff' : C.mut, boxShadow: on ? (failHere ? '0 0 16px rgba(255,94,102,.3)' : '0 0 16px rgba(124,92,255,.3)') : 'none' }}>{failHere ? '整理失败' : s}</span>
+                  <span key={i} className="flex items-center gap-[6px]">
+                    {i > 0 && <span className="text-mut-2">→</span>}
+                    <span className="text-[12px] rounded-[99px] py-[5px] px-3 whitespace-nowrap border border-solid" style={{ borderColor: on ? (failHere ? 'rgba(255,94,102,.6)' : 'rgba(124,92,255,.6)') : C.line, background: i < curStep ? 'rgba(73,209,141,.1)' : on ? (failHere ? 'rgba(255,94,102,.14)' : 'rgba(124,92,255,.16)') : 'rgba(255,255,255,.03)', color: i < curStep ? '#9be6c4' : on ? '#fff' : C.mut, boxShadow: on ? (failHere ? '0 0 16px rgba(255,94,102,.3)' : '0 0 16px rgba(124,92,255,.3)') : 'none' }}>{failHere ? '整理失败' : s}</span>
                   </span>
                 )
               })}
@@ -600,93 +603,93 @@ export default function KnowledgePage() {
           )
         })()}
 
-        <input ref={folderInputRef} type="file" style={{ display: 'none' }} onChange={(e) => { onNativePicked(e.target.files, true); e.target.value = '' }} />
-        <input ref={filesInputRef} type="file" multiple accept=".txt,.md,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={(e) => { onNativePicked(e.target.files, false); e.target.value = '' }} />
-        <div className="btnrow" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn" onClick={() => folderInputRef.current?.click()} disabled={busy} title="弹出系统对话框;不支持的格式(如 .rar/.dwg)会自动跳过" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FolderOpen size={15} /> 选择文件夹</button>
-          <button className="btn" onClick={() => filesInputRef.current?.click()} disabled={busy} title="可多选；不支持的格式(如 .rar/.dwg)会自动跳过" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Files size={15} /> 选择文件</button>
-          <button className="btn" onClick={organize} disabled={busy || !picked} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <input ref={folderInputRef} type="file" className="hidden" onChange={(e) => { onNativePicked(e.target.files, true); e.target.value = '' }} />
+        <input ref={filesInputRef} type="file" multiple accept=".txt,.md,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg" className="hidden" onChange={(e) => { onNativePicked(e.target.files, false); e.target.value = '' }} />
+        <div className="btnrow flex-wrap items-center">
+          <button className="btn inline-flex items-center gap-[6px]" onClick={() => folderInputRef.current?.click()} disabled={busy} title="弹出系统对话框;不支持的格式(如 .rar/.dwg)会自动跳过"><FolderOpen size={15} /> 选择文件夹</button>
+          <button className="btn inline-flex items-center gap-[6px]" onClick={() => filesInputRef.current?.click()} disabled={busy} title="可多选；不支持的格式(如 .rar/.dwg)会自动跳过"><Files size={15} /> 选择文件</button>
+          <button className={`btn inline-flex items-center gap-[6px] ${gradBtn}`} onClick={organize} disabled={busy || !picked}>
             {ingesting ? (ingestProg ? `整理中… ${ingestProg.done}/${ingestProg.total}` : '整理中…') : <><Zap size={15} /> 一键整理</>}
           </button>
-          <span style={{ marginLeft: 'auto', fontSize: 11.5, color: C.mut }}>
-            整理目标：{repoRoot ? <b style={{ color: C.gold }}>仓库 {repoRoot}</b> : <>程序内部目录（默认）</>}
+          <span className="ml-auto text-[11.5px] text-mut">
+            整理目标：{repoRoot ? <b className="text-brand-gold">仓库 {repoRoot}</b> : <>程序内部目录（默认）</>}
           </span>
         </div>
-        <div style={{ fontSize: 11.5, color: C.mut, margin: '6px 2px 0' }}>
-          支持 txt·md·pdf·docx·pptx·xlsx·图片;复制接入并建索引,原始文件不动。{!repoRoot && <span style={{ color: C.mut2 }}> 整理目标可在「设置 → 知识库与数据」配置。</span>}
+        <div className="text-[11.5px] text-mut mt-[6px] mx-[2px] mb-0">
+          支持 txt·md·pdf·docx·pptx·xlsx·图片;复制接入并建索引,原始文件不动。{!repoRoot && <span className="text-mut-2"> 整理目标可在「设置 → 知识库与数据」配置。</span>}
         </div>
 
         {/* 已选文件预览 + 整理成的项目名(可编辑) */}
         {picked && !ingestResult && (
-          <div className="card" style={{ marginTop: 12 }}>
+          <div className="card mt-3">
             <div className="ct">待整理（{picked.files.length} 个可解析文件，原文件不动）</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '6px 2px' }}>
+            <div className="flex gap-2 items-center flex-wrap my-[6px] mx-[2px]">
               <span className="meta">整理成项目：</span>
-              <input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="项目名称" style={{ flex: 1, minWidth: 180, padding: '6px 10px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
+              <input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="项目名称" className={`flex-1 min-w-[180px] py-[6px] px-[10px] rounded-[8px] ${fieldCls}`} />
             </div>
-            <div style={{ fontSize: 11.5, color: C.mut, margin: '0 2px 6px' }}>
+            <div className="text-[11.5px] text-mut mt-0 mx-[2px] mb-[6px]">
               {picked.fromFolder ? '默认用文件夹名；' : '默认用当前项目名；'}同名项目会并入，否则新建。
               {picked.skipped ? ` 已跳过 ${picked.skipped} 个不支持的文件。` : ''}
             </div>
             {picked.files.slice(0, 5).map((f, i) => (
               <div className="kbrow" key={i}>
-                <span className="pth"><FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{(f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name}</span>
+                <span className="pth"><FileText size={12} className="align-[-2px] mr-1" />{(f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name}</span>
                 <span className="meta">{fmtSize(f.size)}</span>
               </div>
             ))}
-            {picked.files.length > 5 && <div style={{ fontSize: 11.5, color: C.mut, padding: 4 }}>…等共 {picked.files.length} 个</div>}
+            {picked.files.length > 5 && <div className="text-[11.5px] text-mut p-1">…等共 {picked.files.length} 个</div>}
           </div>
         )}
 
         {/* 整理结果卡 */}
         {ingestResult && (
-          <div className="card" style={{ marginTop: 12 }}>
+          <div className="card mt-3">
             <div className="ct">整理结果 · 项目「{ingestResult.projectName}」</div>
-            <div style={{ fontSize: 13, color: C.ink2, margin: '4px 2px' }}>
+            <div className="text-[13px] text-ink-2 my-1 mx-[2px]">
               接入 <b>{ingestResult.uploaded}</b> 个文件 · 建索引 <b>{ingestResult.indexed}</b> · 失败 <b>{ingestResult.failed}</b> / 共 {ingestResult.total}
             </div>
-            <div style={{ fontSize: 12, color: C.mut, margin: '0 2px 4px' }}>
+            <div className="text-[12px] text-mut mt-0 mx-[2px] mb-1">
               索引状态：{ingestResult.indexed > 0 ? `已建立本地索引（${ingestResult.indexed} 条）` : '本次无新增索引'}
               {lastIngestAt && <> · 最近整理时间：{lastIngestAt.toLocaleString('zh-CN')}</>}
             </div>
-            <div className="kbrow" style={{ flexWrap: 'wrap' }}>
+            <div className="kbrow flex-wrap">
               <span className="pth"><b>{ingestResult.projectName}</b></span>
-              <span className="act" style={{ color: C.purple }} onClick={() => { setCurId(ingestResult.projectId); setSwitchNote(`已设为当前项目「${ingestResult.projectName}」，切到「项目中心」即可看到它的文件 / 认知。`) }}>设为当前项目</span>
+              <span className="act text-brand-purple" onClick={() => { setCurId(ingestResult.projectId); setSwitchNote(`已设为当前项目「${ingestResult.projectName}」，切到「项目中心」即可看到它的文件 / 认知。`) }}>设为当前项目</span>
             </div>
-            {switchNote && <div style={{ fontSize: 12, color: C.mut, marginTop: 6 }}>{switchNote}</div>}
+            {switchNote && <div className="text-[12px] text-mut mt-[6px]">{switchNote}</div>}
           </div>
         )}
       </div>
 
       {/* 收件箱监听:默认折叠(首屏减负,2026-07)——配置一次即长期后台运行,状态点+待处理数常显,细节点开 */}
-      <div className="ckcard" style={{ marginTop: 12, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
+      <div className="ckcard mt-3" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
         <button type="button" onClick={() => setInboxOpen((v) => !v)}
-          style={{ width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 8, color: C.ink }}>
-          <span style={{ color: C.mut }}>{inboxOpen ? '▾' : '▸'}</span>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>收件箱监听</span>
-          <span style={{ fontSize: 11, color: C.mut }}>丢进文件夹的文件自动入库</span>
+          className="w-full text-left [font-family:inherit] cursor-pointer bg-transparent border-0 py-[14px] px-[18px] flex items-center gap-2 text-ink">
+          <span className="text-mut">{inboxOpen ? '▾' : '▸'}</span>
+          <span className="text-[14px] font-bold text-white">收件箱监听</span>
+          <span className="text-[11px] text-mut">丢进文件夹的文件自动入库</span>
           {inboxInfo && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: inboxInfo.accessible ? C.green : C.mut }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: inboxInfo.accessible ? C.green : C.mut2, boxShadow: inboxInfo.accessible ? `0 0 8px ${C.green}` : 'none' }} />
+            <span className="inline-flex items-center gap-[6px] text-[11px]" style={{ color: inboxInfo.accessible ? C.green : C.mut }}>
+              <span className="w-[7px] h-[7px] rounded-full" style={{ background: inboxInfo.accessible ? C.green : C.mut2, boxShadow: inboxInfo.accessible ? `0 0 8px ${C.green}` : 'none' }} />
               {inboxInfo.inbox_root_path ? (inboxInfo.accessible ? '运行中' : '路径不可访问') : '未启用'}
             </span>
           )}
-          {inboxInfo?.accessible && inboxInfo.pending > 0 && <span style={{ fontSize: 10.5, color: C.amber, border: `1px solid ${C.amber}66`, background: `${C.amber}1f`, borderRadius: 99, padding: '2px 8px' }}>待处理 {inboxInfo.pending}</span>}
+          {inboxInfo?.accessible && inboxInfo.pending > 0 && <span className="text-[10.5px] text-brand-amber border border-solid border-brand-amber/40 bg-brand-amber/[.12] rounded-[99px] py-[2px] px-2">待处理 {inboxInfo.pending}</span>}
         </button>
         {inboxOpen && (
-          <div style={{ padding: '0 18px 16px' }}>
-            <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 8 }}>
+          <div className="pt-0 px-[18px] pb-4">
+            <div className="text-[11.5px] text-mut mb-2">
               后台每分钟自动扫描并接入知识库（入库后原件移到该文件夹下的 <code>_done/</code>）。也可随时点「立即扫描」。
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input value={inboxInput} onChange={(e) => setInboxInput(e.target.value)} placeholder="收件箱文件夹的完整路径，如 C:\Users\…\ROM-AI收件箱" style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
-              <button className="btn" onClick={saveInbox} disabled={inboxBusy} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{inboxBusy ? '处理中…' : '保存'}</button>
+            <div className="flex gap-2 items-center flex-wrap">
+              <input value={inboxInput} onChange={(e) => setInboxInput(e.target.value)} placeholder="收件箱文件夹的完整路径，如 C:\Users\…\ROM-AI收件箱" className={`flex-1 min-w-[240px] py-2 px-3 rounded-[8px] ${fieldCls}`} />
+              <button className={`btn ${gradBtn}`} onClick={saveInbox} disabled={inboxBusy}>{inboxBusy ? '处理中…' : '保存'}</button>
               <button className="anbtn" onClick={scanInboxNow} disabled={inboxBusy || !inboxInfo?.accessible} title={inboxInfo?.accessible ? '立即扫描收件箱并入库' : '请先保存一个可访问的收件箱路径'}>立即扫描</button>
-              {!inboxInfo?.accessible && <span style={{ fontSize: 11, color: C.mut2 }}>（先在左侧填好路径并保存，扫描才可用）</span>}
+              {!inboxInfo?.accessible && <span className="text-[11px] text-mut-2">（先在左侧填好路径并保存，扫描才可用）</span>}
             </div>
-            <div style={{ fontSize: 11.5, marginTop: 6 }}>
-              {inboxInfo?.inbox_root_path && <span style={{ color: C.mut }}>{inboxInfo.inbox_root_path}</span>}
-              {inboxMsg && <span style={{ color: C.ink2, marginLeft: 8 }}>{inboxMsg}</span>}
+            <div className="text-[11.5px] mt-[6px]">
+              {inboxInfo?.inbox_root_path && <span className="text-mut">{inboxInfo.inbox_root_path}</span>}
+              {inboxMsg && <span className="text-ink-2 ml-2">{inboxMsg}</span>}
             </div>
           </div>
         )}
@@ -694,75 +697,75 @@ export default function KnowledgePage() {
 
       {/* ② 知识库：已入库文档(类型统计+最近入库,全量在抽屉) + 可复用资产计数(侧) 两栏 */}
       <GroupLabel hint="类型总览 · 最近入库 · 标签沉淀">② 知识库</GroupLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 18, alignItems: 'start' }}>
-        <div className="ckcard" style={{ padding: '16px 18px', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>已入库文档 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{docs.length} 篇 · 按类型归档</span></div>
-            <span style={{ flex: 1 }} />
+      <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-[18px] items-start">
+        <div className="ckcard py-4 px-[18px]" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
+          <div className="flex items-center gap-[10px] mb-[10px] flex-wrap">
+            <div className="text-[14px] font-bold text-white">已入库文档 <span className="text-[11px] text-mut font-normal">{docs.length} 篇 · 按类型归档</span></div>
+            <span className="flex-1" />
             {metaMissing.length > 0 && !batchBusy && (
-              <button type="button" onClick={runBatchMeta} title={`批量生成元数据（${metaMissing.length} 条缺摘要）`} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '5px 12px' }}>
-                <Zap size={13} style={{ verticalAlign: -2, marginRight: 4 }} />批量生成（{metaMissing.length}）
+              <button type="button" onClick={runBatchMeta} title={`批量生成元数据（${metaMissing.length} 条缺摘要）`} className="[font-family:inherit] cursor-pointer text-[12px] border border-solid border-brand-purple/40 bg-brand-purple/10 rounded-[9px] py-[5px] px-3" style={{ color: '#c8bcff' }}>
+                <Zap size={13} className="align-[-2px] mr-1" />批量生成（{metaMissing.length}）
               </button>
             )}
             {batchBusy && (
-              <button type="button" onClick={() => { batchStop.current = true }} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#ff9b9b', border: '1px solid rgba(255,94,102,.4)', background: 'rgba(255,94,102,.1)', borderRadius: 9, padding: '5px 12px' }}>
+              <button type="button" onClick={() => { batchStop.current = true }} className="[font-family:inherit] cursor-pointer text-[12px] border border-solid border-brand-red/40 bg-brand-red/10 rounded-[9px] py-[5px] px-3" style={{ color: '#ff9b9b' }}>
                 ■ 停止
               </button>
             )}
             <button className="anbtn" onClick={() => openDrawer(null)}>浏览全部 ▸</button>
           </div>
-          {batchNote && <div style={{ fontSize: 11.5, color: C.mut, margin: '0 0 8px' }}>{batchNote}</div>}
-          {loading && <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>加载中…</div>}
+          {batchNote && <div className="text-[11.5px] text-mut mt-0 mb-2">{batchNote}</div>}
+          {loading && <div className="text-mut text-[12px] p-2">加载中…</div>}
           {!loading && docs.length === 0 && (
-            <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>暂无已入库文档。先「选择来源」再「一键整理」接入本地文件后会出现在这里。</div>
+            <div className="text-mut text-[12px] p-2">暂无已入库文档。先「选择来源」再「一键整理」接入本地文件后会出现在这里。</div>
           )}
           {docs.length > 0 && (
             <>
               {/* 类型分组统计 tile(签名视觉:数字为主,点 tile 开抽屉预过滤) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(118px,1fr))', gap: 8 }}>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-2">
                 {typeGroups.map(([t, n]) => (
                   <button key={t} type="button" onClick={() => openDrawer({ kind: 'type', value: t })}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(124,92,255,.5)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.line }}
-                    style={{ fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left', border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.03)', borderRadius: 12, padding: '10px 12px', color: C.ink, transition: 'border-color .16s' }}>
-                    <div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{n}</div>
-                    <div style={{ fontSize: 11, color: C.mut, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t}</div>
+                    className="[font-family:inherit] cursor-pointer text-left border border-solid border-line bg-white/[.03] rounded-[12px] py-[10px] px-3 text-ink transition-[border-color] duration-[160ms]">
+                    <div className="text-[20px] font-bold tabular-nums">{n}</div>
+                    <div className="text-[11px] text-mut mt-[2px] truncate">{t}</div>
                   </button>
                 ))}
               </div>
               {typeGroups.length === 1 && typeGroups[0][0] === '未分类' && (
-                <div style={{ fontSize: 11.5, color: C.mut, marginTop: 8 }}>点右上「批量生成元数据」,AI 会把它们自动归类。</div>
+                <div className="text-[11.5px] text-mut mt-2">点右上「批量生成元数据」,AI 会把它们自动归类。</div>
               )}
               {/* 最近入库 ≤5:type chip + 标题 + 日期,点行开抽屉并展开该篇 */}
-              <div style={{ fontSize: 11.5, color: C.mut, margin: '14px 2px 2px' }}>最近入库</div>
+              <div className="text-[11.5px] text-mut mt-[14px] mx-[2px] mb-[2px]">最近入库</div>
               {recentDocs.map((d) => (
-                <div className="kbrow" key={d.id} style={{ cursor: 'pointer' }}
+                <div className="kbrow cursor-pointer" key={d.id}
                   onClick={() => {
                     openDrawer(null)
                     if (expandedId !== d.id) void toggleExpand(d.id)
                     setTimeout(() => document.getElementById('kbdoc-' + d.id)?.scrollIntoView({ block: 'start' }), 300)
                   }}>
-                  <span className="pth"><span className="chip" style={{ marginRight: 6, fontSize: 10 }}>{(d.type || '').trim() || '未分类'}</span><b>{d.title}</b></span>
+                  <span className="pth"><span className="chip mr-[6px] text-[10px]">{(d.type || '').trim() || '未分类'}</span><b>{d.title}</b></span>
                   <span className="meta">{d.created_at.slice(0, 10)}</span>
                 </div>
               ))}
             </>
           )}
-          {metaNote && <div style={{ fontSize: 12, color: C.mut, padding: '6px 2px' }}>{metaNote}</div>}
+          {metaNote && <div className="text-[12px] text-mut py-[6px] px-[2px]">{metaNote}</div>}
         </div>
 
-        <aside style={{ display: 'grid', gap: 14 }}>
-          <div className="ckcard" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>可复用资产 · 沉淀层 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{assetGroups.length ? `${assetGroups.length} 类` : '空'}</span></div>
+        <aside className="grid gap-[14px]">
+          <div className="ckcard p-4">
+            <div className="text-[14px] font-bold text-white mb-[10px]">可复用资产 · 沉淀层 <span className="text-[11px] text-mut font-normal">{assetGroups.length ? `${assetGroups.length} 类` : '空'}</span></div>
             {assetGroups.length === 0 ? (
-              <div style={{ color: C.mut, fontSize: 12.5, padding: '4px 0' }}>暂无可复用资产。给文档打标签后，会在此按标签自动聚合。</div>
+              <div className="text-mut text-[12.5px] py-1">暂无可复用资产。给文档打标签后，会在此按标签自动聚合。</div>
             ) : (
               <div>
                 {assetGroups.map(([group, items]) => (
                   <button key={group} type="button" onClick={() => openDrawer({ kind: 'tag', value: group })}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, borderBottom: `1px solid ${C.line}`, padding: '8px 2px', color: C.ink2, fontSize: 12.5 }}>
-                    <span style={{ color: C.gold }}>#</span>{group}
-                    <span style={{ marginLeft: 'auto', color: C.mut, fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+                    className="flex items-center gap-2 w-full text-left [font-family:inherit] cursor-pointer bg-transparent border-x-0 border-t-0 border-b border-solid border-line py-2 px-[2px] text-ink-2 text-[12.5px]">
+                    <span className="text-brand-gold">#</span>{group}
+                    <span className="ml-auto text-mut tabular-nums">{items.length}</span>
                   </button>
                 ))}
               </div>
@@ -774,7 +777,7 @@ export default function KnowledgePage() {
 
       {/* ③ 图片资产：生图素材 + img2img + 效果图画廊 */}
       <GroupLabel hint={cur ? `当前项目 · ${cur.name} · 上传 / 文档抽取 / AI 生图` : '未选择项目'}>③ 图片资产</GroupLabel>
-      <div className="ckcard" style={{ padding: 18, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
+      <div className="ckcard p-[18px]" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)' } as React.CSSProperties}>
         {!cur ? (
           <div className="gallery"><div className="gempty">请先选择项目。</div></div>
         ) : (() => {
@@ -782,13 +785,13 @@ export default function KnowledgePage() {
           const shown = assetTab === 'all' ? assets : assets.filter((a) => a.asset_type === assetTab)
           return (
             <>
-              <div className="matlabel" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-                <span style={{ alignSelf: 'center' }}>效果图成果</span>
-                <span style={{ flex: 1 }} />
+              <div className="matlabel flex gap-[6px] flex-wrap items-center mt-[2px]">
+                <span className="self-center">效果图成果</span>
+                <span className="flex-1" />
                 {ASSET_TABS.map((t) => {
                   const n = t.key === 'all' ? assets.length : assets.filter((a) => a.asset_type === t.key).length
                   return (
-                    <button key={t.key} className="anbtn" onClick={() => setAssetTab(t.key)} style={assetTab === t.key ? { borderColor: 'var(--terra-line)', background: 'var(--terra-soft)', color: 'var(--terra)' } : undefined}>{t.label}（{n}）</button>
+                    <button key={t.key} className="anbtn" onClick={() => setAssetTab(t.key)} style={assetTab === t.key ? anbtnOn : undefined}>{t.label}（{n}）</button>
                   )
                 })}
               </div>
@@ -803,49 +806,49 @@ export default function KnowledgePage() {
                     <div key={a.id} className="gtile" style={{ backgroundImage: `url("${api.assetThumbUrl(cur.id, a.id)}")` }}>
                       <span className="glabel">{TYPE_CN[a.asset_type] || '图片'} · {(a.caption || '').slice(0, 12) || (a.slide_no ? `第${a.slide_no}页` : a.page_no ? `第${a.page_no}页` : '未命名')}</span>
                       <div className="gov">
-                        <select title="改分类" value="" onChange={(e) => { if (e.target.value) reclassAsset(a.id, e.target.value) }} style={{ height: 28, fontSize: 11, border: 0, borderRadius: 8, background: 'rgba(20,22,30,.92)', color: C.ink, cursor: 'pointer' }}>
+                        <select title="改分类" value="" onChange={(e) => { if (e.target.value) reclassAsset(a.id, e.target.value) }} className="h-7 text-[11px] border-0 rounded-[8px] bg-[rgba(20,22,30,.92)] text-ink cursor-pointer">
                           <option value="">分类…</option>
                           {RECLASS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                         </select>
-                        <a href={api.assetImageUrl(cur.id, a.id)} target="_blank" rel="noreferrer" title="查看原图" style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,22,30,.92)', color: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}><ZoomIn size={14} /></a>
-                        <a href={api.assetImageUrl(cur.id, a.id)} download title="下载原图" style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,22,30,.92)', color: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>⬇</a>
+                        <a href={api.assetImageUrl(cur.id, a.id)} target="_blank" rel="noreferrer" title="查看原图" className="w-7 h-7 rounded-[8px] bg-[rgba(20,22,30,.92)] text-ink flex items-center justify-center no-underline"><ZoomIn size={14} /></a>
+                        <a href={api.assetImageUrl(cur.id, a.id)} download title="下载原图" className="w-7 h-7 rounded-[8px] bg-[rgba(20,22,30,.92)] text-ink flex items-center justify-center no-underline">⬇</a>
                         <button className="gx" title="移除(软隐藏,可恢复,不删原文件)" onClick={() => removeAsset(a.id)}>✕</button>
                       </div>
                     </div>
                   ))}
                   {shown.length > galleryShown && (
-                    <div className="gempty" style={{ gridColumn: '1 / -1' }}>
-                      <button className="anbtn" title="每次 6 张" onClick={() => setGalleryShown((n) => n + 6)}>加载更多</button> <span style={{ fontSize: 11, color: C.mut }}>已显示 {Math.min(galleryShown, shown.length)} / {shown.length}</span>
+                    <div className="gempty col-span-full">
+                      <button className="anbtn" title="每次 6 张" onClick={() => setGalleryShown((n) => n + 6)}>加载更多</button> <span className="text-[11px] text-mut">已显示 {Math.min(galleryShown, shown.length)} / {shown.length}</span>
                     </div>
                   )}
                 </div>
               )}
 
               {removed.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <button className="anbtn" style={{ fontSize: 11 }} onClick={() => setShowRemoved((v) => !v)}>已移除（{removed.length}）{showRemoved ? ' 收起 ▴' : ' 查看 ▾'}</button>
+                <div className="mt-[10px]">
+                  <button className="anbtn text-[11px]" onClick={() => setShowRemoved((v) => !v)}>已移除（{removed.length}）{showRemoved ? ' 收起 ▴' : ' 查看 ▾'}</button>
                   {showRemoved && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {removed.slice(0, 40).map((a) => (
-                        <div key={a.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                          <img src={api.assetThumbUrl(cur.id, a.id)} alt={a.caption.slice(0, 12) || '已移除'} title={a.caption} style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 6, border: `1px solid ${C.line}`, opacity: 0.55 }} />
-                          <button className="anbtn" style={{ fontSize: 10, padding: '1px 7px' }} onClick={() => restoreAsset(a.id)}>恢复</button>
+                        <div key={a.id} className="flex flex-col items-center gap-[3px]">
+                          <img src={api.assetThumbUrl(cur.id, a.id)} alt={a.caption.slice(0, 12) || '已移除'} title={a.caption} className="w-[72px] h-[54px] object-cover rounded-[6px] border border-solid border-line opacity-[.55]" />
+                          <button className="anbtn text-[10px] py-px px-[7px]" onClick={() => restoreAsset(a.id)}>恢复</button>
                         </div>
                       ))}
-                      {removed.length > 40 && <div style={{ alignSelf: 'center', fontSize: 11, color: C.mut }}>…共 {removed.length} 张</div>}
+                      {removed.length > 40 && <div className="self-center text-[11px] text-mut">…共 {removed.length} 张</div>}
                     </div>
                   )}
                 </div>
               )}
 
               {/* AI 生图工坊:降为卡内折叠(默认收;img2img 是花钱动作,多一次点击=保护),功能与 runImg2Img 逻辑原样 */}
-              <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 14 }}>
+              <div className="border-x-0 border-b-0 border-t border-solid border-line mt-[14px]">
                 <button type="button" onClick={() => setWorkshopOpen((v) => !v)}
-                  style={{ width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, padding: '12px 0 4px', display: 'flex', alignItems: 'center', gap: 8, color: C.ink }}>
-                  <span style={{ color: C.mut }}>{workshopOpen ? '▾' : '▸'}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>AI 生图工坊</span>
-                  <span style={{ fontSize: 11, color: C.mut }}>{mats.length > 0 ? `图生图 · ${Math.min(mats.length, 4)} 张素材作参考` : '文生图 · 暂无素材'}</span>
-                  {mats.length > 0 && <span style={{ fontSize: 10.5, color: C.cyan, border: `1px solid ${C.cyan}66`, background: `${C.cyan}1f`, borderRadius: 99, padding: '2px 8px' }}>素材 {mats.length}</span>}
+                  className="w-full text-left [font-family:inherit] cursor-pointer bg-transparent border-0 pt-3 px-0 pb-1 flex items-center gap-2 text-ink">
+                  <span className="text-mut">{workshopOpen ? '▾' : '▸'}</span>
+                  <span className="text-[13.5px] font-bold text-white">AI 生图工坊</span>
+                  <span className="text-[11px] text-mut">{mats.length > 0 ? `图生图 · ${Math.min(mats.length, 4)} 张素材作参考` : '文生图 · 暂无素材'}</span>
+                  {mats.length > 0 && <span className="text-[10.5px] text-brand-cyan border border-solid border-brand-cyan/40 bg-brand-cyan/[.12] rounded-[99px] py-[2px] px-2">素材 {mats.length}</span>}
                 </button>
                 {workshopOpen && (
                   <div className="matwrap">
@@ -870,7 +873,7 @@ export default function KnowledgePage() {
                         <>
                           <span className="mode i2i">图生图（{Math.min(mats.length, 4)} 张素材作参考）</span>
                           <span className="sep">·</span>
-                          <span style={{ color: 'var(--mut)' }}>注入提示词</span>
+                          <span className="text-muted-foreground">注入提示词</span>
                           <div className="promptchips">
                             {['控制视角', '保持构图', ...mats.slice(0, 4).map((m, i) => `参考图${i + 1}·${TYPE_CN[m.asset_type]}`)].map((c, i) => (
                               <span className="pchip" key={i}>{c}</span>
@@ -880,12 +883,12 @@ export default function KnowledgePage() {
                       )}
                     </div>
                     {mats.length > 0 && (
-                      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input value={img2imgPrompt} onChange={(e) => setImg2imgPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') runImg2Img(mats.slice(0, 4).map((m) => m.id)) }} placeholder="描述要生成的效果图（以上方素材为参考图）…" style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
-                        <button className="btn" disabled={img2imgBusy || !img2imgPrompt.trim()} onClick={() => runImg2Img(mats.slice(0, 4).map((m) => m.id))} title={`用这 ${Math.min(mats.length, 4)} 张素材作参考图生成（约 30-60s）`} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{img2imgBusy ? '生成中…' : '素材生图'}</button>
+                      <div className="flex gap-2 mt-2 items-center flex-wrap">
+                        <input value={img2imgPrompt} onChange={(e) => setImg2imgPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') runImg2Img(mats.slice(0, 4).map((m) => m.id)) }} placeholder="描述要生成的效果图（以上方素材为参考图）…" className={`flex-1 min-w-[240px] py-2 px-3 rounded-[8px] ${fieldCls}`} />
+                        <button className={`btn ${gradBtn}`} disabled={img2imgBusy || !img2imgPrompt.trim()} onClick={() => runImg2Img(mats.slice(0, 4).map((m) => m.id))} title={`用这 ${Math.min(mats.length, 4)} 张素材作参考图生成（约 30-60s）`}>{img2imgBusy ? '生成中…' : '素材生图'}</button>
                       </div>
                     )}
-                    {img2imgMsg && <div style={{ fontSize: 11.5, color: C.ink2, marginTop: 4 }}>{img2imgMsg}</div>}
+                    {img2imgMsg && <div className="text-[11.5px] text-ink-2 mt-1">{img2imgMsg}</div>}
                   </div>
                 )}
               </div>
@@ -901,53 +904,53 @@ export default function KnowledgePage() {
       {/* 已入库文档 · 全部:右滑抽屉(复用 .setmask/.setdrawer 全局类;始终挂载靠 show 类切换保滑入动画)
           原 ② 卡的全量列表整块迁到这里,expandedId/detailCache/toggleExpand/genMeta/del 逻辑零改动 */}
       <div className={'setmask' + (docsDrawerOpen ? ' show' : '')} onClick={() => setDocsDrawerOpen(false)} />
-      <aside className={'setdrawer' + (docsDrawerOpen ? ' show' : '')} style={{ width: 'min(680px,94vw)', zIndex: 42 }}>
+      <aside className={'setdrawer w-[min(680px,94vw)] z-[42]' + (docsDrawerOpen ? ' show' : '')}>
         <div className="sethead">
           <span className="sett">已入库文档 · {drawerDocs.length}{drawerFilter ? ` / ${docs.length}` : ''}</span>
           <button className="setx" onClick={() => setDocsDrawerOpen(false)}>✕</button>
         </div>
-        <div style={{ padding: '12px 20px 0', display: 'flex', gap: 6, flexWrap: 'wrap', flex: 'none' }}>
+        <div className="pt-3 px-5 pb-0 flex gap-[6px] flex-wrap flex-none">
           <button className="anbtn" style={!drawerFilter ? anbtnOn : undefined} onClick={() => setDrawerFilter(null)}>全部（{docs.length}）</button>
           {typeGroups.map(([t, n]) => (
             <button key={t} className="anbtn" style={drawerFilter?.kind === 'type' && drawerFilter.value === t ? anbtnOn : undefined} onClick={() => setDrawerFilter({ kind: 'type', value: t })}>{t}（{n}）</button>
           ))}
           {drawerFilter?.kind === 'tag' && <button className="anbtn" style={anbtnOn} onClick={() => setDrawerFilter(null)}>#{drawerFilter.value} ✕</button>}
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 20px' }}>
-          {drawerDocs.length === 0 && <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>该类暂无文档。</div>}
+        <div className="flex-1 overflow-y-auto pt-2 px-5 pb-5">
+          {drawerDocs.length === 0 && <div className="text-mut text-[12px] p-2">该类暂无文档。</div>}
           {drawerDocs.map((d) => {
             const expanded = expandedId === d.id
             const det = detailCache[d.id]
             const parseStatus = det ? (det.content_text.trim() ? '已解析入库' : '仅元数据登记') : '加载中…'
             return (
               <div className="rgroup" key={d.id} id={'kbdoc-' + d.id}>
-                <div className="kbrow" style={{ flexWrap: 'wrap' }}>
-                  <span className="pth" style={{ cursor: 'pointer' }} onClick={() => toggleExpand(d.id)}>
-                    <span style={{ color: C.mut, marginRight: 4 }}>{expanded ? '▾' : '▸'}</span>
-                    {d.type && <span className="chip" style={{ marginRight: 6, fontSize: 10 }}>{d.type}</span>}
+                <div className="kbrow flex-wrap">
+                  <span className="pth cursor-pointer" onClick={() => toggleExpand(d.id)}>
+                    <span className="text-mut mr-1">{expanded ? '▾' : '▸'}</span>
+                    {d.type && <span className="chip mr-[6px] text-[10px]">{d.type}</span>}
                     <b>{d.title}</b>
-                    {d.tags && <span style={{ color: C.mut, marginLeft: 8 }}>#{d.tags}</span>}
+                    {d.tags && <span className="text-mut ml-2">#{d.tags}</span>}
                   </span>
                   <span className="meta">{d.file_type}</span>
-                  <span className="act" onClick={() => genMeta(d.id)} style={{ color: C.purple, opacity: genningId === d.id ? 0.5 : 1 }}>{genningId === d.id ? '生成中…' : 'AI 生成元数据'}</span>
-                  <span className="act" onClick={() => del(d.id)} style={{ color: C.red }}>删除</span>
+                  <span className="act text-brand-purple" onClick={() => genMeta(d.id)} style={{ opacity: genningId === d.id ? 0.5 : 1 }}>{genningId === d.id ? '生成中…' : 'AI 生成元数据'}</span>
+                  <span className="act text-brand-red" onClick={() => del(d.id)}>删除</span>
                 </div>
                 {expanded && (
-                  <div style={{ width: '100%', marginTop: 6, padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 8, fontSize: 12.5 }}>
+                  <div className="w-full mt-[6px] py-2 px-[10px] bg-white/[.03] rounded-[8px] text-[12.5px]">
                     <div className="kvline"><span className="kvk">文件名</span>{d.title}</div>
                     <div className="kvline"><span className="kvk">文件类型</span>{d.file_type}{d.type ? ` · ${d.type}` : ''}</div>
-                    <div className="kvline"><span className="kvk">来源路径</span><span className="mono" style={{ wordBreak: 'break-all' }}>{d.source_path || '—'}</span></div>
+                    <div className="kvline"><span className="kvk">来源路径</span><span className="mono break-all">{d.source_path || '—'}</span></div>
                     <div className="kvline"><span className="kvk">来源说明</span>{d.resource || '—'}</div>
                     <div className="kvline"><span className="kvk">摘要</span>{d.description ? renderInline(d.description) : '（未生成，可点「AI 生成元数据」）'}</div>
                     <div className="kvline"><span className="kvk">入库方式</span>复制接入（原文件不动，系统留受管副本）</div>
                     <div className="kvline"><span className="kvk">解析状态</span>{parseStatus}</div>
-                    <div className="kvline" style={{ alignItems: 'flex-start' }}>
+                    <div className="kvline items-start">
                       <span className="kvk">内容片段</span>
-                      <span style={{ whiteSpace: 'pre-wrap', color: C.ink2 }}>
+                      <span className="whitespace-pre-wrap text-ink-2">
                         {det ? (det.content_text.trim() ? det.content_text.slice(0, 500) + (det.content_text.length > 500 ? ' …' : '') : '（无正文，仅登记元数据）') : '加载中…'}
                       </span>
                     </div>
-                    <div style={{ marginTop: 6 }}>
+                    <div className="mt-[6px]">
                       <button className="anbtn" disabled={genningId === d.id} onClick={() => genMeta(d.id)}>{genningId === d.id ? '生成中…' : 'AI 生成元数据'}</button>
                     </div>
                   </div>
@@ -955,11 +958,11 @@ export default function KnowledgePage() {
               </div>
             )
           })}
-          {metaNote && <div style={{ fontSize: 12, color: C.mut, padding: '6px 2px' }}>{metaNote}</div>}
+          {metaNote && <div className="text-[12px] text-mut py-[6px] px-[2px]">{metaNote}</div>}
         </div>
       </aside>
 
-      {err && <div style={{ color: C.red, fontSize: 12, marginTop: 8 }}>错误：{err}</div>}
+      {err && <div className="text-brand-red text-[12px] mt-2">错误：{err}</div>}
     </div>
   )
 }
