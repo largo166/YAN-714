@@ -23,6 +23,7 @@ from .routers import workspace
 from .routers import skills
 from .routers import filesystem
 from .routers import review_checklist
+from .routers import admin
 
 
 @asynccontextmanager
@@ -63,6 +64,7 @@ app.include_router(agents.router)
 app.include_router(broadcast.router)
 app.include_router(boss.router)
 app.include_router(result_send.router)
+app.include_router(admin.router)
 
 
 # ── 前端托管：构建产物存在时(exe / 生产)同源托管 dist，免第二个端口/CORS ──

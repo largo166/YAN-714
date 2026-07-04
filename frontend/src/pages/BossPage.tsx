@@ -111,18 +111,55 @@ export default function BossPage() {
   const [commentsOk, setCommentsOk] = useState(false)
   const [bcText, setBcText] = useState('')
 
+  // 口令门禁(P1-6):本机口令防同屏误入;解锁凭据只记本次会话(sessionStorage)。
+  const [gate, setGate] = useState<'checking' | 'setup' | 'locked' | 'open'>('checking')
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [gateErr, setGateErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.adminStatus()
+      .then((s) => {
+        if (!s.configured) { sessionStorage.removeItem('romai_admin_ok'); setGate('setup') }
+        else if (sessionStorage.getItem('romai_admin_ok') === '1') setGate('open')
+        else setGate('locked')
+      })
+      .catch(() => setGate('locked'))
+  }, [])
+
+  const doSetup = async () => {
+    setGateErr(null)
+    if (pw.trim().length < 4) { setGateErr('口令至少 4 位'); return }
+    if (pw !== pw2) { setGateErr('两次输入不一致'); return }
+    try {
+      await api.adminSetup(pw.trim())
+      sessionStorage.setItem('romai_admin_ok', '1')
+      setPw(''); setPw2(''); setGate('open')
+    } catch (e) { setGateErr((e as Error).message) }
+  }
+  const doLogin = async () => {
+    setGateErr(null)
+    try {
+      await api.adminLogin(pw)
+      sessionStorage.setItem('romai_admin_ok', '1')
+      setPw(''); setGate('open')
+    } catch (e) { setGateErr((e as Error).message) }
+  }
+  const doLock = () => { sessionStorage.removeItem('romai_admin_ok'); setPw(''); setGate('locked') }
+
   const loadBroadcasts = useCallback(() => {
     api.listBroadcasts().then(setBroadcasts).catch(() => setBroadcasts([]))
   }, [])
 
   useEffect(() => {
+    if (gate !== 'open') return
     api.getBossDashboard().then(setDash).catch(() => setDash(null))
     api.getWorkload().then(setWorkload).catch(() => setWorkload([]))
     api.getAiUsage().then(setAiUsage).catch(() => setAiUsage([]))
     api.getFeishuBoard().then((r) => setFeishuOk(r.status === 'ok')).catch(() => setFeishuOk(false))
     api.getBossComments().then((r) => setCommentsOk(r.status === 'ok')).catch(() => setCommentsOk(false))
     loadBroadcasts()
-  }, [loadBroadcasts])
+  }, [gate, loadBroadcasts])
 
   const publish = async () => {
     const t = bcText.trim()
@@ -136,8 +173,46 @@ export default function BossPage() {
     }
   }
 
+  const fontWrap: React.CSSProperties = { color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }
+  const gateInput = (v: string, set: (s: string) => void, ph: string, onEnter: () => void) => (
+    <input type="password" value={v} placeholder={ph} autoComplete="off"
+      onChange={(e) => set(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onEnter() }}
+      style={{ width: '100%', padding: '10px 13px', border: `1px solid ${C.line}`, borderRadius: 10, background: 'rgba(255,255,255,.045)', color: C.ink, fontSize: 14, fontFamily: 'inherit', outline: 'none', marginBottom: 10 }} />
+  )
+
+  // 未解锁:口令门禁(首次设置 / 输入口令)。数据在解锁前不拉取。
+  if (gate !== 'open') {
+    return (
+      <div style={{ ...fontWrap, display: 'grid', placeItems: 'center', minHeight: '58vh' }}>
+        {gate === 'checking' ? (
+          <div style={{ color: C.mut, fontSize: 13 }}>正在检查权限…</div>
+        ) : (
+          <div className="ckcard" style={{ width: 'min(380px, 92vw)', padding: '26px 26px 20px', ['--ac']: '#d7a86e', ['--gl']: 'rgba(215,168,110,.24)' } as React.CSSProperties}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, background: `${C.gold}1f`, border: `1px solid ${C.gold}55`, color: C.gold, display: 'grid', placeItems: 'center' }}><Lock size={17} /></span>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{gate === 'setup' ? '设置管理口令' : '管理驾驶舱已锁定'}</div>
+                <div style={{ fontSize: 11.5, color: C.mut, marginTop: 2 }}>{gate === 'setup' ? '首次使用,先设一个管理口令' : '输入管理口令进入'}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 14 }}>
+              {gateInput(pw, setPw, gate === 'setup' ? '设置口令(至少 4 位)' : '管理口令', gate === 'setup' ? doSetup : doLogin)}
+              {gate === 'setup' && gateInput(pw2, setPw2, '再输一遍确认', doSetup)}
+              <button type="button" onClick={gate === 'setup' ? doSetup : doLogin}
+                style={{ width: '100%', height: 40, border: 0, borderRadius: 11, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13.5, fontFamily: 'inherit', cursor: 'pointer' }}>
+                {gate === 'setup' ? '设置并进入' : '解锁'}
+              </button>
+              {gateErr && <div style={{ color: '#ff9b9b', fontSize: 12, marginTop: 8 }}>{gateErr}</div>}
+              <div style={{ color: C.mut2, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>本机口令,防同屏他人误入;口令仅以加盐哈希存本机,不上传。</div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+    <div style={fontWrap}>
       {/* header */}
       <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 22 }}>
         <div>
@@ -147,6 +222,10 @@ export default function BossPage() {
           </div>
           <p style={{ margin: '8px 0 0', color: C.mut, fontSize: 13 }}>面向负责人的跨项目只读聚合 —— 进行中项目、交付节点、风险与 AI 产能一屏掌握。</p>
         </div>
+        <button type="button" onClick={doLock} title="锁定驾驶舱(下次进入需再输口令)"
+          style={{ fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 13px', borderRadius: 10, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.04)', color: C.ink2, fontSize: 12.5 }}>
+          <Lock size={12} /> 锁定
+        </button>
       </header>
 
       {/* KPI row */}

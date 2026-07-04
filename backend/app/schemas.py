@@ -423,6 +423,19 @@ class SettingsUpdate(BaseModel):
     repository_root_path: Optional[str] = None  # 非空=校验后配置;""=解除配置
 
 
+# ── 管理口令门槛(P1-6):本机口令防同屏误入,非网络级安全 ──
+class AdminPasswordIn(BaseModel):
+    password: str
+
+
+class AdminStatusOut(BaseModel):
+    configured: bool
+
+
+class AdminLoginOut(BaseModel):
+    ok: bool
+
+
 # ── 4B: 聊天 ──
 class ChatSessionCreate(BaseModel):
     title: str = "新会话"

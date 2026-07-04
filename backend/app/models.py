@@ -92,6 +92,9 @@ class AppSetting(Base):
     repository_root_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     # 收件箱根(P1-C):监听此文件夹,新文件自动入库。空=未启用。【新增列→需 alembic 0020】
     inbox_root_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    # 管理口令哈希(P1-6 驾驶舱门槛):"salt$pbkdf2" 格式;空=未设置。本机口令防同屏误入,
+    # 非网络级安全(单机产品,不建会话/令牌体系)。【新增列→需 alembic 0022】
+    admin_password_hash: Mapped[str] = mapped_column(String(300), default="", nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
     )

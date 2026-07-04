@@ -340,6 +340,17 @@ export const api = {
     )
   },
 
+  // ── 管理口令门槛(P1-6):本机口令防同屏误入,非网络级安全 ──
+  async adminStatus(): Promise<{ configured: boolean }> {
+    return (await request('/api/admin/status')) as { configured: boolean }
+  },
+  async adminSetup(password: string): Promise<{ ok: boolean }> {
+    return (await request('/api/admin/setup', { method: 'POST', body: JSON.stringify({ password }) })) as { ok: boolean }
+  },
+  async adminLogin(password: string): Promise<{ ok: boolean }> {
+    return (await request('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) })) as { ok: boolean }
+  },
+
   // ── 4B: 聊天 ──
   async listChatSessions() {
     return ChatSessionListSchema.parse(await request('/api/chat/sessions'))
