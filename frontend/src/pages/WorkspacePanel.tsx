@@ -260,13 +260,13 @@ export default function WorkspacePanel() {
               {/* 两步确认执行：移入隔离区,永不删除,可撤销 */}
               <div className="btnrow" style={{ marginTop: 10 }}>
                 {!confirmApply ? (
-                  <button className="btn" disabled={busy} onClick={() => setConfirmApply(true)}>
-                    🧹 执行清理（移入隔离区）
+                  <button className="btn" disabled={busy} onClick={() => setConfirmApply(true)} title="执行清理：只移入隔离区 _ROMAI_CLEANUP_QUARANTINE/，不删除，可一键撤销">
+                    🧹 执行清理
                   </button>
                 ) : (
                   <>
-                    <button className="btn" disabled={busy} onClick={doApply} style={{ background: 'var(--terra)', color: '#fff' }}>
-                      {busy ? '执行中…' : `确认移入隔离区 ${preview.count} 项`}
+                    <button className="btn" disabled={busy} onClick={doApply} title={`确认移入隔离区 ${preview.count} 项，不删除，可撤销`}>
+                      {busy ? '执行中…' : `确认移入 ${preview.count} 项`}
                     </button>
                     <button className="btn ghost" disabled={busy} onClick={() => setConfirmApply(false)}>
                       取消

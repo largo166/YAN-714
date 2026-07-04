@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 
-/** 板块动态背景(按小样确认,2026-07;v2 整体加浓约 1.5×):同一紫蓝色调——
- *  dots=点阵波场(项目中心) sparks=思维粒子(共创营地) orbits=轨道连线(协作平台)
- *  aurora=静谧光晕(数据基地/管理驾驶舱:大片模糊光斑仅做 20s+ 呼吸,零空间位移)。
- *  【晕动症红线,2026-07 用户反馈】禁止连续定向运动(下落光丝/滚动心电/扫描线)——
- *  streams/pulse/radar 因此弃用保留,不得再挂到页面。新形态只许:静场、慢呼吸透明度、极轻指针视差。
+/** 板块动态背景(统一两形态,2026-07-04):同一紫蓝色调——
+ *  dots=点阵波场(工作台:项目中心/共创营地) aurora=静谧光晕(汇总台:数据基地/协作平台/管理驾驶舱,
+ *  大片模糊光斑仅做 20s+ 呼吸,零空间位移)。
+ *  【晕动症红线,2026-07 用户反馈】禁止连续定向运动——streams(下落光丝)/pulse(滚动心电)/
+ *  radar(扫描线)/sparks(游动粒子)/orbits(轨道运转) 全部弃用保留,不得再挂到页面。
+ *  新形态只许:静场、慢呼吸透明度、极轻指针视差。
  *  只用于各页 HERO 区(父容器 position:relative,内容自己抬 z-index);
  *  Canvas2D、DPR 上限 2、指针轻视差;prefers-reduced-motion 时完全不画。 */
 export type BackdropMode = 'dots' | 'streams' | 'sparks' | 'orbits' | 'radar' | 'pulse' | 'aurora'

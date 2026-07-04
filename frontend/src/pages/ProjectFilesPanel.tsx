@@ -213,7 +213,7 @@ export default function ProjectFilesPanel({
                   >
                     入库
                   </button>
-                  <button className="anbtn" onClick={() => onDelete(f.id)}>
+                  <button className="anbtn" style={{ color: 'var(--red)', borderColor: 'rgba(255,90,90,.35)' }} onClick={() => onDelete(f.id)}>
                     删除
                   </button>
                 </div>

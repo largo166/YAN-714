@@ -117,7 +117,7 @@ export default function TaskBoardPanel({
                     >
                       <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{t.task_title}</div>
                       <div style={{ fontSize: 11, color: over ? 'var(--red)' : 'var(--mut)', marginTop: 3 }}>
-                        {t.owner_name && <span>👤 {t.owner_name}　</span>}
+                        {t.owner_name && <span>👤 {t.owner_name}{'　'}</span>}
                         {t.due && (
                           <span>
                             {over ? '⚠ ' : '⏱ '}
@@ -126,7 +126,7 @@ export default function TaskBoardPanel({
                           </span>
                         )}
                         {isStale(t) && (
-                          <span style={{ color: 'var(--terra)' }}>　🐌 卡住 {ageDays(t.created_at)} 天</span>
+                          <span style={{ color: 'var(--terra)' }}>{'　'}🐌 卡住 {ageDays(t.created_at)} 天</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>

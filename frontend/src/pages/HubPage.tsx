@@ -119,7 +119,7 @@ export default function HubPage() {
     <div style={{ color: C.ink }}>
       {/* HERO 区:板块动态背景(轨道连线)只罩 头部+团队成员区(按小样,不铺全页) */}
       <section style={{ position: 'relative' }}>
-        <BoardBackdrop mode="orbits" />
+        <BoardBackdrop mode="aurora" />
         <div style={{ position: 'relative', zIndex: 1 }}>
       <header style={{ marginBottom: 22 }}>
         <h1 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-.025em' }}>协作平台</h1>
@@ -158,7 +158,7 @@ export default function HubPage() {
             <input placeholder="姓名（必填）" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ ...fieldStyle, flex: '1 1 120px', minWidth: 120 }} />
             <input placeholder="角色，如 建筑师" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} style={{ ...fieldStyle, flex: '1 1 120px', minWidth: 120 }} />
             <input placeholder="工作分工" value={form.duty} onChange={(e) => setForm((f) => ({ ...f, duty: e.target.value }))} style={{ ...fieldStyle, flex: '2 1 200px', minWidth: 160 }} />
-            <button type="button" onClick={submitNew} disabled={!form.name.trim()} style={{ height: 38, padding: '0 16px', border: 0, borderRadius: 10, background: form.name.trim() ? 'linear-gradient(135deg,#7c5cff,#42a5ff)' : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: form.name.trim() ? 'pointer' : 'not-allowed' }}>保存</button>
+            <button type="button" onClick={submitNew} disabled={!form.name.trim()} style={{ height: 36, padding: '0 15px', border: 0, borderRadius: 10, background: form.name.trim() ? 'linear-gradient(135deg,#7c5cff,#42a5ff)' : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.02em', fontFamily: 'inherit', cursor: form.name.trim() ? 'pointer' : 'not-allowed' }}>保存</button>
           </div>
         </div>
       )}

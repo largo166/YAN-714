@@ -130,7 +130,7 @@ function MoaResult({
                   {it.note && <span style={{ color: 'var(--ink2)' }}>：{it.note}</span>}
                   {!it.pass && (it.design_impact || it.suggested_action) && (
                     <div style={{ color: 'var(--mut)', marginTop: 2, marginLeft: 4 }}>
-                      {it.design_impact && <span>影响：{it.design_impact}　</span>}
+                      {it.design_impact && <span>影响：{it.design_impact}{'　'}</span>}
                       {it.suggested_action && <span>建议：{it.suggested_action}</span>}
                     </div>
                   )}
@@ -150,7 +150,7 @@ function MoaResult({
               <b>{it.issue}</b>
               {(it.impact || it.suggestion) && (
                 <div style={{ color: 'var(--mut)', marginTop: 1, marginLeft: 4 }}>
-                  {it.impact && <span>影响：{it.impact}　</span>}
+                  {it.impact && <span>影响：{it.impact}{'　'}</span>}
                   {it.suggestion && <span>建议：{it.suggestion}</span>}
                 </div>
               )}
@@ -207,7 +207,7 @@ function MoaResult({
 
       {historyOnly && (
         <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 10 }}>
-          {createdAt ? `历史评图 · ${new Date(createdAt).toLocaleString()}　` : ''}
+          {createdAt ? `历史评图 · ${new Date(createdAt).toLocaleString()}\u3000` : ''}
           历史只保留评审结论；评图过程（三位评图人原话）按设计不留存。
         </div>
       )}

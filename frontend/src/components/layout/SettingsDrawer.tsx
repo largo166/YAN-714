@@ -224,8 +224,8 @@ export default function SettingsDrawer({ open, onClose }: Props) {
                 {repoErr && <div className="d" style={{ color: 'var(--red)' }}>{repoErr}</div>}
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <button className="btn" onClick={() => setRepoPickerOpen(true)}>
-                  {repoRoot ? '更改仓库' : '选择仓库文件夹'}
+                <button className="btn" title="选择仓库文件夹" onClick={() => setRepoPickerOpen(true)}>
+                  {repoRoot ? '更改仓库' : '选择文件夹'}
                 </button>
                 {repoRoot && (
                   <button

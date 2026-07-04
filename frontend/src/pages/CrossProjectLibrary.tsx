@@ -42,7 +42,7 @@ export default function CrossProjectLibrary() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
         <button
           className="anbtn"
-          style={active === null ? { background: 'var(--terra)', color: '#fff', fontSize: 12 } : { fontSize: 12 }}
+          style={active === null ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.55)', color: '#cfc4ff', fontSize: 12 } : { fontSize: 12 }}
           onClick={() => setActive(null)}
         >
           全部
@@ -51,7 +51,7 @@ export default function CrossProjectLibrary() {
           <button
             key={t.type}
             className="anbtn"
-            style={active === t.type ? { background: 'var(--terra)', color: '#fff', fontSize: 12 } : { fontSize: 12 }}
+            style={active === t.type ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.55)', color: '#cfc4ff', fontSize: 12 } : { fontSize: 12 }}
             onClick={() => setActive(t.type)}
           >
             {t.label}（{t.count}）

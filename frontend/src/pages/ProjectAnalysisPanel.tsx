@@ -123,7 +123,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
           <button
             key={t.key}
             className={'anbtn' + (active === t.key ? ' on' : '')}
-            style={active === t.key ? { background: 'var(--terra)', color: '#fff' } : undefined}
+            style={active === t.key ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.45)', color: '#cfc6ff' } : undefined}
             disabled={projectId == null}
             onClick={() => { setActive(t.key); setReflowNote(null) }}
           >
@@ -136,10 +136,9 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
           className="btn"
           disabled={projectId == null || batchRunning}
           onClick={runAll}
-          style={{ background: 'var(--terra)', color: '#fff' }}
           title="对全部任务依次分析(已生成的秒回、没有的才生成)"
         >
-          {batchRunning ? '分析中…' : '✦ 前期分析(全部)'}
+          {batchRunning ? '分析中…' : '✦ 前期分析'}
         </button>
       </div>
 
@@ -215,7 +214,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
         </div>
       ) : (
         <div style={{ border: '1px dashed var(--line2)', borderRadius: 8, padding: '14px', fontSize: 13, color: 'var(--mut)' }}>
-          「{taskLabel(active)}」尚未生成。点上方「✦ 前期分析(全部)」一次生成全部,或点
+          「{taskLabel(active)}」尚未生成。点上方「✦ 前期分析」一次生成全部,或点
           <button className="anbtn" disabled={projectId == null || runningTask === active || batchRunning} onClick={() => regenerate(active)} style={{ margin: '0 6px' }}>
             {runningTask === active ? '生成中…' : '单独生成本项'}
           </button>

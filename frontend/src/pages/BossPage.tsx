@@ -188,7 +188,7 @@ export default function BossPage() {
               {gateInput(pw, setPw, gate === 'setup' ? '设置口令(至少 4 位)' : '管理口令', gate === 'setup' ? doSetup : doLogin)}
               {gate === 'setup' && gateInput(pw2, setPw2, '再输一遍确认', doSetup)}
               <button type="button" onClick={gate === 'setup' ? doSetup : doLogin}
-                style={{ width: '100%', height: 40, border: 0, borderRadius: 11, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13.5, fontFamily: 'inherit', cursor: 'pointer' }}>
+                style={{ width: '100%', height: 36, border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.02em', fontFamily: 'inherit', cursor: 'pointer' }}>
                 {gate === 'setup' ? '设置并进入' : '解锁'}
               </button>
               {gateErr && <div style={{ color: '#ff9b9b', fontSize: 12, marginTop: 8 }}>{gateErr}</div>}
@@ -283,7 +283,7 @@ export default function BossPage() {
           <button
             type="button"
             onClick={publish}
-            style={{ height: 42, padding: '0 18px', border: 0, borderRadius: 12, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 0 36px rgba(124,92,255,.24)' }}
+            style={{ height: 36, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.02em', fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 0 36px rgba(124,92,255,.24)' }}
           >
             发布
           </button>

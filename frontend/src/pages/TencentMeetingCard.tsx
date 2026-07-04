@@ -87,8 +87,8 @@ export default function TencentMeetingCard({ projectId }: { projectId: number | 
       <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
         一键创建真实腾讯会议，自动生成会议号与入会链接（未配置时不可用、不伪造链接）。
       </div>
-      <button className="btn" disabled={busy} onClick={createOne}>
-        {busy ? '创建中…' : '一键创建腾讯会议'}
+      <button className="btn" title="一键创建腾讯会议" disabled={busy} onClick={createOne}>
+        {busy ? '创建中…' : '一键创建'}
       </button>
 
       {msg && <div style={{ color: 'var(--ok)', fontSize: 12.5, marginTop: 8 }}>{msg}</div>}

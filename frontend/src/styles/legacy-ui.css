@@ -688,7 +688,13 @@ body.darkui .brand .word span{color:#8b91a0}
 body.darkui .nav button:hover{background:rgba(255,255,255,.06);color:#fff}
 body.darkui .nav button.on{color:#fff;background:linear-gradient(135deg,rgba(124,92,255,.24),rgba(66,165,255,.12));font-weight:600}
 /* 反转点：原 var(--ink) 深底浅字 → 暗色下改紫蓝渐变实心 */
-body.darkui .btn{background:linear-gradient(135deg,#7c5cff,#42a5ff);color:#fff}
+body.darkui .btn{background:linear-gradient(135deg,#7c5cff,#42a5ff);color:#fff;padding:9px 15px;font-size:13px;letter-spacing:.02em;border-radius:10px}
+/* 老面板平板色收口(2026-07,"点开项目文件背景变色"根修):.sec/.card 在暗色下由不透明 --panel 平板
+   改为半透明玻璃,与 ckcard/cardBase 同一语言;hover 改微提亮(原 --panel2 更深,点后滞留像变色)。 */
+body.darkui .sec{background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.022));border-color:rgba(255,255,255,.08)}
+body.darkui .sechead:hover{background:rgba(255,255,255,.035)}
+body.darkui .sec.nocollapse .sechead:hover{background:none}
+body.darkui .card{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.07)}
 body.darkui .btn:hover{background:linear-gradient(135deg,#8b6dff,#54b0ff)}
 body.darkui .bubble.u{background:linear-gradient(135deg,rgba(124,92,255,.92),rgba(66,165,255,.82));color:#fff}
 body.darkui .cmitem .av{background:linear-gradient(135deg,#7c5cff,#42a5ff);color:#fff}
@@ -713,7 +719,8 @@ body.darkui .mono,body.darkui code,body.darkui pre{font-family:var(--font-mono)}
 body.darkui .serif{font-family:var(--font-sans)}
 body.darkui .ptitle h1{font-size:32px;font-weight:600;letter-spacing:-.025em}
 body.darkui .sechead .stitle{font-weight:600}
-body.darkui .btn,body.darkui .anbtn{font-weight:600;letter-spacing:.01em}
+body.darkui .btn{font-weight:700;letter-spacing:.02em} /* 渐变底白字:700+宽字距(按钮标尺 v2) */
+body.darkui .anbtn{font-weight:600;letter-spacing:.01em}
 /* 暗色表单域：.ipt 与裸 input/textarea 原本吃浏览器默认白底 → 走深底 */
 body.darkui .ipt,
 body.darkui textarea,

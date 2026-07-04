@@ -83,7 +83,7 @@ export default function CognitionSection({ projectId }: { projectId: number | nu
               className={'anbtn' + (m.module === active ? ' on' : '')}
               style={
                 m.module === active
-                  ? { background: 'var(--terra)', color: '#fff', fontSize: 12 }
+                  ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.45)', color: '#cfc6ff', fontSize: 12 }
                   : { fontSize: 12 }
               }
               onClick={() => setActive(m.module)}
@@ -97,10 +97,9 @@ export default function CognitionSection({ projectId }: { projectId: number | nu
             className="btn"
             disabled={running}
             onClick={runAll}
-            style={{ background: 'var(--terra)', color: '#fff', fontSize: 12 }}
             title="对全部认知模块依次 AI 解读(跳过已生成)"
           >
-            {running ? '解读中…' : '✦ AI 解读(全部)'}
+            {running ? '解读中…' : '✦ AI 解读'}
           </button>
         </div>
       )}

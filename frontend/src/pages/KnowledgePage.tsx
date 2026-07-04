@@ -552,7 +552,7 @@ export default function KnowledgePage() {
               placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…"
               style={{ flex: 1, padding: '9px 12px', border: `1px solid ${C.line}`, borderRadius: 10, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink, fontFamily: 'inherit', outline: 'none' }}
             />
-            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 38, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{searching ? '搜索中…' : <><Search size={14} /> 搜索</>}</button>
+            <button type="button" onClick={doSearch} disabled={searching} style={{ height: 36, padding: '0 15px', border: 0, borderRadius: 10, background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.02em', fontFamily: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{searching ? '搜索中…' : <><Search size={14} /> 搜索</>}</button>
             {searchHits !== null && <button type="button" className="anbtn" onClick={() => { setSearchHits(null); setSearchQ('') }}>清空</button>}
           </div>
           {searchHits !== null && (
@@ -604,7 +604,7 @@ export default function KnowledgePage() {
         <input ref={filesInputRef} type="file" multiple accept=".txt,.md,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={(e) => { onNativePicked(e.target.files, false); e.target.value = '' }} />
         <div className="btnrow" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="btn" onClick={() => folderInputRef.current?.click()} disabled={busy} title="弹出系统对话框;不支持的格式(如 .rar/.dwg)会自动跳过" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FolderOpen size={15} /> 选择文件夹</button>
-          <button className="btn" onClick={() => filesInputRef.current?.click()} disabled={busy} title="弹出系统对话框;不支持的格式(如 .rar/.dwg)会自动跳过" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Files size={15} /> 选择文件(可多选)</button>
+          <button className="btn" onClick={() => filesInputRef.current?.click()} disabled={busy} title="可多选；不支持的格式(如 .rar/.dwg)会自动跳过" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Files size={15} /> 选择文件</button>
           <button className="btn" onClick={organize} disabled={busy || !picked} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             {ingesting ? (ingestProg ? `整理中… ${ingestProg.done}/${ingestProg.total}` : '整理中…') : <><Zap size={15} /> 一键整理</>}
           </button>
@@ -700,8 +700,8 @@ export default function KnowledgePage() {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>已入库文档 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{docs.length} 篇 · 按类型归档</span></div>
             <span style={{ flex: 1 }} />
             {metaMissing.length > 0 && !batchBusy && (
-              <button type="button" onClick={runBatchMeta} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '5px 12px' }}>
-                <Zap size={13} style={{ verticalAlign: -2, marginRight: 4 }} />批量生成元数据（{metaMissing.length} 条缺摘要）
+              <button type="button" onClick={runBatchMeta} title={`批量生成元数据（${metaMissing.length} 条缺摘要）`} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '5px 12px' }}>
+                <Zap size={13} style={{ verticalAlign: -2, marginRight: 4 }} />批量生成（{metaMissing.length}）
               </button>
             )}
             {batchBusy && (
@@ -815,7 +815,7 @@ export default function KnowledgePage() {
                   ))}
                   {shown.length > galleryShown && (
                     <div className="gempty" style={{ gridColumn: '1 / -1' }}>
-                      <button className="anbtn" onClick={() => setGalleryShown((n) => n + 6)}>加载更多（每次 6 张，已显示 {Math.min(galleryShown, shown.length)} / {shown.length}）</button>
+                      <button className="anbtn" title="每次 6 张" onClick={() => setGalleryShown((n) => n + 6)}>加载更多</button> <span style={{ fontSize: 11, color: C.mut }}>已显示 {Math.min(galleryShown, shown.length)} / {shown.length}</span>
                     </div>
                   )}
                 </div>
@@ -882,7 +882,7 @@ export default function KnowledgePage() {
                     {mats.length > 0 && (
                       <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <input value={img2imgPrompt} onChange={(e) => setImg2imgPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') runImg2Img(mats.slice(0, 4).map((m) => m.id)) }} placeholder="描述要生成的效果图（以上方素材为参考图）…" style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
-                        <button className="btn" disabled={img2imgBusy || !img2imgPrompt.trim()} onClick={() => runImg2Img(mats.slice(0, 4).map((m) => m.id))} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{img2imgBusy ? '生成中…（约 30-60s）' : `用这 ${Math.min(mats.length, 4)} 张素材生图`}</button>
+                        <button className="btn" disabled={img2imgBusy || !img2imgPrompt.trim()} onClick={() => runImg2Img(mats.slice(0, 4).map((m) => m.id))} title={`用这 ${Math.min(mats.length, 4)} 张素材作参考图生成（约 30-60s）`} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{img2imgBusy ? '生成中…' : '素材生图'}</button>
                       </div>
                     )}
                     {img2imgMsg && <div style={{ fontSize: 11.5, color: C.ink2, marginTop: 4 }}>{img2imgMsg}</div>}

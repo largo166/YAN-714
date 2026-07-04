@@ -149,8 +149,8 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
                 key={it.abs_path}
                 style={{
                   ...rowStyle,
-                  background: isSel ? 'var(--terra)' : 'transparent',
-                  color: isSel ? '#fff' : 'var(--ink)',
+                  background: isSel ? 'rgba(124,92,255,.18)' : 'transparent',
+                  color: 'var(--ink)',
                   opacity: foldersOnly && !it.is_dir ? 0.4 : 1,
                   cursor: foldersOnly && !it.is_dir ? 'default' : 'pointer',
                 }}
@@ -165,7 +165,7 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
                 <span style={{ display: 'inline-flex' }}>{it.is_dir ? <Folder size={14} /> : it.supported ? <FileText size={14} /> : <Package size={14} />}</span>
                 <span style={{ flex: 1, wordBreak: 'break-all' }}>{it.name}</span>
                 {!it.is_dir && !it.supported && (
-                  <span style={{ fontSize: 10, color: isSel ? '#fff' : 'var(--mut)' }}>不可解析</span>
+                  <span style={{ fontSize: 10, color: 'var(--mut)' }}>不可解析</span>
                 )}
               </div>
             )
@@ -178,13 +178,13 @@ export default function FolderPicker({ open, initialPath = '', foldersOnly = fal
             className="btn"
             disabled={level !== 'dir'}
             onClick={() => onPick(cwd)}
-            style={{ background: 'var(--terra)', color: '#fff' }}
+            title="选定当前文件夹"
           >
-            ✓ 选定当前文件夹
+            选定此文件夹
           </button>
           {!foldersOnly && (
-            <button className="btn" disabled={!selectedFile} onClick={() => selectedFile && onPick(selectedFile.abs_path)}>
-              选定此文件{selectedFile ? `（${selectedFile.name}）` : ''}
+            <button className="anbtn" disabled={!selectedFile} onClick={() => selectedFile && onPick(selectedFile.abs_path)} title={selectedFile ? selectedFile.name : ''}>
+              选定此文件
             </button>
           )}
           <span style={{ flex: 1 }} />

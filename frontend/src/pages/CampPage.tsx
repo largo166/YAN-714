@@ -106,7 +106,7 @@ function MoaDark({ cl }: { cl: Record<string, unknown> }) {
                   <span style={{ color: '#fff', background: it.pass ? C.cyan : C.red, borderRadius: 4, padding: '1px 6px', fontSize: 10.5, marginRight: 6 }}>{it.pass ? '通过' : '不通过'}</span>
                   <b style={{ color: C.ink }}>{String(it.item || '')}</b>{it.note ? `：${String(it.note)}` : ''}
                   {!it.pass && Boolean(it.design_impact || it.suggested_action) && (
-                    <div style={{ color: C.mut, marginTop: 2, marginLeft: 4 }}>{it.design_impact ? `影响：${String(it.design_impact)}　` : ''}{it.suggested_action ? `建议：${String(it.suggested_action)}` : ''}</div>
+                    <div style={{ color: C.mut, marginTop: 2, marginLeft: 4 }}>{it.design_impact ? `影响：${String(it.design_impact)}\u3000` : ''}{it.suggested_action ? `建议：${String(it.suggested_action)}` : ''}</div>
                   )}
                 </div>
               ))}
@@ -308,7 +308,7 @@ export default function CampPage() {
     )
     return (
       <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-        <BoardBackdrop mode="sparks" />
+        <BoardBackdrop mode="dots" />
         <div style={{ width: '100%', maxWidth: 760, position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 30 }}>
             <BrandMark size={46} />
@@ -339,8 +339,8 @@ export default function CampPage() {
                 })}
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button type="button" onClick={() => setView('skills')} style={{ flex: 1.4, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}>▤ 浏览全部技能 <span style={{ color: C.purple }}>→</span></button>
-            <button type="button" onClick={openArchive} style={{ flex: 1, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 44, borderRadius: 14, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 13.5, fontWeight: 600 }}><Archive size={15} /> 历史成果</button>
+            <button type="button" onClick={() => setView('skills')} style={{ flex: 1.4, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 36, borderRadius: 10, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 12.5, fontWeight: 600 }}>▤ 浏览全部技能 <span style={{ color: C.purple }}>→</span></button>
+            <button type="button" onClick={openArchive} style={{ flex: 1, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 36, borderRadius: 10, border: '1px dashed rgba(255,255,255,.16)', background: 'rgba(255,255,255,.025)', color: '#b9bdcc', fontSize: 12.5, fontWeight: 600 }}><Archive size={15} /> 历史成果</button>
           </div>
         </div>
       </div>
