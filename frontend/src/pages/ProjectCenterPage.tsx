@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { AlertTriangle, Calendar, FileAudio, FileText, ListChecks, RefreshCw } from 'lucide-react'
-
 import { api } from '@/lib/api'
 import BoardBackdrop from '@/lib/BoardBackdrop'
 import { CountNum, useCountUp } from '@/lib/useCountUp'
@@ -39,16 +37,6 @@ const C = {
   glass: 'linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032))',
 }
 const cardBase: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 18, background: C.glass }
-
-/** 驾驶舱 KPI 卡（.ckcard：顶边光条 + 发光角 + hover）。ac=顶条色 gl=角辉光。值 '—' 不伪造。 */
-function Kpi({ icon, label, value, color, ac, gl }: { icon: React.ReactNode; label: string; value: React.ReactNode; color?: string; ac: string; gl: string }) {
-  return (
-    <div className="ckcard" style={{ padding: '14px 15px', minHeight: 84, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
-      <div style={{ color: C.mut, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }}><span>{icon}</span>{label}</div>
-      <div style={{ marginTop: 9, fontSize: 27, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
-    </div>
-  )
-}
 
 /** 阶段进度环形仪表（pct 真实，发光 conic 环 + 充能动画 + 中心数字滚动）。 */
 function Gauge({ pct }: { pct: number }) {
@@ -118,9 +106,10 @@ export default function ProjectCenterPage() {
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const [renameErr, setRenameErr] = useState<string | null>(null)
-  // 折叠状态；核心块默认展开，资料块（files/workspace 未列）默认折叠。
+  // 折叠状态(首屏减负,2026-07)：默认只展开三件核心事(会议纪要/任务看板/项目解读);
+  // 腾讯会议/智能研判/阶段拆解/资料 折叠待点——内容都在,版面只给核心。
   const [open, setOpen] = useState<Record<string, boolean>>({
-    tencent: true, meeting: true, tasks: true, stage: true, cognition: true, analysis: true,
+    meeting: true, tasks: true, cognition: true,
   })
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
 
@@ -331,15 +320,8 @@ export default function ProjectCenterPage() {
         </div>
       </div>
 
-      {/* KPI 指标带（真实数据，去掉后端恒 0 的「成果缺口」） */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Kpi icon={<FileText size={13} />} label="文件" value={overview ? <CountNum n={overview.files} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.3)" />
-        <Kpi icon={<Calendar size={13} />} label="会议" value={overview ? <CountNum n={overview.meetings} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
-        <Kpi icon={<ListChecks size={13} />} label="待办" value={overview ? <CountNum n={overview.todos} /> : '—'} color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.26)" />
-        <Kpi icon={<FileAudio size={13} />} label="会议纪要" value={overview ? <CountNum n={overview.minutes} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
-        <Kpi icon={<AlertTriangle size={13} />} label="风险" value={overview ? <CountNum n={overview.risks} /> : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
-        <Kpi icon={<RefreshCw size={13} />} label="可复用资产" value={overview ? <CountNum n={overview.assets} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
-      </div>
+      {/* KPI 指标带已移除(首屏减负,2026-07):6 项指标与 脉搏卡 mini(文件/会议/纪要)、
+          聚焦卡(待办/风险)、侧栏(资产) 完全重复,零信息损失。 */}
         </div>
       </section>
 

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react'
 
-/** 板块动态背景(按小样确认,2026-07):同一紫蓝色调、五种形态——
+/** 板块动态背景(按小样确认,2026-07;v2 整体加浓约 1.5×):同一紫蓝色调——
  *  dots=点阵波场(项目中心) streams=数据流(数据基地) sparks=思维粒子(共创营地)
- *  orbits=轨道连线(协作平台) radar=雷达脉冲(管理驾驶舱)。
+ *  orbits=轨道连线(协作平台) pulse=心电脉搏线(管理驾驶舱,项目健康监测;radar 弃用保留)。
  *  只用于各页 HERO 区(父容器 position:relative,内容自己抬 z-index);
  *  Canvas2D、DPR 上限 2、指针轻视差;prefers-reduced-motion 时完全不画。 */
-export type BackdropMode = 'dots' | 'streams' | 'sparks' | 'orbits' | 'radar'
+export type BackdropMode = 'dots' | 'streams' | 'sparks' | 'orbits' | 'radar' | 'pulse'
 
 const PURPLE = '124,92,255'
 const BLUE = '66,165,255'
@@ -51,10 +51,10 @@ export default function BoardBackdrop({ mode }: { mode: BackdropMode }) {
     host.addEventListener('pointermove', pm)
 
     const streams: Stream[] = mode === 'streams'
-      ? Array.from({ length: 26 }, () => ({ x: Math.random(), y: Math.random(), v: rand(0.0004, 0.0016), len: rand(40, 140), w: rand(0.6, 1.6), hue: Math.random() < 0.6 ? PURPLE : BLUE, a: rand(0.05, 0.16) }))
+      ? Array.from({ length: 34 }, () => ({ x: Math.random(), y: Math.random(), v: rand(0.0004, 0.0016), len: rand(50, 170), w: rand(0.7, 1.8), hue: Math.random() < 0.6 ? PURPLE : BLUE, a: rand(0.08, 0.24) }))
       : []
     const sparks: Spark[] = mode === 'sparks'
-      ? Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random(), vx: rand(-0.00025, 0.00025), vy: rand(-0.0002, 0.0002), r: rand(0.8, 2.2), hue: Math.random() < 0.6 ? PURPLE : BLUE, a: rand(0.18, 0.5) }))
+      ? Array.from({ length: 54 }, () => ({ x: Math.random(), y: Math.random(), vx: rand(-0.00025, 0.00025), vy: rand(-0.0002, 0.0002), r: rand(0.9, 2.5), hue: Math.random() < 0.6 ? PURPLE : BLUE, a: rand(0.26, 0.66) }))
       : []
     const orbits: Orbit[] = mode === 'orbits'
       ? Array.from({ length: 9 }, (_, i) => ({ R: rand(0.14, 0.46), th: Math.random() * 6.283, v: rand(0.0006, 0.0018) * (i % 2 ? 1 : -1), r: rand(1.6, 2.6), hue: i % 3 ? PURPLE : BLUE }))
@@ -74,7 +74,7 @@ export default function BoardBackdrop({ mode }: { mode: BackdropMode }) {
           for (let x = gap / 2; x < W; x += gap) {
             const w1 = Math.sin(x * 0.012 + t * 0.014) + Math.cos(y * 0.014 + t * 0.011)
             const w2 = Math.sin((x + y) * 0.006 + t * 0.008)
-            const a = (0.05 + 0.10 * (w1 + w2 + 2) / 4) * (1 - (y / H) * 0.55)
+            const a = (0.08 + 0.16 * (w1 + w2 + 2) / 4) * (1 - (y / H) * 0.5)
             const r = 1 + 0.9 * (w2 + 1) / 2
             ctx.fillStyle = `rgba(${(x / W + y / H) % 1 < 0.55 ? PURPLE : BLUE},${a.toFixed(3)})`
             ctx.beginPath()
@@ -113,8 +113,8 @@ export default function BoardBackdrop({ mode }: { mode: BackdropMode }) {
             const bx = b.x * W + ox
             const by = b.y * H + oy
             const d = Math.hypot(ax - bx, ay - by)
-            if (d < 110) {
-              ctx.strokeStyle = `rgba(${PURPLE},${(0.10 * (1 - d / 110)).toFixed(3)})`
+            if (d < 120) {
+              ctx.strokeStyle = `rgba(${PURPLE},${(0.16 * (1 - d / 120)).toFixed(3)})`
               ctx.lineWidth = 0.7
               ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke()
             }
@@ -126,7 +126,7 @@ export default function BoardBackdrop({ mode }: { mode: BackdropMode }) {
       if (mode === 'orbits') {
         const cx = W * 0.78 + ox * 2
         const cy = H * 0.42 + oy * 2
-        ctx.strokeStyle = 'rgba(255,255,255,.045)'
+        ctx.strokeStyle = 'rgba(255,255,255,.07)'
         ctx.lineWidth = 1
         for (const p of orbits) {
           ctx.beginPath(); ctx.arc(cx, cy, p.R * Math.min(W, H), 0, 6.283); ctx.stroke()
@@ -138,13 +138,52 @@ export default function BoardBackdrop({ mode }: { mode: BackdropMode }) {
         })
         pts.forEach((cur, i) => {
           const nxt = pts[(i + 1) % pts.length]
-          ctx.strokeStyle = `rgba(${PURPLE},.08)`
+          ctx.strokeStyle = `rgba(${PURPLE},.13)`
           ctx.beginPath(); ctx.moveTo(cur.x, cur.y); ctx.lineTo(nxt.x, nxt.y); ctx.stroke()
-          ctx.fillStyle = `rgba(${cur.p.hue},.55)`
+          ctx.fillStyle = `rgba(${cur.p.hue},.7)`
           ctx.beginPath(); ctx.arc(cur.x, cur.y, cur.p.r, 0, 6.283); ctx.fill()
-          ctx.fillStyle = `rgba(${cur.p.hue},.12)`
+          ctx.fillStyle = `rgba(${cur.p.hue},.18)`
           ctx.beginPath(); ctx.arc(cur.x, cur.y, cur.p.r * 3.2, 0, 6.283); ctx.fill()
         })
+      }
+      if (mode === 'pulse') {
+        // 心电脉搏线(项目健康监测):两条相位错开的脉搏迹线缓慢左移 + 底部刻度网格。
+        const base = H * 0.6 + oy
+        ctx.strokeStyle = 'rgba(255,255,255,.045)'
+        ctx.lineWidth = 1
+        const tickShift = (t * 0.4) % 56
+        for (let x = -tickShift; x < W; x += 56) {
+          ctx.beginPath(); ctx.moveTo(x, base + 26); ctx.lineTo(x, base + 34); ctx.stroke()
+        }
+        ctx.beginPath(); ctx.moveTo(0, base + 30); ctx.lineTo(W, base + 30)
+        ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.stroke()
+        const beat = (u: number): number => {
+          if (u < 0.08) return Math.sin((u / 0.08) * Math.PI) * 6
+          if (u < 0.12) return 0
+          if (u < 0.145) return -((u - 0.12) / 0.025) * 10
+          if (u < 0.17) return -10 + ((u - 0.145) / 0.025) * 58
+          if (u < 0.2) return 48 - ((u - 0.17) / 0.03) * 62
+          if (u < 0.24) return -14 + ((u - 0.2) / 0.04) * 14
+          if (u < 0.4) return Math.sin(((u - 0.24) / 0.16) * Math.PI) * 10
+          return 0
+        }
+        const period = 340
+        const trace = (yBase: number, hue: string, alpha: number, phase: number, amp: number) => {
+          for (const [lw, a2] of [[6, alpha * 0.12], [1.6, alpha]] as const) {
+            ctx.strokeStyle = `rgba(${hue},${a2.toFixed(3)})`
+            ctx.lineWidth = lw
+            ctx.beginPath()
+            for (let x = 0; x <= W; x += 2) {
+              const u = (((x + t * 1.1 + phase) % period) + period) % period / period
+              const y = yBase - beat(u) * amp + ox * 0.15
+              if (x === 0) ctx.moveTo(x, y)
+              else ctx.lineTo(x, y)
+            }
+            ctx.stroke()
+          }
+        }
+        trace(base, PURPLE, 0.5, 0, 0.9)
+        trace(base + 22, BLUE, 0.22, 150, 0.55)
       }
       if (mode === 'radar') {
         const cx = W * 0.5 + ox * 2

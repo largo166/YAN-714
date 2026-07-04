@@ -86,22 +86,6 @@ function AiDonut({ items }: { items: AiUsageItem[] }) {
   )
 }
 
-/** 飞书未接入占位（三态红线：不伪造数据） */
-function NotConfigured({ title, tag, hint }: { title: string; tag: string; hint: string }) {
-  return (
-    <div style={{ ...cardBase, padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff' }}>{title}</h2>
-        <span style={{ fontSize: 10.5, color: C.gold, border: `1px solid ${C.gold}55`, background: `${C.gold}1a`, borderRadius: 7, padding: '2px 8px' }}>{tag}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', color: C.mut, fontSize: 13, lineHeight: 1.6 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: C.mut2 }} />
-        {hint}
-      </div>
-    </div>
-  )
-}
-
 /** 管理驾驶舱：跨项目只读聚合，接真实后端（C5）。 */
 export default function BossPage() {
   const [dash, setDash] = useState<BossDashboard | null>(null)
@@ -185,7 +169,7 @@ export default function BossPage() {
   if (gate !== 'open') {
     return (
       <div style={{ ...fontWrap, position: 'relative', display: 'grid', placeItems: 'center', minHeight: '58vh' }}>
-        <BoardBackdrop mode="radar" />
+        <BoardBackdrop mode="pulse" />
         {gate === 'checking' ? (
           <div style={{ color: C.mut, fontSize: 13, position: 'relative', zIndex: 1 }}>正在检查权限…</div>
         ) : (
@@ -217,7 +201,7 @@ export default function BossPage() {
     <div style={fontWrap}>
       {/* HERO 区:板块动态背景(雷达脉冲)只罩 头部+KPI 带(按小样,不铺全页) */}
       <section style={{ position: 'relative' }}>
-        <BoardBackdrop mode="radar" />
+        <BoardBackdrop mode="pulse" />
         <div style={{ position: 'relative', zIndex: 1 }}>
       {/* header */}
       <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 22 }}>
@@ -306,19 +290,13 @@ export default function BossPage() {
         </div>
       </section>
 
-      {/* feishu placeholders — 三态红线 */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18 }}>
-        <NotConfigured
-          title="飞书项目看板 · 合同进度"
-          tag="飞书同步"
-          hint={feishuOk ? '（飞书看板数据）' : '飞书未接入。配置飞书集成后在此显示合同进度与收款节点（当前不显示模拟数据）。'}
-        />
-        <NotConfigured
-          title="项目评论 · 通知到成员"
-          tag="飞书消息"
-          hint={commentsOk ? '（项目评论数据）' : '飞书未接入。配置后可对项目写评论并通过飞书通知成员（当前不显示模拟评论）。'}
-        />
-      </section>
+      {/* 飞书能力未接入:收成一行,不再占两张卡(首屏减负;真接入后再升卡) */}
+      {!(feishuOk && commentsOk) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, color: C.mut2, fontSize: 12 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.mut2, flexShrink: 0 }} />
+          飞书项目看板 · 项目评论 —— 即将接入
+        </div>
+      )}
     </div>
   )
 }

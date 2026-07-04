@@ -280,7 +280,8 @@ export default function KnowledgePage() {
   // 当前生效的整理目标根:配置了仓库则显示仓库路径,否则"程序内部目录"。
   const [repoRoot, setRepoRoot] = useState('')
 
-  // 收件箱监听(P1-C):设一个文件夹,新文件自动入库(后台 60s 轮询 + 此处手动兜底)。
+  // 收件箱监听(P1-C):设一个文件夹,新文件自动入库(后台 60s 轮询 + 此处手动兜底)。默认折叠。
+  const [inboxOpen, setInboxOpen] = useState(false)
   const [inboxInfo, setInboxInfo] = useState<{ inbox_root_path: string; accessible: boolean; pending: number } | null>(null)
   const [inboxInput, setInboxInput] = useState('')
   const [inboxBusy, setInboxBusy] = useState(false)
@@ -634,30 +635,38 @@ export default function KnowledgePage() {
         )}
       </div>
 
-      {/* 收件箱监听 */}
-      <div className="ckcard" style={{ padding: 18, marginTop: 12, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-          收件箱监听 <span style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>丢进文件夹的文件自动入库</span>
-          {inboxInfo?.accessible && <span style={{ fontSize: 10.5, color: C.amber, border: `1px solid ${C.amber}66`, background: `${C.amber}1f`, borderRadius: 99, padding: '2px 8px' }}>待处理 {inboxInfo.pending}</span>}
-        </div>
-        <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 8 }}>
-          后台每分钟自动扫描并接入知识库（入库后原件移到该文件夹下的 <code>_done/</code>）。也可随时点「立即扫描」。
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input value={inboxInput} onChange={(e) => setInboxInput(e.target.value)} placeholder="收件箱文件夹的完整路径，如 C:\Users\…\ROM-AI收件箱" style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
-          <button className="btn" onClick={saveInbox} disabled={inboxBusy} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{inboxBusy ? '处理中…' : '保存'}</button>
-          <button className="anbtn" onClick={scanInboxNow} disabled={inboxBusy || !inboxInfo?.accessible} title={inboxInfo?.accessible ? '立即扫描收件箱并入库' : '请先保存一个可访问的收件箱路径'}>立即扫描</button>
-          {!inboxInfo?.accessible && <span style={{ fontSize: 11, color: C.mut2 }}>（先在左侧填好路径并保存，扫描才可用）</span>}
-        </div>
-        <div style={{ fontSize: 11.5, marginTop: 6 }}>
+      {/* 收件箱监听:默认折叠(首屏减负,2026-07)——配置一次即长期后台运行,状态点+待处理数常显,细节点开 */}
+      <div className="ckcard" style={{ marginTop: 12, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.18)' } as React.CSSProperties}>
+        <button type="button" onClick={() => setInboxOpen((v) => !v)}
+          style={{ width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: 0, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 8, color: C.ink }}>
+          <span style={{ color: C.mut }}>{inboxOpen ? '▾' : '▸'}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>收件箱监听</span>
+          <span style={{ fontSize: 11, color: C.mut }}>丢进文件夹的文件自动入库</span>
           {inboxInfo && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: inboxInfo.accessible ? C.green : C.mut }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: inboxInfo.accessible ? C.green : C.mut2, boxShadow: inboxInfo.accessible ? `0 0 8px ${C.green}` : 'none' }} />
-              {inboxInfo.inbox_root_path ? (inboxInfo.accessible ? `已启用：${inboxInfo.inbox_root_path}` : `路径不可访问：${inboxInfo.inbox_root_path}`) : '未启用收件箱'}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: inboxInfo.accessible ? C.green : C.mut }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: inboxInfo.accessible ? C.green : C.mut2, boxShadow: inboxInfo.accessible ? `0 0 8px ${C.green}` : 'none' }} />
+              {inboxInfo.inbox_root_path ? (inboxInfo.accessible ? '运行中' : '路径不可访问') : '未启用'}
             </span>
           )}
-          {inboxMsg && <span style={{ color: C.ink2, marginLeft: 8 }}>{inboxMsg}</span>}
-        </div>
+          {inboxInfo?.accessible && inboxInfo.pending > 0 && <span style={{ fontSize: 10.5, color: C.amber, border: `1px solid ${C.amber}66`, background: `${C.amber}1f`, borderRadius: 99, padding: '2px 8px' }}>待处理 {inboxInfo.pending}</span>}
+        </button>
+        {inboxOpen && (
+          <div style={{ padding: '0 18px 16px' }}>
+            <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 8 }}>
+              后台每分钟自动扫描并接入知识库（入库后原件移到该文件夹下的 <code>_done/</code>）。也可随时点「立即扫描」。
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input value={inboxInput} onChange={(e) => setInboxInput(e.target.value)} placeholder="收件箱文件夹的完整路径，如 C:\Users\…\ROM-AI收件箱" style={{ flex: 1, minWidth: 240, padding: '8px 12px', border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,.045)', color: C.ink }} />
+              <button className="btn" onClick={saveInbox} disabled={inboxBusy} style={{ background: 'linear-gradient(135deg,#7c5cff,#42a5ff)', color: '#fff' }}>{inboxBusy ? '处理中…' : '保存'}</button>
+              <button className="anbtn" onClick={scanInboxNow} disabled={inboxBusy || !inboxInfo?.accessible} title={inboxInfo?.accessible ? '立即扫描收件箱并入库' : '请先保存一个可访问的收件箱路径'}>立即扫描</button>
+              {!inboxInfo?.accessible && <span style={{ fontSize: 11, color: C.mut2 }}>（先在左侧填好路径并保存，扫描才可用）</span>}
+            </div>
+            <div style={{ fontSize: 11.5, marginTop: 6 }}>
+              {inboxInfo?.inbox_root_path && <span style={{ color: C.mut }}>{inboxInfo.inbox_root_path}</span>}
+              {inboxMsg && <span style={{ color: C.ink2, marginLeft: 8 }}>{inboxMsg}</span>}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ② 知识库：已入库文档(主) + 可复用资产 / 库存健康(侧) 两栏 */}
@@ -742,15 +751,7 @@ export default function KnowledgePage() {
               </div>
             )}
           </div>
-          <div className="ckcard" style={{ padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10 }}>库存健康</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.ink2, padding: '5px 0' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, boxShadow: `0 0 8px ${C.green}`, flexShrink: 0 }} />索引状态 正常 · {stats ? stats.engine.toUpperCase() : 'FTS5 / BM25'}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12, color: C.ink2, padding: '5px 0' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.mut2, flexShrink: 0, transform: 'translateY(2px)' }} />图纸 / 图片登记元数据，暂不入全文检索
-            </div>
-          </div>
+          {/* 「库存健康」卡已删(首屏减负,2026-07):索引状态/引擎与脉搏卡完全重复 */}
         </aside>
       </div>
 
