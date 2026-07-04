@@ -112,3 +112,23 @@ line rgba(255,255,255,.08)   glass linear-gradient(145deg,rgba(255,255,255,.07),
 
 - 页 = H1 头部(标题+徽章+副标) → HERO 双卡(签名仪表/聚焦) → KPI 指标带 → 分组(GroupLabel 竖条+渐隐线) → 主/侧两栏(minmax(0,1fr) + 320~340px) → 降权区(默认折叠)。
 - 空态/加载:骨架或深色提示条;禁止大面积空白。
+
+## 10. Tailwind 迁移标尺(P2 内联样式收口,2026-07-05)
+
+目标:**像素级等价转换**——只把静态内联 style 换成工具类,不改布局、不改结构、不"顺手优化"。
+
+- **颜色必须走 token,禁止 className 里写 hex**:
+  页内 C 常量 hex → 板块色板类:`C.purple→brand-purple` `C.blue→brand-blue` `C.gold→brand-gold`
+  `C.cyan→brand-cyan` `C.red→brand-red` `C.amber→brand-amber` `C.green→brand-green`
+  `C.ink→ink` `C.ink2→ink-2` `C.mut→mut` `C.mut2→mut-2` `C.line→line` `#fff→white`;
+  `var(--xxx)` 系(主题反应式)→ shadcn 语义类:`var(--mut)→muted-foreground` `var(--panel)→card`
+  `var(--panel2)→popover` `var(--ink)→foreground` `var(--line/line2)→border/input` `var(--terra)→primary`。
+- **字号一律任意值 `text-[13px]`,禁用 text-xs/sm/base 等命名档**——命名档会同时改 line-height,
+  破坏继承的 1.5,不等价。行高显式写的才加 `leading-[x]`。
+- 间距/圆角:标准档恰好相等才用(`gap-2`=8px),否则任意值(`p-[10px]` `rounded-[18px]`);
+  `--radius`=10px ⇒ `rounded-lg`=按钮 10px 档。字重 500/600/700 → `font-medium/semibold/bold`。
+- **必须保留内联的**:动态表达式(状态/计算宽度/animation-delay 循环)、grid 模板等超长一次性值可留。
+  复杂渐变/glow 可用任意值(`shadow-[0_0_22px_rgba(124,92,255,.35)]`,空格换下划线),别硬转致损。
+- legacy 类(.card/.anbtn/.statpill/.gshell/.ckcard…)原样保留不动;共享 style 常量对象 → 共享 className 串。
+- 每文件收口后:剩余 `style={{` 只允许动态值;C 常量整体无引用才删,部分引用不折腾。
+- 验收:tsc/eslint 零错误 + 迁移前后截图/关键元素计算样式比对 + 控制台零新错。

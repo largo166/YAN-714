@@ -13,6 +13,20 @@ export default {
         mono: ['Space Mono', 'ui-monospace', 'Consolas', 'monospace'],
       },
       colors: {
+        // ===== 板块色板(DESIGN.md 第 3 节,暗色板专用;页内 C 常量的 token 化替身) =====
+        brand: {
+          purple: '#7c5cff',
+          blue: '#42a5ff',
+          gold: '#d7a86e',
+          cyan: '#36e6d4',
+          red: '#ff5e66',
+          amber: '#fdab3d',
+          green: '#49d18d',
+        },
+        ink: { DEFAULT: '#f4f1ea', 2: '#d8d4cc' },
+        mut: { DEFAULT: '#8f96a5', 2: '#5f6674' },
+        line: { DEFAULT: 'rgba(255,255,255,.08)', 2: 'rgba(255,255,255,.12)' },
+        // ===== shadcn 语义变量(主题反应式,亮暗随 .darkui 翻转) =====
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

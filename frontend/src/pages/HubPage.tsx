@@ -4,41 +4,39 @@ import { Building2, Cake, Megaphone } from 'lucide-react'
 
 import { api, type ClientPortrait } from '@/lib/api'
 import BoardBackdrop from '@/lib/BoardBackdrop'
+import { cn } from '@/lib/utils'
 import type { Agent, TeamMember, TickerItem } from '@/types/schemas'
 
 /* 协作平台 · DC 暗色打磨（图标卡片/玻璃/霓虹）。数据全接真实后端（C4/C5），逻辑不动：
    团队成员 CRUD / 通知走马灯 / 甲方画像（仅汇已确认认知）/ 智能助手目录。
-   红线：无数据走空态，不塞 mock；分派/发布/run 不在本页（指向项目中心/驾驶舱/共创营地）。 */
+   红线：无数据走空态，不塞 mock；分派/发布/run 不在本页（指向项目中心/驾驶舱/共创营地）。
+   样式:P2 已收口——静态样式走 Tailwind token(DESIGN.md §10),内联只剩动态值。 */
 
 const C = {
-  purple: '#7c5cff', blue: '#42a5ff', gold: '#d7a86e', cyan: '#36e6d4', red: '#ff5e66', amber: '#fdab3d', green: '#49d18d',
-  ink: '#f4f1ea', ink2: '#d8d4cc', mut: '#8f96a5', mut2: '#5f6674',
-  line: 'rgba(255,255,255,.08)',
-  glass: 'linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032))',
+  gold: '#d7a86e', ink2: '#d8d4cc', line: 'rgba(255,255,255,.08)',
 }
-const cardBase: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 18, background: C.glass }
-const fieldStyle: React.CSSProperties = { background: 'rgba(255,255,255,.045)', border: `1px solid ${C.line}`, borderRadius: 8, padding: '8px 11px', fontFamily: 'inherit', fontSize: 13, color: C.ink, outline: 'none' }
+const glassCard = 'border border-solid border-line rounded-[18px] bg-[linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032))]'
+const fieldCls = 'bg-[rgba(255,255,255,.045)] border border-solid border-line rounded-[8px] py-2 px-[11px] [font-family:inherit] text-[13px] text-ink outline-none'
+const dutyRowCls = 'text-[12.5px] text-ink-2 flex items-baseline gap-2 flex-wrap'
+const dutyKeyCls = 'text-mut font-semibold text-[11.5px] shrink-0'
 
 function Avatar({ text, kind }: { text: string; kind: 'human' | 'agent' }) {
   const grad = kind === 'agent' ? 'linear-gradient(135deg,#d7a86e,#36e6d4)' : 'linear-gradient(135deg,#7c5cff,#42a5ff)'
   const glow = kind === 'agent' ? 'rgba(54,230,212,.3)' : 'rgba(124,92,255,.35)'
   return (
-    <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 13, background: grad, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 15, fontWeight: 700, boxShadow: `0 0 22px ${glow}` }}>{text}</div>
+    <div className="w-10 h-10 shrink-0 rounded-[13px] grid place-items-center text-white text-[15px] font-bold" style={{ background: grad, boxShadow: `0 0 22px ${glow}` }}>{text}</div>
   )
 }
 
 function SecLabel({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 14px' }}>
-      <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff' }}>{title}</h2>
-      {sub && <span style={{ fontSize: 12, color: C.mut }}>{sub}</span>}
-      <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${C.line},transparent)` }} />
+    <div className="flex items-center gap-[10px] m-0 mb-[14px]">
+      <h2 className="m-0 text-[17px] font-bold text-white">{title}</h2>
+      {sub && <span className="text-[12px] text-mut">{sub}</span>}
+      <span className="flex-1 h-px bg-[linear-gradient(90deg,rgba(255,255,255,.08),transparent)]" />
     </div>
   )
 }
-
-const dutyRow: React.CSSProperties = { fontSize: 12.5, color: C.ink2, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }
-const dutyKey: React.CSSProperties = { color: C.mut, fontWeight: 600, fontSize: 11.5, flexShrink: 0 }
 
 /** 协作平台：团队成员 + 智能助手卡 + 通知走马灯 + 甲方画像，接真实后端（C4）。 */
 export default function HubPage() {
@@ -116,29 +114,29 @@ export default function HubPage() {
   const plannedAgents = agents.filter((a) => a.status !== 'ok')
 
   return (
-    <div style={{ color: C.ink }}>
+    <div className="text-ink">
       {/* HERO 区:板块动态背景(轨道连线)只罩 头部+团队成员区(按小样,不铺全页) */}
-      <section style={{ position: 'relative' }}>
+      <section className="relative">
         <BoardBackdrop mode="aurora" />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-      <header style={{ marginBottom: 22 }}>
-        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-.025em' }}>协作平台</h1>
-        <p style={{ margin: '8px 0 0', color: C.mut, fontSize: 13 }}>团队 / 智能助手 / 甲方画像 一屏协作 —— 谁在做什么、卡在哪，一眼可见。</p>
+        <div className="relative z-[1]">
+      <header className="mb-[22px]">
+        <h1 className="m-0 text-[32px] font-semibold tracking-[-0.025em]">协作平台</h1>
+        <p className="m-0 mt-2 text-mut text-[13px]">团队 / 智能助手 / 甲方画像 一屏协作 —— 谁在做什么、卡在哪，一眼可见。</p>
       </header>
 
       {/* 团队成员 + 走马灯 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '0 0 14px' }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', flexShrink: 0 }}>团队成员</h2>
-        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      <div className="flex items-center gap-[14px] m-0 mb-[14px]">
+        <h2 className="m-0 text-[17px] font-bold text-white shrink-0">团队成员</h2>
+        <div className="flex-1 min-w-0 overflow-hidden whitespace-nowrap">
           {ticker.length === 0 ? (
-            <span style={{ fontSize: 11.5, color: C.mut }}>暂无通知 · 在驾驶舱发布全员通知后会在此轮播</span>
+            <span className="text-[11.5px] text-mut">暂无通知 · 在驾驶舱发布全员通知后会在此轮播</span>
           ) : (() => {
             const t = ticker[tickIdx % ticker.length]
             return (
-              <span key={tickIdx} className="tickfade" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: t.kind === 'broadcast' ? '#a98bff' : C.gold, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span key={tickIdx} className="tickfade inline-flex items-center gap-[5px] text-[11.5px] max-w-full overflow-hidden text-ellipsis" style={{ color: t.kind === 'broadcast' ? '#a98bff' : C.gold }}>
                 {t.kind === 'broadcast' ? <Megaphone size={12} /> : <Cake size={12} />}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.text}</span>
-                {ticker.length > 1 && <span style={{ color: C.mut2, fontSize: 10.5, flexShrink: 0 }}>{(tickIdx % ticker.length) + 1}/{ticker.length}</span>}
+                <span className="overflow-hidden text-ellipsis">{t.text}</span>
+                {ticker.length > 1 && <span className="text-mut-2 text-[10.5px] shrink-0">{(tickIdx % ticker.length) + 1}/{ticker.length}</span>}
               </span>
             )
           })()}
@@ -146,63 +144,64 @@ export default function HubPage() {
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          style={{ flexShrink: 0, fontFamily: 'inherit', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, height: 32, padding: '0 13px', borderRadius: 10, border: `1px solid ${C.line}`, background: adding ? 'rgba(255,255,255,.05)' : 'transparent', color: C.ink2 }}
+          className="shrink-0 [font-family:inherit] cursor-pointer text-[12.5px] font-semibold h-8 py-0 px-[13px] rounded-[10px] border border-solid border-line text-ink-2"
+          style={{ background: adding ? 'rgba(255,255,255,.05)' : 'transparent' }}
         >
           {adding ? '收起' : '+ 添加成员'}
         </button>
       </div>
 
       {adding && (
-        <div style={{ ...cardBase, padding: 14, marginBottom: 14 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input placeholder="姓名（必填）" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ ...fieldStyle, flex: '1 1 120px', minWidth: 120 }} />
-            <input placeholder="角色，如 建筑师" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} style={{ ...fieldStyle, flex: '1 1 120px', minWidth: 120 }} />
-            <input placeholder="工作分工" value={form.duty} onChange={(e) => setForm((f) => ({ ...f, duty: e.target.value }))} style={{ ...fieldStyle, flex: '2 1 200px', minWidth: 160 }} />
-            <button type="button" onClick={submitNew} disabled={!form.name.trim()} style={{ height: 36, padding: '0 15px', border: 0, borderRadius: 10, background: form.name.trim() ? 'linear-gradient(135deg,#7c5cff,#42a5ff)' : 'rgba(255,255,255,.08)', color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.02em', fontFamily: 'inherit', cursor: form.name.trim() ? 'pointer' : 'not-allowed' }}>保存</button>
+        <div className={cn(glassCard, 'p-[14px] mb-[14px]')}>
+          <div className="flex gap-2 flex-wrap items-center">
+            <input placeholder="姓名（必填）" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={cn(fieldCls, 'flex-[1_1_120px] min-w-[120px]')} />
+            <input placeholder="角色，如 建筑师" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={cn(fieldCls, 'flex-[1_1_120px] min-w-[120px]')} />
+            <input placeholder="工作分工" value={form.duty} onChange={(e) => setForm((f) => ({ ...f, duty: e.target.value }))} className={cn(fieldCls, 'flex-[2_1_200px] min-w-[160px]')} />
+            <button type="button" onClick={submitNew} disabled={!form.name.trim()} className="h-9 py-0 px-[15px] border-0 rounded-[10px] text-white font-bold text-[13px] tracking-[.02em] [font-family:inherit]" style={{ background: form.name.trim() ? 'linear-gradient(135deg,#7c5cff,#42a5ff)' : 'rgba(255,255,255,.08)', cursor: form.name.trim() ? 'pointer' : 'not-allowed' }}>保存</button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14, marginBottom: 28 }}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-[14px] mb-7">
         {members.length === 0 && (
-          <div style={{ color: C.mut, fontSize: 13, padding: '4px 2px' }}>暂无团队成员。点「添加成员」录入，或在共创营地录入人员后生成卡片。</div>
+          <div className="text-mut text-[13px] py-1 px-[2px]">暂无团队成员。点「添加成员」录入，或在共创营地录入人员后生成卡片。</div>
         )}
         {members.map((m) => (
-          <div key={m.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <div key={m.id} className="ckcard p-4 flex flex-col gap-[11px]" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
+            <div className="flex items-center gap-[11px]">
               <Avatar text={m.name?.[0] || '人'} kind="human" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
-                <div style={{ fontSize: 12, color: C.mut }}>{m.role || '—'}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-bold text-white truncate">{m.name}</div>
+                <div className="text-[12px] text-mut">{m.role || '—'}</div>
               </div>
-              <span title="停用成员（软删除）" onClick={() => removeMember(m.id, m.name)} style={{ cursor: 'pointer', color: C.mut, fontSize: 14 }}>✕</span>
+              <span title="停用成员（软删除）" onClick={() => removeMember(m.id, m.name)} className="cursor-pointer text-mut text-[14px]">✕</span>
             </div>
-            <div style={dutyRow}>
-              <b style={dutyKey}>工作分工</b>
+            <div className={dutyRowCls}>
+              <b className={dutyKeyCls}>工作分工</b>
               {editId === m.id ? (
                 <>
-                  <input value={editDuty} onChange={(e) => setEditDuty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveDuty(m.id)} autoFocus style={{ ...fieldStyle, flex: 1, padding: '3px 8px', fontSize: 12.5 }} />
-                  <span style={{ cursor: 'pointer', color: C.cyan }} onClick={() => saveDuty(m.id)}>✓</span>
+                  <input value={editDuty} onChange={(e) => setEditDuty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveDuty(m.id)} autoFocus className={cn(fieldCls, 'flex-1 py-[3px] px-2 text-[12.5px]')} />
+                  <span className="cursor-pointer text-brand-cyan" onClick={() => saveDuty(m.id)}>✓</span>
                 </>
               ) : (
                 <>
-                  <span style={{ flex: 1 }}>{m.duty || '—'}</span>
-                  <span style={{ cursor: 'pointer', color: C.mut }} onClick={() => { setEditId(m.id); setEditDuty(m.duty) }}>✎</span>
+                  <span className="flex-1">{m.duty || '—'}</span>
+                  <span className="cursor-pointer text-mut" onClick={() => { setEditId(m.id); setEditDuty(m.duty) }}>✎</span>
                 </>
               )}
             </div>
-            <div style={dutyRow}>
-              <b style={dutyKey}>承担任务</b>
+            <div className={dutyRowCls}>
+              <b className={dutyKeyCls}>承担任务</b>
               {m.assignments.length === 0 ? (
-                <span style={{ color: C.mut }}>未分派</span>
+                <span className="text-mut">未分派</span>
               ) : (
-                <span style={{ flex: 1 }}>
+                <span className="flex-1">
                   {m.assignments.map((a, i) => (
                     <span key={i}>{i > 0 && '；'}{a.task_title}{a.due ? ` · ${a.due}` : ''}</span>
                   ))}
                 </span>
               )}
-              <span style={{ fontSize: 10, color: C.mut2, border: `1px solid ${C.line}`, borderRadius: 6, padding: '1px 6px' }}>项目中心分派</span>
+              <span className="text-[10px] text-mut-2 border border-solid border-line rounded-[6px] py-px px-[6px]">项目中心分派</span>
             </div>
           </div>
         ))}
@@ -212,13 +211,13 @@ export default function HubPage() {
 
       {/* 甲方画像库(签名卡:渐变描边壳) */}
       <SecLabel title="甲方画像库" sub="同一甲方的项目 / 诉求 / 历史，一处聚合（只汇入已确认的认知）" />
-      <div className="gshell" style={{ marginBottom: 28 }}>
-        <div className="gshell-in" style={{ padding: 18 }}>
+      <div className="gshell mb-7">
+        <div className="gshell-in p-[18px]">
         {clients.length === 0 ? (
-          <div style={{ color: C.mut, fontSize: 13 }}>暂无甲方。给项目填上「甲方」后，这里按甲方聚合其项目与诉求/历史。</div>
+          <div className="text-mut text-[13px]">暂无甲方。给项目填上「甲方」后，这里按甲方聚合其项目与诉求/历史。</div>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: portrait ? 14 : 0 }}>
+            <div className="flex gap-2 flex-wrap" style={{ marginBottom: portrait ? 14 : 0 }}>
               {clients.map((c) => {
                 const sel = selClient === c.name
                 return (
@@ -226,7 +225,8 @@ export default function HubPage() {
                     key={c.name}
                     type="button"
                     onClick={() => selectClient(c.name)}
-                    style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, borderRadius: 99, padding: '6px 13px', border: `1px solid ${sel ? 'rgba(124,92,255,.55)' : C.line}`, background: sel ? 'rgba(124,92,255,.16)' : 'rgba(255,255,255,.04)', color: sel ? '#c8bcff' : C.ink2, boxShadow: sel ? '0 0 16px rgba(124,92,255,.25)' : 'none' }}
+                    className="[font-family:inherit] cursor-pointer text-[12.5px] font-semibold rounded-[99px] py-[6px] px-[13px] border border-solid"
+                    style={{ borderColor: sel ? 'rgba(124,92,255,.55)' : C.line, background: sel ? 'rgba(124,92,255,.16)' : 'rgba(255,255,255,.04)', color: sel ? '#c8bcff' : C.ink2, boxShadow: sel ? '0 0 16px rgba(124,92,255,.25)' : 'none' }}
                   >
                     {c.name}（{c.project_count}）
                   </button>
@@ -235,23 +235,23 @@ export default function HubPage() {
             </div>
             {portrait && (
               <div>
-                <div style={{ fontSize: 13, marginBottom: 8 }}>
-                  <b style={{ color: '#fff' }}>{portrait.client}</b> · {portrait.project_count} 个项目
-                  {portrait.cities.length > 0 && <span style={{ color: C.mut }}>{'　'}<Building2 size={12} style={{ verticalAlign: -2 }} /> {portrait.cities.join('、')}</span>}
+                <div className="text-[13px] mb-2">
+                  <b className="text-white">{portrait.client}</b> · {portrait.project_count} 个项目
+                  {portrait.cities.length > 0 && <span className="text-mut">{'　'}<Building2 size={12} className="align-[-2px]" /> {portrait.cities.join('、')}</span>}
                 </div>
                 {portrait.projects.map((p) => (
-                  <div key={p.id} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9 }}>
-                    <div style={{ fontSize: 12.5 }}>
-                      <b style={{ color: C.ink }}>{p.name}</b>
-                      {p.city && <span style={{ color: C.mut }}>{'　'}{p.city}</span>}
-                      <span style={{ marginLeft: 6, fontSize: 10.5, color: C.gold, border: `1px solid ${C.gold}44`, background: `${C.gold}14`, borderRadius: 6, padding: '1px 7px' }}>{p.status}</span>
+                  <div key={p.id} className="border-t border-solid border-line pt-[9px] mt-[9px]">
+                    <div className="text-[12.5px]">
+                      <b className="text-ink">{p.name}</b>
+                      {p.city && <span className="text-mut">{'　'}{p.city}</span>}
+                      <span className="ml-[6px] text-[10.5px] text-brand-gold border border-solid border-brand-gold/[.27] bg-brand-gold/[.08] rounded-[6px] py-px px-[7px]">{p.status}</span>
                     </div>
                     {p.cognition.length === 0 ? (
-                      <div style={{ fontSize: 11.5, color: C.mut, marginTop: 4 }}>暂无已确认认知（在项目中心「项目解读」确认后汇入）。</div>
+                      <div className="text-[11.5px] text-mut mt-1">暂无已确认认知（在项目中心「项目解读」确认后汇入）。</div>
                     ) : (
                       p.cognition.map((g, i) => (
-                        <div key={i} style={{ fontSize: 11.5, color: C.ink2, marginTop: 4 }}>
-                          <span style={{ color: C.cyan }}>{g.module_label}：</span>
+                        <div key={i} className="text-[11.5px] text-ink-2 mt-1">
+                          <span className="text-brand-cyan">{g.module_label}：</span>
                           {g.summary}
                         </div>
                       ))
@@ -267,27 +267,27 @@ export default function HubPage() {
 
       {/* 智能助手:只上可用的卡片;规划中的收成「即将上岗」一行,不占卡位 */}
       <SecLabel title="智能助手" sub="AI 同事 · 能力分阶段上岗" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-[14px]">
         {okAgents.map((a) => (
-          <div key={a.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <div key={a.id} className="ckcard p-4 flex flex-col gap-[11px]" style={{ ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
+            <div className="flex items-center gap-[11px]">
               <Avatar text={a.name?.[0] || 'A'} kind="agent" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{a.name}</div>
-                <div style={{ fontSize: 12, color: C.mut }}>{a.role}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-bold text-white">{a.name}</div>
+                <div className="text-[12px] text-mut">{a.role}</div>
               </div>
-              <span style={{ fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap', borderRadius: 7, padding: '2px 9px', color: C.green, border: `1px solid ${C.green}55`, background: `${C.green}18`, boxShadow: `0 0 14px ${C.green}33` }}>可用</span>
+              <span className="text-[10.5px] font-bold whitespace-nowrap rounded-[7px] py-[2px] px-[9px] text-brand-green border border-solid border-brand-green/[.33] bg-brand-green/[.094] shadow-[0_0_14px_rgba(73,209,141,.2)]">可用</span>
             </div>
-            <div style={dutyRow}><b style={dutyKey}>负责</b><span style={{ flex: 1 }}>{a.duty}</span></div>
-            <div style={dutyRow}><b style={dutyKey}>输出</b><span style={{ flex: 1 }}>{a.output}</span></div>
+            <div className={dutyRowCls}><b className={dutyKeyCls}>负责</b><span className="flex-1">{a.duty}</span></div>
+            <div className={dutyRowCls}><b className={dutyKeyCls}>输出</b><span className="flex-1">{a.output}</span></div>
           </div>
         ))}
-        {okAgents.length === 0 && agents.length > 0 && <div style={{ color: C.mut, fontSize: 13, padding: '4px 2px' }}>智能助手筹备中,能力分阶段上岗。</div>}
-        {agents.length === 0 && <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>智能助手目录加载中…</div>}
+        {okAgents.length === 0 && agents.length > 0 && <div className="text-mut text-[13px] py-1 px-[2px]">智能助手筹备中,能力分阶段上岗。</div>}
+        {agents.length === 0 && <div className="text-mut text-[12px] p-2">智能助手目录加载中…</div>}
       </div>
       {plannedAgents.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, color: C.mut2, fontSize: 12, flexWrap: 'wrap' }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.mut2, flexShrink: 0 }} />
+        <div className="flex items-center gap-2 mt-3 text-mut-2 text-[12px] flex-wrap">
+          <span className="w-[7px] h-[7px] rounded-full bg-mut-2 shrink-0" />
           即将上岗：{plannedAgents.map((a) => a.name).join(' · ')}
         </div>
       )}
