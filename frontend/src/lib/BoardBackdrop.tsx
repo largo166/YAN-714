@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react'
 
 /** 板块动态背景(按小样确认,2026-07;v2 整体加浓约 1.5×):同一紫蓝色调——
- *  dots=点阵波场(项目中心) streams=数据流(数据基地) sparks=思维粒子(共创营地)
- *  orbits=轨道连线(协作平台) pulse=心电脉搏线(管理驾驶舱,项目健康监测;radar 弃用保留)。
+ *  dots=点阵波场(项目中心) sparks=思维粒子(共创营地) orbits=轨道连线(协作平台)
+ *  aurora=静谧光晕(数据基地/管理驾驶舱:大片模糊光斑仅做 20s+ 呼吸,零空间位移)。
+ *  【晕动症红线,2026-07 用户反馈】禁止连续定向运动(下落光丝/滚动心电/扫描线)——
+ *  streams/pulse/radar 因此弃用保留,不得再挂到页面。新形态只许:静场、慢呼吸透明度、极轻指针视差。
  *  只用于各页 HERO 区(父容器 position:relative,内容自己抬 z-index);
  *  Canvas2D、DPR 上限 2、指针轻视差;prefers-reduced-motion 时完全不画。 */
-export type BackdropMode = 'dots' | 'streams' | 'sparks' | 'orbits' | 'radar' | 'pulse'
+export type BackdropMode = 'dots' | 'streams' | 'sparks' | 'orbits' | 'radar' | 'pulse' | 'aurora'
 
 const PURPLE = '124,92,255'
 const BLUE = '66,165,255'
@@ -145,6 +147,24 @@ export default function BoardBackdrop({ mode }: { mode: BackdropMode }) {
           ctx.fillStyle = `rgba(${cur.p.hue},.18)`
           ctx.beginPath(); ctx.arc(cur.x, cur.y, cur.p.r * 3.2, 0, 6.283); ctx.fill()
         })
+      }
+      if (mode === 'aurora') {
+        // 静谧光晕:三团大模糊光斑,位置固定,只有透明度在 21s/29s/37s 周期上极缓呼吸。
+        // 无任何空间位移、无指针视差——数据基地/驾驶舱专用的"安静场"。
+        const orbs: Array<[number, number, number, string, number, number]> = [
+          [0.22, 0.30, 0.52, PURPLE, 0.11, 0.0030],
+          [0.78, 0.22, 0.46, BLUE, 0.085, 0.0022],
+          [0.55, 0.85, 0.60, PURPLE, 0.07, 0.0017],
+        ]
+        for (const [fx, fy, fr, hue, baseA, freq] of orbs) {
+          const a = baseA * (0.72 + 0.28 * Math.sin(t * freq))
+          const R = fr * Math.max(W, H)
+          const g = ctx.createRadialGradient(fx * W, fy * H, 0, fx * W, fy * H, R)
+          g.addColorStop(0, `rgba(${hue},${a.toFixed(3)})`)
+          g.addColorStop(1, `rgba(${hue},0)`)
+          ctx.fillStyle = g
+          ctx.fillRect(0, 0, W, H)
+        }
       }
       if (mode === 'pulse') {
         // 心电脉搏线(项目健康监测):两条相位错开的脉搏迹线缓慢左移 + 底部刻度网格。

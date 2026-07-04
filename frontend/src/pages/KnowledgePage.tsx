@@ -490,7 +490,7 @@ export default function KnowledgePage() {
       )}
       {/* HERO 区:板块动态背景(数据流)只罩 头部+库存脉搏/检索 双卡(按小样,不铺全页) */}
       <section style={{ position: 'relative' }}>
-        <BoardBackdrop mode="streams" />
+        <BoardBackdrop mode="aurora" />
         <div style={{ position: 'relative', zIndex: 1 }}>
       <div className="ptitle">
         <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>数据基地</h1>

@@ -169,7 +169,7 @@ export default function BossPage() {
   if (gate !== 'open') {
     return (
       <div style={{ ...fontWrap, position: 'relative', display: 'grid', placeItems: 'center', minHeight: '58vh' }}>
-        <BoardBackdrop mode="pulse" />
+        <BoardBackdrop mode="aurora" />
         {gate === 'checking' ? (
           <div style={{ color: C.mut, fontSize: 13, position: 'relative', zIndex: 1 }}>正在检查权限…</div>
         ) : (
@@ -201,7 +201,7 @@ export default function BossPage() {
     <div style={fontWrap}>
       {/* HERO 区:板块动态背景(雷达脉冲)只罩 头部+KPI 带(按小样,不铺全页) */}
       <section style={{ position: 'relative' }}>
-        <BoardBackdrop mode="pulse" />
+        <BoardBackdrop mode="aurora" />
         <div style={{ position: 'relative', zIndex: 1 }}>
       {/* header */}
       <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 22 }}>
