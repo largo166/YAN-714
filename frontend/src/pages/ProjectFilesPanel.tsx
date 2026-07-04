@@ -108,7 +108,7 @@ export default function ProjectFilesPanel({
     return (
       <div className="card mt">
         <div className="ct">项目文件</div>
-        <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>请先选择一个项目。</div>
+        <div className="text-muted-foreground text-[13px] py-2">请先选择一个项目。</div>
       </div>
     )
   }
@@ -129,16 +129,10 @@ export default function ProjectFilesPanel({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
+        className="border-[1.5px] border-dashed rounded-[10px] py-[18px] px-[14px] text-center cursor-pointer text-muted-foreground text-[13px] mb-[10px]"
         style={{
-          border: `1.5px dashed ${dragOver ? 'var(--terra)' : 'var(--line2)'}`,
-          borderRadius: 10,
-          padding: '18px 14px',
-          textAlign: 'center',
-          cursor: 'pointer',
+          borderColor: dragOver ? 'var(--terra)' : 'var(--line2)',
           background: dragOver ? 'var(--terra-soft)' : 'transparent',
-          color: 'var(--mut)',
-          fontSize: 13,
-          marginBottom: 10,
         }}
       >
         拖拽文件到此，或点击选择（支持 txt / md / pdf / docx / pptx，单文件 ≤ 25MB）
@@ -147,7 +141,7 @@ export default function ProjectFilesPanel({
           type="file"
           accept={ACCEPT}
           multiple
-          style={{ display: 'none' }}
+          className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) doUpload(e.target.files)
             e.target.value = ''
@@ -156,44 +150,36 @@ export default function ProjectFilesPanel({
       </div>
 
       {uploading && (
-        <div className="prog" style={{ marginBottom: 10 }}>
+        <div className="prog mb-[10px]">
           <i style={{ width: `${progress}%` }}></i>
         </div>
       )}
-      {msg && <div style={{ color: 'var(--ok)', fontSize: 12.5, marginBottom: 8 }}>{msg}</div>}
-      {err && <div style={{ color: 'var(--red)', fontSize: 12.5, marginBottom: 8 }}>{err}</div>}
+      {msg && <div className="text-brand-green text-[12.5px] mb-2">{msg}</div>}
+      {err && <div className="text-destructive text-[12.5px] mb-2">{err}</div>}
 
       {/* 文件列表 */}
       {files.length === 0 ? (
-        <div style={{ color: 'var(--mut)', fontSize: 13, padding: '4px 0' }}>暂无文件。</div>
+        <div className="text-muted-foreground text-[13px] py-1">暂无文件。</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {files.map((f) => {
             const p = PARSE_LABEL[f.parse_status] ?? PARSE_LABEL.pending
             return (
               <div
                 key={f.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  padding: '8px 10px',
-                  border: '1px solid var(--line2)',
-                  borderRadius: 8,
-                }}
+                className="flex items-center justify-between gap-[10px] py-2 px-[10px] border border-solid border-input rounded-[8px]"
               >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    <FileText size={12} style={{ verticalAlign: -2, marginRight: 4 }} />{f.filename} <span className={'statpill ' + p.cls}>{p.text}</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold overflow-hidden text-ellipsis">
+                    <FileText size={12} className="align-[-2px] mr-1" />{f.filename} <span className={'statpill ' + p.cls}>{p.text}</span>
                     {f.indexed_doc_id > 0 && <span className="statpill live">已入库</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--mut)' }}>
+                  <div className="text-[11px] text-muted-foreground">
                     {fmtSize(f.size)}
                     {f.parse_error && ` · ${f.parse_error}`}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <div className="flex gap-[6px] shrink-0">
                   <button
                     className="anbtn"
                     disabled={
@@ -213,7 +199,7 @@ export default function ProjectFilesPanel({
                   >
                     入库
                   </button>
-                  <button className="anbtn" style={{ color: 'var(--red)', borderColor: 'rgba(255,90,90,.35)' }} onClick={() => onDelete(f.id)}>
+                  <button className="anbtn text-destructive border-[rgba(255,90,90,.35)]" onClick={() => onDelete(f.id)}>
                     删除
                   </button>
                 </div>

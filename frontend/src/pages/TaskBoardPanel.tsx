@@ -77,24 +77,24 @@ export default function TaskBoardPanel({
   }
 
   if (projectId == null) {
-    return <div style={{ color: 'var(--mut)', fontSize: 13 }}>请先选择项目。</div>
+    return <div className="text-muted-foreground text-[13px]">请先选择项目。</div>
   }
 
   return (
     <>
-      <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>
+      <div className="text-[11.5px] text-muted-foreground mb-2">
         会议纪要「确认」后，其待办自动落到此看板；在此推进状态（待办 → 进行中 → 已完成）。有明确日期且过期的标红。
       </div>
       {(overdueCount > 0 || staleCount > 0) && (
-        <div style={{ fontSize: 12, color: 'var(--red)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
-          <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 4 }} />需关注：
+        <div className="text-[12px] text-destructive bg-[var(--terra-soft)] border border-solid border-[var(--terra-line)] rounded-[8px] py-[6px] px-[10px] mb-2">
+          <AlertTriangle size={13} className="align-[-2px] mr-1" />需关注：
           {overdueCount > 0 && <b>{overdueCount} 项过期</b>}
           {overdueCount > 0 && staleCount > 0 && ' · '}
           {staleCount > 0 && <b>{staleCount} 项卡住（放置 ≥{STALE_DAYS} 天未推进）</b>}
         </div>
       )}
       {tasks.length === 0 ? (
-        <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>
+        <div className="text-muted-foreground text-[13px] py-2">
           暂无任务。到「会议纪要」生成纪要并点「确认」，其待办会自动出现在这里。
         </div>
       ) : (
@@ -107,50 +107,48 @@ export default function TaskBoardPanel({
                   {col.label}（{items.length}）
                 </div>
                 {items.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--mut)', padding: '6px 0' }}>—</div>
+                  <div className="text-[12px] text-muted-foreground py-[6px]">—</div>
                 )}
                 {items.map((t) => {
                   const over = isOverdue(t.due, t.status)
                   return (
                     <div
                       key={t.id}
-                      style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '8px 10px', marginTop: 6, background: 'var(--panel2)' }}
+                      className="border border-solid border-input rounded-[8px] py-2 px-[10px] mt-[6px] bg-popover"
                     >
-                      <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{t.task_title}</div>
-                      <div style={{ fontSize: 11, color: over ? 'var(--red)' : 'var(--mut)', marginTop: 3 }}>
+                      <div className="text-[12.5px] text-foreground">{t.task_title}</div>
+                      <div className={`text-[11px] mt-[3px] ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
                         {t.owner_name && (
-                          <span><User size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{t.owner_name}{'　'}</span>
+                          <span><User size={11} className="align-[-1px] mr-[3px]" />{t.owner_name}{'　'}</span>
                         )}
                         {t.due && (
                           <span>
                             {over
-                              ? <AlertTriangle size={11} style={{ verticalAlign: -1, marginRight: 3 }} />
-                              : <Clock size={11} style={{ verticalAlign: -1, marginRight: 3 }} />}
+                              ? <AlertTriangle size={11} className="align-[-1px] mr-[3px]" />
+                              : <Clock size={11} className="align-[-1px] mr-[3px]" />}
                             {t.due}
                             {over ? '（已过期）' : ''}
                           </span>
                         )}
                         {isStale(t) && (
-                          <span style={{ color: 'var(--terra)' }}>{'　'}<Snail size={11} style={{ verticalAlign: -1, marginRight: 3 }} />卡住 {ageDays(t.created_at)} 天</span>
+                          <span className="text-primary">{'　'}<Snail size={11} className="align-[-1px] mr-[3px]" />卡住 {ageDays(t.created_at)} 天</span>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <div className="flex gap-[6px] mt-[6px]">
                         {col.key !== 'todo' && (
                           <button
-                            className="anbtn"
+                            className="anbtn text-[11px]"
                             disabled={busy === t.id}
                             onClick={() => move(t.id, col.key === 'done' ? 'doing' : 'todo')}
-                            style={{ fontSize: 11 }}
                           >
                             ← 退回
                           </button>
                         )}
                         {col.key !== 'done' && (
                           <button
-                            className="anbtn"
+                            className="anbtn text-[11px]"
                             disabled={busy === t.id}
                             onClick={() => move(t.id, col.key === 'todo' ? 'doing' : 'done')}
-                            style={{ fontSize: 11 }}
                           >
                             {col.key === 'todo' ? '→ 进行中' : '→ 完成'}
                           </button>

@@ -32,13 +32,13 @@ export default function SlangDictPanel({ projectId }: { projectId: number | null
 
   return (
     <div className="card mt">
-      <div className="ct" style={{ cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
+      <div className="ct cursor-pointer" onClick={() => setOpen((o) => !o)}>
         {open ? '▾' : '▸'} 甲方诉求词典（黑话翻译）
         <span className="statpill demo">原话→真实含义/影响/动作</span>
       </div>
       {open && (
         <>
-          <div className="pathin" style={{ marginTop: 6 }}>
+          <div className="pathin mt-[6px]">
             <input
               value={q}
               placeholder="输入甲方原话关键词，如「高端大气」「国际化」…（留空看全部）"
@@ -49,16 +49,16 @@ export default function SlangDictPanel({ projectId }: { projectId: number | null
               查
             </span>
           </div>
-          <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+          <div className="mt-2 grid gap-[6px]">
             {loaded && items.length === 0 && (
-              <div style={{ fontSize: 12, color: 'var(--mut)' }}>无匹配词条。</div>
+              <div className="text-[12px] text-muted-foreground">无匹配词条。</div>
             )}
             {items.map((e, i) => (
-              <div key={i} style={{ fontSize: 12.5, padding: '6px 8px', background: 'var(--panel2)', borderRadius: 8 }}>
+              <div key={i} className="text-[12.5px] py-[6px] px-2 bg-popover rounded-[8px]">
                 <div><b>{e.term}</b></div>
-                <div style={{ color: 'var(--ink2)', marginTop: 2 }}>含义：{e.meaning}</div>
-                <div style={{ color: 'var(--mut)', marginTop: 1 }}>影响：{e.impact}</div>
-                <div style={{ color: 'var(--terra)', marginTop: 1 }}>建议：{e.action}</div>
+                <div className="text-secondary-foreground mt-[2px]">含义：{e.meaning}</div>
+                <div className="text-muted-foreground mt-px">影响：{e.impact}</div>
+                <div className="text-primary mt-px">建议：{e.action}</div>
               </div>
             ))}
           </div>

@@ -26,7 +26,7 @@ export default function StageProgressPanel({ projectId }: { projectId: number | 
 
   return (
     <div className="card mt">
-      <div className="ct" style={{ marginBottom: 8 }}>
+      <div className="ct mb-2">
         工作流·下一步建议{' '}
         <span className="statpill demo">
           认知阶段 {sp.done_count}/{sp.total_cognition_stages} · 当前：{curLabel}
@@ -34,18 +34,16 @@ export default function StageProgressPanel({ projectId }: { projectId: number | 
       </div>
 
       {/* 16 节点进度条:done=实心,认知未完成=空心,纯过程=点 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+      <div className="flex flex-wrap gap-1 mb-[10px]">
         {sp.nodes.map((n) => (
           <span
             key={n.stage}
             title={`${n.label}${n.kind === 'cognition' ? (n.done ? '·已完成' : '·待完成') : '·过程节点'}`}
+            className="text-[11px] py-[2px] px-2 rounded-[10px] border border-solid"
             style={{
-              fontSize: 11,
-              padding: '2px 8px',
-              borderRadius: 10,
               background: n.done ? 'var(--terra)' : 'var(--panel2)',
               color: n.done ? '#fff' : n.kind === 'cognition' ? 'var(--ink)' : 'var(--mut)',
-              border: n.stage === sp.current_stage ? '1px solid var(--terra)' : '1px solid transparent',
+              borderColor: n.stage === sp.current_stage ? 'var(--terra)' : 'transparent',
             }}
           >
             {n.label}
@@ -54,18 +52,18 @@ export default function StageProgressPanel({ projectId }: { projectId: number | 
       </div>
 
       {ready.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 4 }}>
-            <CheckCircle2 size={13} style={{ verticalAlign: -2, marginRight: 4, color: 'var(--ok)' }} />可推进（上游已就绪）：
+        <div className="mb-2">
+          <div className="text-[12px] text-secondary-foreground mb-1">
+            <CheckCircle2 size={13} className="align-[-2px] mr-1 text-brand-green" />可推进（上游已就绪）：
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div className="flex flex-wrap gap-[6px]">
             {ready.map((s) => (
-              <span key={s.stage} className="statpill live" style={{ fontSize: 11.5 }}>
+              <span key={s.stage} className="statpill live text-[11.5px]">
                 {s.label}
               </span>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
+          <div className="text-[11px] text-muted-foreground mt-1">
             到「项目结构化认知」对应模块点「AI 抽取」即可推进（逐步触发，不自动串跑）。
           </div>
         </div>
@@ -73,12 +71,12 @@ export default function StageProgressPanel({ projectId }: { projectId: number | 
 
       {blocked.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 4 }}>
-            <Hourglass size={13} style={{ verticalAlign: -2, marginRight: 4 }} />待上游：
+          <div className="text-[12px] text-secondary-foreground mb-1">
+            <Hourglass size={13} className="align-[-2px] mr-1" />待上游：
           </div>
-          <div style={{ display: 'grid', gap: 3 }}>
+          <div className="grid gap-[3px]">
             {blocked.map((s) => (
-              <div key={s.stage} style={{ fontSize: 11.5, color: 'var(--mut)' }}>
+              <div key={s.stage} className="text-[11.5px] text-muted-foreground">
                 {s.label} — 需先完成：{s.blocked_by.map(labelOf).join('、')}
               </div>
             ))}

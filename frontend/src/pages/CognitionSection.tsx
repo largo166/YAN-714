@@ -76,22 +76,22 @@ export default function CognitionSection({ projectId }: { projectId: number | nu
   return (
     <div className="mt">
       {mods.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 2, alignItems: 'center' }}>
+        <div className="flex flex-wrap gap-[6px] mb-[2px] items-center">
           {mods.map((m) => (
             <button
               key={m.module}
-              className={'anbtn' + (m.module === active ? ' on' : '')}
+              className={'anbtn text-[12px]' + (m.module === active ? ' on' : '')}
               style={
                 m.module === active
-                  ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.45)', color: '#cfc6ff', fontSize: 12 }
-                  : { fontSize: 12 }
+                  ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.45)', color: '#cfc6ff' }
+                  : undefined
               }
               onClick={() => setActive(m.module)}
             >
               {m.label}
             </button>
           ))}
-          <span style={{ flex: 1 }} />
+          <span className="flex-1" />
           {/* 一键解读全部模块:点一次跑完整行,不必逐个切 tab 单独点 */}
           <button
             className="btn"
@@ -104,7 +104,7 @@ export default function CognitionSection({ projectId }: { projectId: number | nu
         </div>
       )}
       {progress && (
-        <div style={{ fontSize: 12, color: running ? 'var(--terra)' : 'var(--mut)', margin: '4px 2px' }}>{progress}</div>
+        <div className="text-[12px] my-1 mx-[2px]" style={{ color: running ? 'var(--terra)' : 'var(--mut)' }}>{progress}</div>
       )}
       {/* key 含 refreshKey:批量跑完后强制重挂当前卡,拉取最新认知 */}
       <BriefCognitionCard key={`${active}-${refreshKey}`} projectId={projectId} module={active} label={activeLabel} />

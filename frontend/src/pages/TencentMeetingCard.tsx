@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { Video } from 'lucide-react'
+
 import { api } from '@/lib/api'
 import type { Meeting } from '@/types/schemas'
 
@@ -74,7 +76,7 @@ export default function TencentMeetingCard({ projectId }: { projectId: number | 
     return (
       <div className="card mt">
         <div className="ct">腾讯会议</div>
-        <div style={{ color: 'var(--mut)', fontSize: 13, padding: '8px 0' }}>请先选择一个项目。</div>
+        <div className="text-muted-foreground text-[13px] py-2">请先选择一个项目。</div>
       </div>
     )
   }
@@ -84,26 +86,26 @@ export default function TencentMeetingCard({ projectId }: { projectId: number | 
       <div className="ct">
         腾讯会议 <span className="statpill live">一键创建</span>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
+      <div className="text-[12px] text-muted-foreground mb-2">
         一键创建真实腾讯会议，自动生成会议号与入会链接（未配置时不可用、不伪造链接）。
       </div>
       <button className="btn" title="一键创建腾讯会议" disabled={busy} onClick={createOne}>
         {busy ? '创建中…' : '一键创建'}
       </button>
 
-      {msg && <div style={{ color: 'var(--ok)', fontSize: 12.5, marginTop: 8 }}>{msg}</div>}
-      {err && <div style={{ color: 'var(--red)', fontSize: 12.5, marginTop: 8 }}>{err}</div>}
+      {msg && <div className="text-brand-green text-[12.5px] mt-2">{msg}</div>}
+      {err && <div className="text-destructive text-[12.5px] mt-2">{err}</div>}
 
       {meetings.length > 0 && (
-        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="mt-3 flex flex-col gap-[6px]">
           {meetings.map((m) => (
-            <div key={m.id} style={{ padding: '8px 10px', border: '1px solid var(--line2)', borderRadius: 8, fontSize: 12.5 }}>
-              <div style={{ fontWeight: 600 }}>
-                📹 会议号 {m.tencent_meeting_code}
-                <span style={{ fontSize: 11, color: 'var(--mut)' }}> · {m.tencent_start_time || m.meeting_date}</span>
+            <div key={m.id} className="py-2 px-[10px] border border-solid border-input rounded-[8px] text-[12.5px]">
+              <div className="font-semibold">
+                <Video size={13} className="align-[-2px] mr-1" />会议号 {m.tencent_meeting_code}
+                <span className="text-[11px] text-muted-foreground"> · {m.tencent_start_time || m.meeting_date}</span>
               </div>
-              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <a href={m.tencent_join_url} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>
+              <div className="mt-1 flex items-center gap-[6px] flex-wrap">
+                <a href={m.tencent_join_url} target="_blank" rel="noreferrer" className="break-all">
                   {m.tencent_join_url}
                 </a>
                 <button className="anbtn" onClick={() => copy(m.tencent_join_url)}>复制链接</button>

@@ -35,14 +35,14 @@ export default function CrossProjectLibrary() {
 
   return (
     <div className="card mt">
-      <div className="ct" style={{ marginBottom: 8 }}>
+      <div className="ct mb-2">
         跨项目复用库（B1–B6）{' '}
         <span className="statpill demo">{total} 条已沉淀</span>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+      <div className="flex flex-wrap gap-[6px] mb-2">
         <button
-          className="anbtn"
-          style={active === null ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.55)', color: '#cfc4ff', fontSize: 12 } : { fontSize: 12 }}
+          className="anbtn text-[12px]"
+          style={active === null ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.55)', color: '#cfc4ff' } : undefined}
           onClick={() => setActive(null)}
         >
           全部
@@ -50,8 +50,8 @@ export default function CrossProjectLibrary() {
         {types.map((t) => (
           <button
             key={t.type}
-            className="anbtn"
-            style={active === t.type ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.55)', color: '#cfc4ff', fontSize: 12 } : { fontSize: 12 }}
+            className="anbtn text-[12px]"
+            style={active === t.type ? { background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.55)', color: '#cfc4ff' } : undefined}
             onClick={() => setActive(t.type)}
           >
             {t.label}（{t.count}）
@@ -59,19 +59,19 @@ export default function CrossProjectLibrary() {
         ))}
       </div>
       {items.length === 0 ? (
-        <div style={{ color: 'var(--mut)', fontSize: 13 }}>
+        <div className="text-muted-foreground text-[13px]">
           暂无沉淀条目。在项目中心确认某模块认知后，点「沉淀到跨项目库」，这条经验就能被其它项目复用。
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 6 }}>
+        <div className="grid gap-[6px]">
           {items.map((it) => (
-            <div key={it.document_id} style={{ fontSize: 12.5, padding: '6px 8px', background: 'var(--panel2)', borderRadius: 8 }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span className="statpill demo" style={{ fontSize: 10 }}>{it.label}</span>
+            <div key={it.document_id} className="text-[12.5px] py-[6px] px-2 bg-popover rounded-[8px]">
+              <div className="flex gap-[6px] items-center">
+                <span className="statpill demo text-[10px]">{it.label}</span>
                 <b>{it.title}</b>
               </div>
-              <div style={{ color: 'var(--ink2)', marginTop: 2 }}>{it.description || it.snippet}</div>
-              {it.resource && <div style={{ color: 'var(--mut)', fontSize: 11, marginTop: 2 }}>{it.resource}</div>}
+              <div className="text-secondary-foreground mt-[2px]">{it.description || it.snippet}</div>
+              {it.resource && <div className="text-muted-foreground text-[11px] mt-[2px]">{it.resource}</div>}
             </div>
           ))}
         </div>

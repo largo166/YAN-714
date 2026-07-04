@@ -118,7 +118,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
   return (
     <div className="card mt">
       {/* tab 行 + 前期分析总按钮 */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
+      <div className="flex gap-[6px] flex-wrap mb-[10px] items-center">
         {ANALYSIS_TASKS.map((t) => (
           <button
             key={t.key}
@@ -131,7 +131,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
             {byTask[t.key]?.status === 'ok' ? ' ✓' : ''}
           </button>
         ))}
-        <span style={{ flex: 1 }} />
+        <span className="flex-1" />
         <button
           className="btn"
           disabled={projectId == null || batchRunning}
@@ -142,25 +142,25 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
         </button>
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
+      <div className="text-[12px] text-muted-foreground mb-2">
         研判基于「本项目已解析文件 + 知识库检索」生成，每条结论都带出处。
       </div>
       {progress && (
-        <div style={{ fontSize: 12, color: batchRunning ? 'var(--terra)' : 'var(--mut)', marginBottom: 8 }}>{progress}</div>
+        <div className="text-[12px] mb-2" style={{ color: batchRunning ? 'var(--terra)' : 'var(--mut)' }}>{progress}</div>
       )}
-      {err && <div style={{ color: 'var(--red)', fontSize: 12.5, marginBottom: 8 }}>{err}</div>}
+      {err && <div className="text-destructive text-[12.5px] mb-2">{err}</div>}
 
       {/* 当前 tab 的研判结果(来自缓存,秒显) */}
       {current ? (
-        <div style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '12px 14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <b style={{ fontSize: 14 }}>
+        <div className="border border-solid border-input rounded-[8px] py-3 px-[14px]">
+          <div className="flex justify-between items-center mb-2">
+            <b className="text-[14px]">
               {taskLabel(current.task)}{' '}
               <span className={'statpill ' + (STATUS_HINT[current.status]?.cls ?? 'demo')}>
                 {STATUS_HINT[current.status]?.text ?? current.status}
               </span>
             </b>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div className="flex gap-[6px]">
               <button className="anbtn" disabled={runningTask === active || batchRunning} onClick={() => regenerate(active)}
                       title="忽略缓存,重新调用 AI 生成">
                 {runningTask === active ? '生成中…' : '重新生成'}
@@ -170,7 +170,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
                   <button className="anbtn" disabled={reflowing} onClick={reflow} title="把这次研判结论回写数据基地,供其它项目检索复用">
                     {reflowing ? '回流中…' : '回流入库'}
                   </button>
-                  <a className="anbtn" href={api.analysisExportUrl(projectId as number, current.id)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                  <a className="anbtn no-underline" href={api.analysisExportUrl(projectId as number, current.id)} target="_blank" rel="noreferrer">
                     导出 MD
                   </a>
                 </>
@@ -178,7 +178,7 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
             </div>
           </div>
 
-          {reflowNote && <div style={{ fontSize: 11.5, color: 'var(--mut)', marginBottom: 8 }}>{reflowNote}</div>}
+          {reflowNote && <div className="text-[11.5px] text-muted-foreground mb-2">{reflowNote}</div>}
 
           {/* 研判正文：结构化判断优先(核心判断/关键要点/下一步/待确认)；
               无结构化(回落纯文本/旧记录)→ 清洗 markdown 渲染,长文核心优先+折叠 */}
@@ -199,18 +199,18 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
           })()}
 
           {current.status === 'ok' && current.sources.length > 0 && (
-            <div style={{ marginTop: 12, borderTop: '1px dashed var(--line2)', paddingTop: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mut)', marginBottom: 6 }}>出处（{current.sources.length}）</div>
+            <div className="mt-3 border-t border-dashed border-input pt-2">
+              <div className="text-[12px] font-semibold text-muted-foreground mb-[6px]">出处（{current.sources.length}）</div>
               {/* 出处=可追溯凭证,不是阅读材料:只列徽章+文件名,原文片段仅悬停可查(不渲染原文碎片) */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div className="flex flex-wrap gap-[6px]">
                 {current.sources.map((s, i) => (
                   <span
                     key={i}
                     title={(s.snippet || '').slice(0, 300)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', fontSize: 11.5, color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 8, padding: '3px 8px' }}
+                    className="inline-flex items-center gap-[6px] max-w-full text-[11.5px] text-muted-foreground border border-solid border-input rounded-[8px] py-[3px] px-2"
                   >
                     <span className="pill l">{s.kind === 'project_file' ? '项目文件' : '知识库'}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                    <span className="truncate">{s.title}</span>
                   </span>
                 ))}
               </div>
@@ -218,9 +218,9 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
           )}
         </div>
       ) : (
-        <div style={{ border: '1px dashed var(--line2)', borderRadius: 8, padding: '14px', fontSize: 13, color: 'var(--mut)' }}>
+        <div className="border border-dashed border-input rounded-[8px] p-[14px] text-[13px] text-muted-foreground">
           「{taskLabel(active)}」尚未生成。点上方「✦ 前期分析」一次生成全部,或点
-          <button className="anbtn" disabled={projectId == null || runningTask === active || batchRunning} onClick={() => regenerate(active)} style={{ margin: '0 6px' }}>
+          <button className="anbtn my-0 mx-[6px]" disabled={projectId == null || runningTask === active || batchRunning} onClick={() => regenerate(active)}>
             {runningTask === active ? '生成中…' : '单独生成本项'}
           </button>
           。
