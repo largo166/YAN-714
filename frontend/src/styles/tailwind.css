@@ -1,0 +1,57 @@
+/* Tailwind 基座入口(P0 通电,2026-07-05)。
+   preflight 已关(tailwind.config.js corePlugins)——防全局 reset 砸烂 legacy-ui.css 现有页面。
+   本文件同时是 shadcn 变量桥:把 DESIGN.md / legacy-ui.css 的建筑审美 token 映射成 shadcn HSL 语义变量。
+   色值唯一来源=legacy-ui.css :root(浅色回退)与 body.darkui(暗色,全站现行);改色先改 legacy token 再同步此处,
+   禁止在组件里私设颜色。 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 浅色回退主题(对应 legacy :root:奶白纸感 + 陶土橙 terra) */
+    --background: 48 33% 97%;
+    --foreground: 45 8% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 45 8% 10%;
+    --popover: 50 50% 98%;
+    --popover-foreground: 45 8% 10%;
+    --primary: 24 54% 49%;            /* --terra #c2703a */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 50 50% 98%;
+    --secondary-foreground: 45 9% 34%;
+    --muted: 46 30% 89%;
+    --muted-foreground: 47 9% 50%;    /* --mut */
+    --accent: 24 53% 96%;             /* --terra-soft */
+    --accent-foreground: 24 54% 49%;
+    --destructive: 5 41% 50%;         /* --red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 46 30% 89%;             /* --line */
+    --input: 47 26% 87%;              /* --line2 */
+    --ring: 24 54% 49%;
+    --radius: 0.625rem;               /* 10px,按钮标尺 v2(DESIGN.md 第 2 节) */
+  }
+
+  body.darkui {
+    /* 暗色主题(全站现行,对应 body.darkui:深空底 + 紫电主色) */
+    --background: 228 26% 4%;         /* --bg #07080c */
+    --foreground: 42 31% 94%;         /* --ink #f4f1ea */
+    --card: 228 22% 9%;               /* --panel #12141c */
+    --card-foreground: 42 31% 94%;
+    --popover: 225 24% 7%;            /* --panel2 #0d0f15 */
+    --popover-foreground: 42 31% 94%;
+    --primary: 252 100% 68%;          /* --terra(暗色下=紫 #7c5cff) */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 225 24% 7%;
+    --secondary-foreground: 40 10% 76%; /* --ink2 */
+    --muted: 228 6% 15%;
+    --muted-foreground: 223 10% 59%;  /* --mut #8b91a0 */
+    --accent: 246 33% 18%;            /* 紫 14% 混 panel(选中态,同 rgba(124,92,255,.14)) */
+    --accent-foreground: 252 100% 82%;
+    --destructive: 357 100% 71%;      /* --red #ff6b73 */
+    --destructive-foreground: 228 26% 4%;
+    --border: 228 7% 12%;             /* --line rgba(255,255,255,.09) 混底不透明化 */
+    --input: 228 6% 15%;              /* --line2 */
+    --ring: 252 100% 68%;
+  }
+}

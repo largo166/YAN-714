@@ -50,6 +50,11 @@ line rgba(255,255,255,.08)   glass linear-gradient(145deg,rgba(255,255,255,.07),
 - **主渐变唯一**:`linear-gradient(135deg,#7c5cff,#42a5ff)`(主按钮/选中态/进度)。
 - 语义色:红=风险/危险,琥珀=待办/警示,青=纪要/检索命中,金=下一节点/仓库/管理员,绿=健康/在线。
 - 装饰性配色向紫蓝收敛;**一屏内热色(红/琥珀/金)只做强调,不并排铺满**。
+- **样式基座(P0 通电,2026-07-05)**:Tailwind + shadcn 已接电——变量桥在 `src/styles/tailwind.css`,
+  把本节 token 映射成 shadcn HSL 语义变量(`--primary`=紫 7c5cff/`--card`=panel/`--border`=line 等,
+  浅色回退=legacy `:root` 陶土橙系);**preflight 保持关闭**直到 legacy-ui.css 清退(P3),
+  darkMode 由 `.darkui` 驱动;新组件一律走 Tailwind+shadcn(`src/components/ui/`),颜色只准引语义变量,
+  禁止私设色值;`--radius: 10px` 对齐按钮标尺 v2。
 
 ## 4. 卡片与圆角
 
