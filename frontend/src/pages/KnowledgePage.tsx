@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Files, FolderOpen, Search, Zap, ZoomIn } from 'lucide-react'
 
 import { api, type FileAsset } from '@/lib/api'
+import BoardBackdrop from '@/lib/BoardBackdrop'
 import { CountNum, useCountUp } from '@/lib/useCountUp'
 import { useProject } from '@/contexts/useProject'
 import { renderInline } from '@/components/RichText'
@@ -486,6 +487,10 @@ export default function KnowledgePage() {
           </div>
         </div>
       )}
+      {/* HERO 区:板块动态背景(数据流)只罩 头部+库存脉搏/检索 双卡(按小样,不铺全页) */}
+      <section style={{ position: 'relative' }}>
+        <BoardBackdrop mode="streams" />
+        <div style={{ position: 'relative', zIndex: 1 }}>
       <div className="ptitle">
         <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>数据基地</h1>
         <span className="statpill live" style={{ marginLeft: 8 }}>本地索引 · 已接入</span>
@@ -495,7 +500,8 @@ export default function KnowledgePage() {
       {/* HERO：库存脉搏(索引完成率环 + reindex) + 全文检索 */}
       <GroupLabel hint="读进来 → 索引 → 查得到">库存脉搏 · 检索</GroupLabel>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)', gap: 16 }}>
-        <div className="ckcard" style={{ padding: 20, display: 'grid', gridTemplateColumns: '148px 1fr', gap: 18, alignItems: 'center', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.24)' } as React.CSSProperties}>
+        <div className="gshell">
+          <div className="gshell-in" style={{ padding: 20, display: 'grid', gridTemplateColumns: '148px 1fr', gap: 18, alignItems: 'center' }}>
           <Gauge pct={idxPct} label="索引完成率" color={C.purple} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -508,6 +514,7 @@ export default function KnowledgePage() {
               <button type="button" onClick={doReindex} disabled={reindexing} style={{ fontFamily: 'inherit', cursor: reindexing ? 'default' : 'pointer', fontSize: 12, color: '#c8bcff', border: '1px solid rgba(124,92,255,.4)', background: 'rgba(124,92,255,.1)', borderRadius: 9, padding: '6px 12px' }}>{reindexing ? '重建中…' : '⟳ 重建索引'}</button>
             </div>
             {reindexMsg && <div style={{ fontSize: 11.5, color: C.mut, marginTop: 6 }}>{reindexMsg}</div>}
+          </div>
           </div>
         </div>
 
@@ -543,6 +550,8 @@ export default function KnowledgePage() {
           )}
         </div>
       </div>
+        </div>
+      </section>
 
       {/* ① 读取与整理：状态机发光管线 + 选择/整理 + 收件箱 */}
       <GroupLabel hint="本地来源 → 一键整理入库 · 收件箱自动入库">① 读取与整理</GroupLabel>

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Archive, Zap } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import BoardBackdrop from '@/lib/BoardBackdrop'
 import { SkillGlyph } from '@/lib/icons'
 import { useProject } from '@/contexts/useProject'
 import RichText from '@/components/RichText'
@@ -306,8 +307,9 @@ export default function CampPage() {
       <button type="button" onClick={() => setTab(key)} style={{ fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px 11px', fontSize: 14, fontWeight: 700, border: 'none', color: tab === key ? '#fff' : C.mut, background: tab === key ? 'linear-gradient(180deg,rgba(124,92,255,.26),rgba(124,92,255,.04))' : 'transparent', borderRadius: '14px 14px 0 0', borderBottom: tab === key ? '2px solid ' + C.purple : '2px solid transparent' }}>{icon} {label}</button>
     )
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-        <div style={{ width: '100%', maxWidth: 760 }}>
+      <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+        <BoardBackdrop mode="sparks" />
+        <div style={{ width: '100%', maxWidth: 760, position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 30 }}>
             <BrandMark size={46} />
             <div style={{ display: 'flex', alignItems: 'flex-start' }}>

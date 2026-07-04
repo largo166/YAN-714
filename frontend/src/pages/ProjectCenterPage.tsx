@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Calendar, FileAudio, FileText, ListChecks, RefreshCw } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import BoardBackdrop from '@/lib/BoardBackdrop'
 import { CountNum, useCountUp } from '@/lib/useCountUp'
 import { useProject } from '@/contexts/useProject'
 import type {
@@ -247,6 +248,10 @@ export default function ProjectCenterPage() {
           {!dropping && <button type="button" onClick={() => setDropMsg(null)} style={{ background: 'transparent', border: 0, color: C.mut, cursor: 'pointer', fontSize: 14 }}>✕</button>}
         </div>
       )}
+      {/* HERO 区:板块动态背景(点阵波场)只罩 头部+HERO 卡+KPI 带(按小样,不铺全页) */}
+      <section style={{ position: 'relative' }}>
+        <BoardBackdrop mode="dots" />
+        <div style={{ position: 'relative', zIndex: 1 }}>
       {/* HEADER：项目下拉 / 改名 / chip */}
       <div className="ptitle">
         <h1 style={{ background: 'linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>项目中心</h1>
@@ -295,15 +300,17 @@ export default function ProjectCenterPage() {
 
       {/* HERO：项目脉搏卡（环形仪表 + 阶段 + 下一节点 + 迷你统计）+ 本周聚焦卡（真实聚合，可点跳转） */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', gap: 16, marginBottom: 14 }}>
-        <div className="ckcard" style={{ padding: 20, display: 'grid', gridTemplateColumns: '156px 1fr', gap: 18, alignItems: 'center', ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.26)' } as React.CSSProperties}>
-          <Gauge pct={progress?.pct ?? 0} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{cur ? (STAGE_CHIP[cur.status] ?? cur.status) : '—'}</div>
-            <div style={{ fontSize: 12, color: C.gold, marginTop: 6, lineHeight: 1.5 }}>{nextNode}</div>
-            <div style={{ display: 'flex', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
-              {mini(overview ? <CountNum n={overview.files} /> : '—', '文件')}
-              {mini(overview ? <CountNum n={overview.meetings} /> : '—', '会议')}
-              {mini(overview ? <CountNum n={overview.minutes} /> : '—', '会议纪要')}
+        <div className="gshell">
+          <div className="gshell-in" style={{ padding: 20, display: 'grid', gridTemplateColumns: '156px 1fr', gap: 18, alignItems: 'center' }}>
+            <Gauge pct={progress?.pct ?? 0} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{cur ? (STAGE_CHIP[cur.status] ?? cur.status) : '—'}</div>
+              <div style={{ fontSize: 12, color: C.gold, marginTop: 6, lineHeight: 1.5 }}>{nextNode}</div>
+              <div style={{ display: 'flex', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
+                {mini(overview ? <CountNum n={overview.files} /> : '—', '文件')}
+                {mini(overview ? <CountNum n={overview.meetings} /> : '—', '会议')}
+                {mini(overview ? <CountNum n={overview.minutes} /> : '—', '会议纪要')}
+              </div>
             </div>
           </div>
         </div>
@@ -333,6 +340,8 @@ export default function ProjectCenterPage() {
         <Kpi icon={<AlertTriangle size={13} />} label="风险" value={overview ? <CountNum n={overview.risks} /> : '—'} color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.26)" />
         <Kpi icon={<RefreshCw size={13} />} label="可复用资产" value={overview ? <CountNum n={overview.assets} /> : '—'} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.22)" />
       </div>
+        </div>
+      </section>
 
       {/* 快速跳转 */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>

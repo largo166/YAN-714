@@ -706,7 +706,7 @@ body.darkui .gov button:hover{background:rgba(30,33,45,.96);color:#c8bcff}
 body.darkui button,body.darkui input,body.darkui textarea,body.darkui select{font-family:inherit}
 body.darkui .mono,body.darkui code,body.darkui pre{font-family:var(--font-mono)}
 body.darkui .serif{font-family:var(--font-sans)}
-body.darkui .ptitle h1{font-size:26px;font-weight:700;letter-spacing:-.03em}
+body.darkui .ptitle h1{font-size:32px;font-weight:600;letter-spacing:-.025em}
 body.darkui .sechead .stitle{font-weight:600}
 body.darkui .btn,body.darkui .anbtn{font-weight:600;letter-spacing:.01em}
 /* 暗色表单域：.ipt 与裸 input/textarea 原本吃浏览器默认白底 → 走深底 */
@@ -729,6 +729,10 @@ body.darkui .ckcard::after{content:"";position:absolute;right:-30px;top:-30px;wi
 body.darkui .ckcard>*{position:relative;z-index:1}
 body.darkui .ckcard:hover{transform:translateY(-3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 16px 40px rgba(0,0,0,.4);border-color:rgba(124,92,255,.4)}
 body.darkui .ckcard.flat::before{display:none}
+/* 渐变描边壳(FluidMatrix 招牌技法,按小样确认):外壳 1px 渐变细线(上亮下消),内容面内缩。
+   用于各板块 HERO 签名卡;内面半透明深底【不加 backdrop-filter】(常驻元素禁模糊,动态背景透出即可)。 */
+body.darkui .gshell{border-radius:18px;padding:1px;background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.03) 55%,rgba(124,92,255,.12))}
+body.darkui .gshell>.gshell-in{border-radius:17px;background:rgba(7,8,12,.72);height:100%}
 /* 弹层毛玻璃(借 Apple Liquid Glass 手法,只用在浮层不铺全页):遮罩加背景模糊,设置抽屉改半透明厚玻璃 */
 body.darkui .setmask,body.darkui .modal,body.darkui #pjPrev,body.darkui #skillAll,body.darkui .qrmask{backdrop-filter:blur(10px) saturate(120%)}
 body.darkui .setdrawer{background:rgba(10,12,18,.82);backdrop-filter:blur(26px) saturate(130%);border-left:1px solid rgba(255,255,255,.09)}

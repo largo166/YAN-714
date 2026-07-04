@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Building2, Cake, Megaphone } from 'lucide-react'
 
 import { api, type ClientPortrait } from '@/lib/api'
+import BoardBackdrop from '@/lib/BoardBackdrop'
 import type { Agent, TeamMember, TickerItem } from '@/types/schemas'
 
 /* 协作平台 · DC 暗色打磨（图标卡片/玻璃/霓虹）。数据全接真实后端（C4/C5），逻辑不动：
@@ -107,8 +108,12 @@ export default function HubPage() {
 
   return (
     <div style={{ color: C.ink }}>
+      {/* HERO 区:板块动态背景(轨道连线)只罩 头部+团队成员区(按小样,不铺全页) */}
+      <section style={{ position: 'relative' }}>
+        <BoardBackdrop mode="orbits" />
+        <div style={{ position: 'relative', zIndex: 1 }}>
       <header style={{ marginBottom: 22 }}>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: '-.03em' }}>协作平台</h1>
+        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-.025em' }}>协作平台</h1>
         <p style={{ margin: '8px 0 0', color: C.mut, fontSize: 13 }}>团队 / 智能助手 / 甲方画像 一屏协作 —— 谁在做什么、卡在哪，一眼可见。</p>
       </header>
 
@@ -194,10 +199,13 @@ export default function HubPage() {
           </div>
         ))}
       </div>
+        </div>
+      </section>
 
-      {/* 甲方画像库 */}
+      {/* 甲方画像库(签名卡:渐变描边壳) */}
       <SecLabel title="甲方画像库" sub="同一甲方的项目 / 诉求 / 历史，一处聚合（只汇入已确认的认知）" />
-      <div style={{ ...cardBase, padding: 18, marginBottom: 28 }}>
+      <div className="gshell" style={{ marginBottom: 28 }}>
+        <div className="gshell-in" style={{ padding: 18 }}>
         {clients.length === 0 ? (
           <div style={{ color: C.mut, fontSize: 13 }}>暂无甲方。给项目填上「甲方」后，这里按甲方聚合其项目与诉求/历史。</div>
         ) : (
@@ -246,6 +254,7 @@ export default function HubPage() {
             )}
           </>
         )}
+        </div>
       </div>
 
       {/* 智能助手 */}

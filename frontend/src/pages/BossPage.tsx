@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Lock, Megaphone } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import BoardBackdrop from '@/lib/BoardBackdrop'
 import { CountNum } from '@/lib/useCountUp'
 import type { AiUsageItem, BossDashboard, Broadcast, WorkloadItem } from '@/types/schemas'
 
@@ -183,11 +184,12 @@ export default function BossPage() {
   // 未解锁:口令门禁(首次设置 / 输入口令)。数据在解锁前不拉取。
   if (gate !== 'open') {
     return (
-      <div style={{ ...fontWrap, display: 'grid', placeItems: 'center', minHeight: '58vh' }}>
+      <div style={{ ...fontWrap, position: 'relative', display: 'grid', placeItems: 'center', minHeight: '58vh' }}>
+        <BoardBackdrop mode="radar" />
         {gate === 'checking' ? (
-          <div style={{ color: C.mut, fontSize: 13 }}>正在检查权限…</div>
+          <div style={{ color: C.mut, fontSize: 13, position: 'relative', zIndex: 1 }}>正在检查权限…</div>
         ) : (
-          <div className="ckcard" style={{ width: 'min(380px, 92vw)', padding: '26px 26px 20px', ['--ac']: '#d7a86e', ['--gl']: 'rgba(215,168,110,.24)' } as React.CSSProperties}>
+          <div className="ckcard" style={{ width: 'min(380px, 92vw)', padding: '26px 26px 20px', position: 'relative', zIndex: 1, ['--ac']: '#d7a86e', ['--gl']: 'rgba(215,168,110,.24)' } as React.CSSProperties}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
               <span style={{ width: 38, height: 38, borderRadius: 12, background: `${C.gold}1f`, border: `1px solid ${C.gold}55`, color: C.gold, display: 'grid', placeItems: 'center' }}><Lock size={17} /></span>
               <div>
@@ -213,11 +215,15 @@ export default function BossPage() {
 
   return (
     <div style={fontWrap}>
+      {/* HERO 区:板块动态背景(雷达脉冲)只罩 头部+KPI 带(按小样,不铺全页) */}
+      <section style={{ position: 'relative' }}>
+        <BoardBackdrop mode="radar" />
+        <div style={{ position: 'relative', zIndex: 1 }}>
       {/* header */}
       <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 22 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: '-.03em' }}>管理驾驶舱</h1>
+            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-.025em' }}>管理驾驶舱</h1>
             <span style={{ fontSize: 11.5, color: C.gold, border: `1px solid ${C.gold}55`, background: `${C.gold}1a`, borderRadius: 99, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Lock size={11} /> 仅管理员可见</span>
           </div>
           <p style={{ margin: '8px 0 0', color: C.mut, fontSize: 13 }}>面向负责人的跨项目只读聚合 —— 进行中项目、交付节点、风险与 AI 产能一屏掌握。</p>
@@ -235,12 +241,16 @@ export default function BossPage() {
         <Kpi label="高风险项" value={dash ? <CountNum n={dash.high_risks} /> : '—'} caption="需负责人介入" color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.28)" />
         <Kpi label="AI 使用 · 本周" value={dash ? <CountNum n={dash.ai_usage_week} /> : '—'} caption="次成果生成" ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
       </section>
+        </div>
+      </section>
 
       {/* charts row */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18, marginBottom: 18 }}>
-        <div style={{ ...cardBase, padding: 20 }}>
-          <SectionTitle hint="按能力占比">AI 使用情况</SectionTitle>
-          <AiDonut items={aiUsage} />
+        <div className="gshell">
+          <div className="gshell-in" style={{ padding: 20 }}>
+            <SectionTitle hint="按能力占比">AI 使用情况</SectionTitle>
+            <AiDonut items={aiUsage} />
+          </div>
         </div>
         <div style={{ ...cardBase, padding: 20 }}>
           <SectionTitle hint="本周进行中任务">成员工作量 · 人工 / AI</SectionTitle>

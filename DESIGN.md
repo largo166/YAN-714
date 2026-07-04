@@ -20,7 +20,7 @@
 
 | 层级 | 规格 | 用途 |
 |---|---|---|
-| H1 页标题 | 26px / 700 / -0.03em | 每页一个;可配渐变文字 |
+| H1 页标题 | 32px / 600 / -0.025em | 每页一个;可配渐变文字(展示级纪律来自 FluidMatrix 规格) |
 | H2 区块标题 | 16–17px / 700 | GroupLabel / 卡片标题(白 #fff) |
 | 正文 | 13–13.5px / 400 | 行高 1.5–1.7 |
 | 辅助 | 11–12.5px / 400 | mut 色 |
@@ -59,6 +59,16 @@ line rgba(255,255,255,.08)   glass linear-gradient(145deg,rgba(255,255,255,.07),
 - 统一 **lucide 线性图标**(`lucide-react`,strokeWidth 1.8–2,尺寸 11–17px,继承文字色)。
 - 22 个技能图标走 `lib/icons.tsx` 的 `SkillGlyph` 映射(后端 icon 字段仅作 fallback)。
 - **禁止彩色 emoji**;单色字形(✦ ▸ ▾ ✕ ⟳ ←)可作装饰。
+
+## 6.5 板块动态背景(BoardBackdrop,按小样确认 2026-07)
+
+- 共享组件 `lib/BoardBackdrop.tsx`(Canvas2D,DPR≤2,指针轻视差,reduced-motion 全关)。
+- **同一紫蓝色调、五种形态**:项目中心=dots 点阵波场 / 数据基地=streams 数据流 /
+  共创营地=sparks 思维粒子 / 协作平台=orbits 轨道连线 / 管理驾驶舱=radar 雷达脉冲。
+- **只罩各页 HERO 区**(父容器 relative,内容自抬 zIndex:1),工作列表区禁用;低透明度(≤0.16α)。
+- **渐变描边壳 `.gshell`**(FluidMatrix 招牌技法):外壳 1px 上亮下消渐变细线,内面
+  `rgba(7,8,12,.72)` 半透明深底(**不加 backdrop-filter**,常驻禁模糊);用于各页 HERO 签名卡,
+  每页最多一处,与 ckcard 并存不混用。
 
 ## 7. 动效(三层,克制:只在入场与状态变化时动)
 
