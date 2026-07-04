@@ -433,6 +433,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk','Noto Ser
 .tickitem.bday{color:var(--terra)}
 .tickitem.bc{color:var(--ink2)}
 .tickitem .src{font-size:9px;border:1px solid var(--line2);border-radius:20px;padding:1px 6px;color:var(--mut)}
+/* 静默轮播(协作平台通知):单条淡入换条,仅透明度无位移(晕动症红线);.ticker/.ticktrack 老规则保留但页面已不引用 */
+.tickfade{animation:tickfade .4s ease both}
+@keyframes tickfade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion: reduce){.tickfade{animation:none}}
 @keyframes tickmove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
 /* ── AI 代理：竖向 composer + 工具条 + 拖拽 ── */
@@ -658,8 +662,9 @@ body.darkui::after{content:"";position:fixed;inset:-10% 0;pointer-events:none;z-
 @keyframes huddrift{from{background-position:0 0}to{background-position:48px 48px}}
 @keyframes hudsweep{from{transform:translateX(-2.5%)}to{transform:translateX(2.5%)}}
 body.darkui .topbar,body.darkui .wrap{position:relative;z-index:1}
-/* 层2(入场编排)：切板块时 ckcard 错峰渐入(60ms stagger,只播一次) */
+/* 层2(入场编排)：切板块时 ckcard 错峰渐入(60ms stagger,只播一次);gshell 同款入场(驾驶舱 KPI 带等签名卡) */
 body.darkui .page.on .ckcard{animation:ckin .5s cubic-bezier(.2,.7,.3,1) both}
+body.darkui .page.on .gshell{animation:ckin .5s cubic-bezier(.2,.7,.3,1) both}
 body.darkui .page.on .ckcard:nth-child(2){animation-delay:60ms}
 body.darkui .page.on .ckcard:nth-child(3){animation-delay:120ms}
 body.darkui .page.on .ckcard:nth-child(4){animation-delay:180ms}
@@ -673,7 +678,7 @@ body.darkui .gauge-anim{animation:gaugein .9s cubic-bezier(.25,.7,.3,1) both}
 @keyframes gaugein{from{--gp:0%}}
 /* 克制红线：用户偏好减少动效 → 全部静止(网格/光扫/入场/仪表) */
 @media (prefers-reduced-motion: reduce){
-  body.darkui::before,body.darkui::after,body.darkui .page.on .ckcard,body.darkui .gauge-anim{animation:none !important}
+  body.darkui::before,body.darkui::after,body.darkui .page.on .ckcard,body.darkui .page.on .gshell,body.darkui .gauge-anim{animation:none !important}
 }
 /* 顶栏 */
 body.darkui .topbar{background:rgba(3,4,6,.72);border-bottom-color:rgba(255,255,255,.07)}

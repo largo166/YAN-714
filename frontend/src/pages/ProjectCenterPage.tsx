@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { BookOpenText, BrainCircuit, FileText, ListChecks, SquareKanban, Video } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import BoardBackdrop from '@/lib/BoardBackdrop'
@@ -29,6 +30,18 @@ const STAGE_CHIP: Record<string, string> = {
 
 // 拖拽进项目中心可接入的可解析扩展(与营地/数据基地一致)
 const DROP_EXTS = ['.txt', '.md', '.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg']
+
+// 工作区键:六个工作面板收进底部 workzone,一次只开一个(每屏一个主角)
+type WsKey = 'tencent' | 'meeting' | 'tasks' | 'cognition' | 'analysis' | 'stage'
+
+const WS_META: Record<WsKey, { chain: string; title: string; hint: string }> = {
+  tencent: { chain: '会议链路', title: '腾讯会议', hint: '一键创建真实会议' },
+  meeting: { chain: '会议链路', title: '会议纪要', hint: '创建会议 / 上传材料 / 纪要回流' },
+  tasks: { chain: '会议链路', title: '任务看板', hint: '会议纪要待办 → 待办 / 进行中 / 已完成' },
+  cognition: { chain: '判断解析', title: '项目解读', hint: '任务书 / 场地 / 概念 … 一键 AI 解读' },
+  analysis: { chain: '判断解析', title: '智能研判', hint: '总览 / 难点 / 诉求 / 推进计划 / 汇报提纲' },
+  stage: { chain: '判断解析', title: '阶段拆解', hint: '阶段 → 节点 → 完成度' },
+}
 
 // DC 暗色基元（与 BossPage/CampPage/HubPage 同一套色板，跨页一致）
 const C = {
@@ -97,25 +110,27 @@ function Collapsible({
   )
 }
 
-/** 项目中心：单项目工作台（v2 版面：脉搏卡 + 本周聚焦卡 双 HERO + KPI 指标带 + 快速跳转 + 主/侧两栏 + 资料降权）。
- *  核心 = 前期判断解析 + 会议链路；资料读取/清理归数据基地（此处降权收底）。
- *  数据全接真实后端，逻辑不动；聚焦/迷你统计全部派生自已取的真实数据，不新增后端、不伪造。 */
+/** 项目中心：单项目工作台（v3 版面：脉搏卡 + 本周聚焦卡 双 HERO + 双链路入口卡 + workzone 工作区 + 主/侧两栏 + 资料降权）。
+ *  核心 = 会议链路 + 判断解析,以两张链路卡凸显;点 step tile 在下方 workzone 亮出面板(单开,每屏一个主角)。
+ *  数据全接真实后端，逻辑不动；徽章/聚焦/迷你统计全部派生自已取的真实数据，不新增后端、不伪造。 */
 export default function ProjectCenterPage() {
   const { projects, curId, setCurId, cur, err, reload } = useProject()
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const [renameErr, setRenameErr] = useState<string | null>(null)
-  // 折叠状态(首屏减负,2026-07)：默认只展开三件核心事(会议纪要/任务看板/项目解读);
-  // 腾讯会议/智能研判/阶段拆解/资料 折叠待点——内容都在,版面只给核心。
-  const [open, setOpen] = useState<Record<string, boolean>>({
-    meeting: true, tasks: true, cognition: true,
-  })
-  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
+  // 工作区(改版 2026-07):首屏只见 HERO+双链路入口卡,点 tile 才在下方 workzone 亮出对应面板;
+  // 面板恒挂载仅 display:none 切换(与旧 .secbody 收起严格等价,保 onRisk/refreshKey 数据流)。
+  const [activeWs, setActiveWs] = useState<WsKey | null>(null)
+  const [filesOpen, setFilesOpen] = useState(false)
+  const [wsOpen, setWsOpen] = useState(false)
+  const openWs = (k: WsKey) => {
+    setActiveWs((p) => (p === k ? null : k))
+    setTimeout(() => document.getElementById('workzone')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40)
+  }
 
-  // 跳转锚点：展开目标块（如需）后平滑滚动到位
-  const jump = (anchorId: string, openKey?: string) => {
-    if (openKey) setOpen((o) => ({ ...o, [openKey]: true }))
+  // 跳转锚点：平滑滚动到位(仅剩 side-* 锚点使用)
+  const jump = (anchorId: string) => {
     setTimeout(() => document.getElementById(anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40)
   }
 
@@ -177,15 +192,38 @@ export default function ProjectCenterPage() {
   const focusItems = [
     highRisks.length > 0 && { dot: C.red, label: `高风险${highRisks[0] ? ' · ' + highRisks[0].text : ''}`, n: String(highRisks.length), go: '查看', onClick: () => jump('side-risks') },
     urgentMs.length > 0 && { dot: C.gold, label: `紧急里程碑${urgentMs[0] ? ' · ' + urgentMs[0].title : ''}`, n: String(urgentMs.length), go: '里程碑', onClick: () => jump('side-milestones') },
-    taskBad > 0 && { dot: C.amber, label: '过期 / 卡住任务', n: `${taskRisk.overdue} / ${taskRisk.stale}`, go: '任务看板', onClick: () => jump('sec-tasks', 'tasks') },
+    taskBad > 0 && { dot: C.amber, label: '过期 / 卡住任务', n: `${taskRisk.overdue} / ${taskRisk.stale}`, go: '任务看板', onClick: () => openWs('tasks') },
   ].filter(Boolean) as { dot: string; label: string; n: string; go: string; onClick: () => void }[]
 
   const mini = (n: React.ReactNode, label: string, color?: string) => (
     <div><div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{n}</div><div style={{ fontSize: 11, color: C.mut, marginTop: 2 }}>{label}</div></div>
   )
-  const jumpChip = (label: string, onClick: () => void) => (
-    <button key={label} type="button" onClick={onClick} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: C.ink2, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.04)', borderRadius: 99, padding: '5px 12px' }}>{label}</button>
-  )
+
+  // 双链路入口卡:徽章全派生自已取真实数据,数据未到不显徽章(三态诚实)。
+  // 项目解读不上徽章——后端 gaps 目前恒为 0(硬编码),不挂永不点亮的死徽章。
+  const CHAINS: {
+    title: string; sub: string; ac: string; gl: string; Icon: typeof Video; iconColor: string
+    steps: { ws: WsKey; Icon: typeof Video; t: string; hint: string; badge: string | null; tone?: string }[]
+  }[] = [
+    {
+      title: '会议链路', sub: '开会 → 纪要回流 → 待办追踪,一条不断',
+      ac: 'linear-gradient(90deg,#7c5cff,#42a5ff)', gl: 'rgba(124,92,255,.3)', Icon: Video, iconColor: '#c8bcff',
+      steps: [
+        { ws: 'tencent', Icon: Video, t: '腾讯会议', hint: '一键创建真实会议', badge: overview && overview.meetings > 0 ? `${overview.meetings} 场` : null },
+        { ws: 'meeting', Icon: FileText, t: '会议纪要', hint: '纪要生成 · 回流看板', badge: overview && overview.minutes > 0 ? `${overview.minutes} 条` : null, tone: '#36e6d4' },
+        { ws: 'tasks', Icon: SquareKanban, t: '任务看板', hint: '待办 / 进行中 / 已完成', badge: taskBad > 0 ? `⚠ ${taskBad}` : overview && overview.todos > 0 ? `${overview.todos} 待办` : null, tone: taskBad > 0 ? '#ff5e66' : undefined },
+      ],
+    },
+    {
+      title: '判断解析', sub: 'AI 解读 → 研判 → 阶段拆解',
+      ac: 'linear-gradient(90deg,#d7a86e,rgba(215,168,110,.25))', gl: 'rgba(215,168,110,.25)', Icon: BrainCircuit, iconColor: '#d7a86e',
+      steps: [
+        { ws: 'cognition', Icon: BookOpenText, t: '项目解读', hint: '任务书 / 场地 / 概念', badge: null },
+        { ws: 'analysis', Icon: BrainCircuit, t: '智能研判', hint: '总览 / 难点 / 诉求 / 计划 / 提纲', badge: overview && overview.risks > 0 ? `风险 ${overview.risks}` : null, tone: '#ff5e66' },
+        { ws: 'stage', Icon: ListChecks, t: '阶段拆解', hint: '下一节点在哪', badge: progress ? `${Math.round(progress.pct)}%` : null },
+      ],
+    },
+  ]
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault()
@@ -325,42 +363,67 @@ export default function ProjectCenterPage() {
         </div>
       </section>
 
-      {/* 快速跳转 */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 11.5, color: C.mut }}>快速跳转：</span>
-        {jumpChip('会议链路', () => jump('grp-meeting'))}
-        {jumpChip('任务看板', () => jump('sec-tasks', 'tasks'))}
-        {jumpChip('项目解读', () => jump('sec-cognition', 'cognition'))}
-        {jumpChip('智能研判', () => jump('sec-analysis', 'analysis'))}
-      </div>
-
-      {/* 主（核心：会议链路 + 判断解析）+ 侧（状态：里程碑/风险/资产）两栏 */}
+      {/* 主（双链路入口卡 + workzone 工作区）+ 侧（状态：里程碑/风险/资产）两栏 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 18, alignItems: 'start', marginTop: 4 }}>
         <main style={{ minWidth: 0 }}>
-          <GroupLabel id="grp-meeting" hint="腾讯会议 → 会议纪要 → 任务看板">会议链路</GroupLabel>
-          <Collapsible open={!!open.tencent} onToggle={() => toggle('tencent')} title="腾讯会议" hint="一键创建真实会议">
-            <TencentMeetingCard projectId={curId} />
-          </Collapsible>
-          <Collapsible open={!!open.meeting} onToggle={() => toggle('meeting')} title="会议纪要" hint="创建会议 / 上传材料 / 纪要回流">
-            <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} onConfirmed={() => setRefreshKey((k) => k + 1)} />
-          </Collapsible>
-          <Collapsible open={!!open.tasks} onToggle={() => toggle('tasks')} id="sec-tasks" title="任务看板"
-            count={taskBad > 0 ? `⚠ ${taskBad}` : undefined}
-            hint={taskBad > 0 ? `${taskRisk.overdue} 过期 · ${taskRisk.stale} 卡住` : '会议纪要待办 → 待办 / 进行中 / 已完成'}>
-            <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} refreshSignal={refreshKey} />
-          </Collapsible>
+          {/* 双链路入口卡(签名视觉):每张 = 卡头 + 3 step tile,tile 间静态「›」连接(无动画,守晕动症红线) */}
+          {CHAINS.map((ch) => (
+            <div key={ch.title} className="ckcard" style={{ padding: '16px 16px 14px', marginBottom: 14, ['--ac']: ch.ac, ['--gl']: ch.gl } as React.CSSProperties}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
+                <ch.Icon size={16} strokeWidth={2} style={{ alignSelf: 'center', color: ch.iconColor, flexShrink: 0 }} />
+                <span style={{ fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-.02em' }}>{ch.title}</span>
+                <span style={{ fontSize: 11.5, color: C.mut }}>{ch.sub}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+                {ch.steps.map((s, i) => (
+                  <Fragment key={s.ws}>
+                    {i > 0 && <span style={{ alignSelf: 'center', color: C.mut2, fontSize: 15, flexShrink: 0, userSelect: 'none' }}>›</span>}
+                    <button type="button" onClick={() => openWs(s.ws)} aria-pressed={activeWs === s.ws}
+                      onMouseEnter={(e) => { if (activeWs !== s.ws) e.currentTarget.style.borderColor = 'rgba(124,92,255,.5)' }}
+                      onMouseLeave={(e) => { if (activeWs !== s.ws) e.currentTarget.style.borderColor = C.line }}
+                      style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 9, padding: '12px 12px 11px', borderRadius: 14, transition: 'all .16s', color: C.ink,
+                        border: `1px solid ${activeWs === s.ws ? 'rgba(124,92,255,.55)' : C.line}`,
+                        background: activeWs === s.ws ? 'rgba(124,92,255,.10)' : 'rgba(255,255,255,.03)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', flexShrink: 0, background: 'rgba(255,255,255,.06)', border: `1px solid ${C.line}`, color: C.ink2 }}><s.Icon size={15} strokeWidth={1.8} /></span>
+                        {s.badge && <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap',
+                          color: s.tone || C.ink2, border: `1px solid ${s.tone ? s.tone + '66' : C.line}`, background: s.tone ? s.tone + '1f' : 'rgba(255,255,255,.05)' }}>{s.badge}</span>}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>{s.t}</div>
+                        <div style={{ fontSize: 11, color: C.mut, marginTop: 2, lineHeight: 1.4 }}>{s.hint}</div>
+                      </div>
+                    </button>
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          ))}
 
-          <GroupLabel id="grp-judge" hint="任务书 / 场地 / 概念 … AI 解读 + 研判">判断解析</GroupLabel>
-          <Collapsible open={!!open.cognition} onToggle={() => toggle('cognition')} id="sec-cognition" title="项目解读" hint="任务书 / 场地 / 概念 … 一键 AI 解读">
-            <CognitionSection projectId={curId} />
-          </Collapsible>
-          <Collapsible open={!!open.analysis} onToggle={() => toggle('analysis')} id="sec-analysis" title="智能研判"
-            count="前期分析 · 5 项" hint="总览 / 难点 / 诉求 / 推进计划 / 汇报提纲">
-            <ProjectAnalysisPanel projectId={curId} />
-          </Collapsible>
-          <Collapsible open={!!open.stage} onToggle={() => toggle('stage')} title="阶段拆解">
-            <StageProgressPanel projectId={curId} />
-          </Collapsible>
+          {/* workzone:点 tile 亮出对应面板;六面板恒挂载(保 onRisk/refreshKey 数据流),非 active display:none */}
+          <section id="workzone" style={{ scrollMarginTop: 14 }}>
+            {activeWs && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 12px' }}>
+                <span style={{ width: 4, height: 16, borderRadius: 2, background: 'linear-gradient(180deg,#7c5cff,#42a5ff)', flexShrink: 0 }} />
+                <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-.02em' }}>{WS_META[activeWs].chain} · {WS_META[activeWs].title}</h2>
+                <span style={{ fontSize: 11.5, color: C.mut }}>{WS_META[activeWs].hint}</span>
+                <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${C.line},transparent)` }} />
+                <button type="button" onClick={() => setActiveWs(null)} style={{ fontFamily: 'inherit', cursor: 'pointer', fontSize: 12, color: C.ink2, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.04)', borderRadius: 99, padding: '4px 12px', flexShrink: 0 }}>收起 ✕</button>
+              </div>
+            )}
+            {([
+              ['tencent', <TencentMeetingCard projectId={curId} />],
+              ['meeting', <MeetingPanel projectId={curId} onReflowed={() => setRefreshKey((k) => k + 1)} onConfirmed={() => setRefreshKey((k) => k + 1)} />],
+              ['tasks', <TaskBoardPanel projectId={curId} onRisk={setTaskRisk} refreshSignal={refreshKey} />],
+              ['cognition', <CognitionSection projectId={curId} />],
+              ['analysis', <ProjectAnalysisPanel projectId={curId} />],
+              ['stage', <StageProgressPanel projectId={curId} />],
+            ] as [WsKey, React.ReactNode][]).map(([k, node]) => (
+              <div key={k} style={{ display: activeWs === k ? 'block' : 'none' }}>
+                <div style={{ ...cardBase, padding: '16px 20px 20px' }}>{node}</div>
+              </div>
+            ))}
+          </section>
         </main>
 
         <aside style={{ display: 'grid', gap: 14, position: 'sticky', top: 14 }}>
@@ -390,23 +453,29 @@ export default function ProjectCenterPage() {
                 </div>
               ))
             )}
-            {reuseTags.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
-                {reuseTags.map((t, i) => (
-                  <span key={i} style={{ fontSize: 11, color: C.ink2, border: `1px solid ${C.line}`, borderRadius: 7, padding: '2px 8px' }}><span style={{ color: C.mut, marginRight: 4 }}>{t.kind}</span>{t.name}</span>
-                ))}
-              </div>
-            )}
+            {reuseTags.length > 0 && (() => {
+              // 首屏禁忌:不罗列文件名——按 kind 聚合成计数 pill(明细在数据基地)
+              const kinds = new Map<string, number>()
+              for (const t of reuseTags) kinds.set(t.kind, (kinds.get(t.kind) || 0) + 1)
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
+                  {[...kinds.entries()].map(([k, n]) => (
+                    <span key={k} style={{ fontSize: 11, color: C.ink2, border: `1px solid ${C.line}`, borderRadius: 7, padding: '2px 8px' }}>{k} <b style={{ fontVariantNumeric: 'tabular-nums' }}>{n}</b></span>
+                  ))}
+                  <span style={{ fontSize: 10.5, color: C.mut2, alignSelf: 'center' }}>明细在数据基地</span>
+                </div>
+              )
+            })()}
           </div>
         </aside>
       </div>
 
       {/* 资料区降权（职能区分：读取/清理归数据基地，此处默认折叠、低权重，不删） */}
       <GroupLabel hint="读取 / 清理归数据基地 · 此处仅本项目入口">资料</GroupLabel>
-      <Collapsible open={!!open.files} onToggle={() => toggle('files')} title="项目文件" hint="拖拽 / 选择上传 · txt/md/pdf/docx/pptx">
+      <Collapsible open={filesOpen} onToggle={() => setFilesOpen((v) => !v)} title="项目文件" hint="拖拽 / 选择上传 · txt/md/pdf/docx/pptx">
         <ProjectFilesPanel projectId={curId} />
       </Collapsible>
-      <Collapsible open={!!open.workspace} onToggle={() => toggle('workspace')} title="项目目录 · 读取与安全清理">
+      <Collapsible open={wsOpen} onToggle={() => setWsOpen((v) => !v)} title="项目目录 · 读取与安全清理">
         <WorkspacePanel />
       </Collapsible>
     </div>

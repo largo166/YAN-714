@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Lock, Megaphone } from 'lucide-react'
 
@@ -38,12 +38,13 @@ function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: st
   )
 }
 
-function Kpi({ label, value, caption, color, ac, gl }: { label: string; value: React.ReactNode; caption: string; color?: string; ac: string; gl: string }) {
+/** 签名 KPI 带内的大数字单元(44px/700/tabular,单元间 1px 竖分隔;标尺见 DESIGN.md 第 2 节 HERO KPI) */
+function HeroKpi({ label, value, caption, color, first }: { label: string; value: React.ReactNode; caption: string; color?: string; first?: boolean }) {
   return (
-    <div className="ckcard" style={{ padding: 18, minHeight: 128, ['--ac']: ac, ['--gl']: gl } as React.CSSProperties}>
+    <div style={{ flex: '1 1 150px', minWidth: 150, padding: '2px 22px', borderLeft: first ? 'none' : `1px solid ${C.line}` }}>
       <div style={{ color: C.mut, fontSize: 12.5 }}>{label}</div>
-      <div style={{ marginTop: 16, fontSize: 36, fontWeight: 700, letterSpacing: '-.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
-      <div style={{ marginTop: 10, color: C.mut, fontSize: 12, lineHeight: 1.5 }}>{caption}</div>
+      <div style={{ marginTop: 10, fontSize: 44, fontWeight: 700, letterSpacing: '-.035em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: color || C.ink }}>{value}</div>
+      <div style={{ marginTop: 8, color: C.mut, fontSize: 12 }}>{caption}</div>
     </div>
   )
 }
@@ -66,7 +67,7 @@ function AiDonut({ items }: { items: AiUsageItem[] }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
       <div style={{ width: 128, height: 128, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(${stops})`, display: 'grid', placeItems: 'center' }}>
-        <div style={{ width: 86, height: 86, borderRadius: '50%', background: '#0a0c12', display: 'grid', placeItems: 'center', textAlign: 'center' }}>
+        <div style={{ width: 86, height: 86, borderRadius: '50%', background: 'rgba(7,8,12,.9)', display: 'grid', placeItems: 'center', textAlign: 'center' }}>
           <div>
             <div style={{ fontSize: 23, fontWeight: 700, lineHeight: 1 }}>{total}</div>
             <div style={{ fontSize: 10, color: C.mut, marginTop: 3 }}>次成果</div>
@@ -95,6 +96,8 @@ export default function BossPage() {
   const [feishuOk, setFeishuOk] = useState(false)
   const [commentsOk, setCommentsOk] = useState(false)
   const [bcText, setBcText] = useState('')
+  const [bcAll, setBcAll] = useState(false) // 通知历史:首屏只显最近 3 条,其余点开
+  const bcRef = useRef<HTMLInputElement>(null) // KPI 带「发全员通知」滚动聚焦落点
 
   // 口令门禁(P1-6):本机口令防同屏误入;解锁凭据只记本次会话(sessionStorage)。
   const [gate, setGate] = useState<'checking' | 'setup' | 'locked' | 'open'>('checking')
@@ -199,7 +202,7 @@ export default function BossPage() {
 
   return (
     <div style={fontWrap}>
-      {/* HERO 区:板块动态背景(雷达脉冲)只罩 头部+KPI 带(按小样,不铺全页) */}
+      {/* HERO 区:板块动态背景(aurora 静场呼吸)只罩 头部+KPI 带(数字主角,背景安静) */}
       <section style={{ position: 'relative' }}>
         <BoardBackdrop mode="aurora" />
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -218,23 +221,27 @@ export default function BossPage() {
         </button>
       </header>
 
-      {/* KPI row */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
-        <Kpi label="进行中项目" value={dash ? <CountNum n={dash.active_projects} /> : '—'} caption="跨项目聚合" color={C.ink} ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.30)" />
-        <Kpi label="临近交付" value={dash ? <CountNum n={dash.near_delivery} /> : '—'} caption="14 天内到节点" color={C.amber} ac="#fdab3d" gl="rgba(215,168,110,.30)" />
-        <Kpi label="高风险项" value={dash ? <CountNum n={dash.high_risks} /> : '—'} caption="需负责人介入" color={C.red} ac="#ff5e66" gl="rgba(255,94,102,.28)" />
-        <Kpi label="AI 使用 · 本周" value={dash ? <CountNum n={dash.ai_usage_week} /> : '—'} caption="次成果生成" ac="linear-gradient(90deg,#7c5cff,#42a5ff)" gl="rgba(124,92,255,.24)" />
+      {/* 签名 KPI 带:本页唯一 gshell —— 一条大数字仪表带(数字是主角,背景安静) */}
+      <section className="gshell" style={{ marginBottom: 20 }}>
+        <div className="gshell-in" style={{ padding: '20px 10px', display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', rowGap: 18 }}>
+          <HeroKpi first label="进行中项目" value={dash ? <CountNum n={dash.active_projects} /> : '—'} caption="跨项目聚合" />
+          <HeroKpi label="临近交付" value={dash ? <CountNum n={dash.near_delivery} /> : '—'} caption="14 天内到节点" color={C.amber} />
+          <HeroKpi label="高风险项" value={dash ? <CountNum n={dash.high_risks} /> : '—'} caption="需负责人介入" color={C.red} />
+          <HeroKpi label="AI 使用 · 本周" value={dash ? <CountNum n={dash.ai_usage_week} /> : '—'} caption="次成果生成" />
+          <button type="button" onClick={() => { bcRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => bcRef.current?.focus(), 350) }}
+            style={{ marginLeft: 'auto', alignSelf: 'center', marginRight: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 15px', borderRadius: 11, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.05)', color: C.ink2, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
+            <Megaphone size={13} /> 发全员通知
+          </button>
+        </div>
       </section>
         </div>
       </section>
 
       {/* charts row */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18, marginBottom: 18 }}>
-        <div className="gshell">
-          <div className="gshell-in" style={{ padding: 20 }}>
-            <SectionTitle hint="按能力占比">AI 使用情况</SectionTitle>
-            <AiDonut items={aiUsage} />
-          </div>
+        <div style={{ ...cardBase, padding: 20 }}>
+          <SectionTitle hint="按能力占比">AI 使用情况</SectionTitle>
+          <AiDonut items={aiUsage} />
         </div>
         <div style={{ ...cardBase, padding: 20 }}>
           <SectionTitle hint="本周进行中任务">成员工作量 · 人工 / AI</SectionTitle>
@@ -264,10 +271,13 @@ export default function BossPage() {
         <SectionTitle hint="出现在所有员工的「项目员工」信息带">发全员通知</SectionTitle>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input
+            ref={bcRef}
             placeholder="输入要广播给全员的通知，例如：本周五下午 3 点市庄项目阶段评审，请相关同事预留时间"
             value={bcText}
             onChange={(e) => setBcText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && publish()}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(124,92,255,.55)' }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = C.line }}
             style={{ flex: 1, border: `1px solid ${C.line}`, background: 'rgba(255,255,255,.045)', borderRadius: 12, padding: '11px 14px', fontSize: 13.5, fontFamily: 'inherit', color: C.ink, outline: 'none' }}
           />
           <button
@@ -280,13 +290,18 @@ export default function BossPage() {
         </div>
         <div style={{ marginTop: 12 }}>
           {broadcasts.length === 0 && <div style={{ fontSize: 12.5, color: C.mut, padding: '7px 0' }}>暂无已发布通知。</div>}
-          {broadcasts.map((b) => (
+          {(bcAll ? broadcasts : broadcasts.slice(0, 3)).map((b) => (
             <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5, color: C.ink2, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
               <span style={{ display: 'inline-flex' }}><Megaphone size={13} /></span>
               <span style={{ flex: 1 }}>{b.text}</span>
               <span style={{ fontSize: 10.5, color: C.mut }}>{b.created_at.slice(0, 10)}</span>
             </div>
           ))}
+          {broadcasts.length > 3 && (
+            <button type="button" onClick={() => setBcAll((v) => !v)} style={{ background: 'none', border: 0, padding: '9px 0 0', color: C.mut, fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>
+              {bcAll ? '收起 ▴' : `查看全部 ${broadcasts.length} 条 ▾`}
+            </button>
+          )}
         </div>
       </section>
 

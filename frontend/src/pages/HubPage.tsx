@@ -103,8 +103,17 @@ export default function HubPage() {
     }
   }
 
-  // 走马灯需要可循环；为视觉滚动连续，内容复制一份
-  const tickerItems = ticker.length ? [...ticker, ...ticker] : []
+  // 通知静默轮播(晕动症红线:停用连续平移 .ticktrack,改 8s 单条淡入换条)
+  const [tickIdx, setTickIdx] = useState(0)
+  useEffect(() => {
+    if (ticker.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const h = setInterval(() => setTickIdx((i) => i + 1), 8000)
+    return () => clearInterval(h)
+  }, [ticker.length])
+
+  // 智能助手:可用的上卡片,规划中的收成「即将上岗」一行(真上线后自动升回卡片)
+  const okAgents = agents.filter((a) => a.status === 'ok')
+  const plannedAgents = agents.filter((a) => a.status !== 'ok')
 
   return (
     <div style={{ color: C.ink }}>
@@ -120,19 +129,19 @@ export default function HubPage() {
       {/* 团队成员 + 走马灯 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '0 0 14px' }}>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', flexShrink: 0 }}>团队成员</h2>
-        <div className="ticker" style={{ flex: 1, minWidth: 0 }}>
-          <div className="ticktrack">
-            {tickerItems.length === 0 ? (
-              <span className="tickitem" style={{ color: C.mut }}>暂无通知 · 在驾驶舱发布全员通知后将在此滚动</span>
-            ) : (
-              tickerItems.map((t, i) => (
-                <span className="tickitem" key={i} style={{ color: t.kind === 'broadcast' ? '#a98bff' : C.gold }}>
-                  {t.kind === 'broadcast' ? <Megaphone size={12} style={{ verticalAlign: -2, marginRight: 5 }} /> : <Cake size={12} style={{ verticalAlign: -2, marginRight: 5 }} />}
-                  {t.text}
-                </span>
-              ))
-            )}
-          </div>
+        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {ticker.length === 0 ? (
+            <span style={{ fontSize: 11.5, color: C.mut }}>暂无通知 · 在驾驶舱发布全员通知后会在此轮播</span>
+          ) : (() => {
+            const t = ticker[tickIdx % ticker.length]
+            return (
+              <span key={tickIdx} className="tickfade" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: t.kind === 'broadcast' ? '#a98bff' : C.gold, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {t.kind === 'broadcast' ? <Megaphone size={12} /> : <Cake size={12} />}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.text}</span>
+                {ticker.length > 1 && <span style={{ color: C.mut2, fontSize: 10.5, flexShrink: 0 }}>{(tickIdx % ticker.length) + 1}/{ticker.length}</span>}
+              </span>
+            )
+          })()}
         </div>
         <button
           type="button"
@@ -166,7 +175,6 @@ export default function HubPage() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
                 <div style={{ fontSize: 12, color: C.mut }}>{m.role || '—'}</div>
               </div>
-              <span style={{ fontSize: 10.5, color: C.cyan, border: `1px solid ${C.cyan}55`, background: `${C.cyan}18`, borderRadius: 7, padding: '2px 8px', whiteSpace: 'nowrap' }}>真实成员</span>
               <span title="停用成员（软删除）" onClick={() => removeMember(m.id, m.name)} style={{ cursor: 'pointer', color: C.mut, fontSize: 14 }}>✕</span>
             </div>
             <div style={dutyRow}>
@@ -229,13 +237,13 @@ export default function HubPage() {
               <div>
                 <div style={{ fontSize: 13, marginBottom: 8 }}>
                   <b style={{ color: '#fff' }}>{portrait.client}</b> · {portrait.project_count} 个项目
-                  {portrait.cities.length > 0 && <span style={{ color: C.mut }}>　<Building2 size={12} style={{ verticalAlign: -2 }} /> {portrait.cities.join('、')}</span>}
+                  {portrait.cities.length > 0 && <span style={{ color: C.mut }}>{'　'}<Building2 size={12} style={{ verticalAlign: -2 }} /> {portrait.cities.join('、')}</span>}
                 </div>
                 {portrait.projects.map((p) => (
                   <div key={p.id} style={{ borderTop: `1px solid ${C.line}`, paddingTop: 9, marginTop: 9 }}>
                     <div style={{ fontSize: 12.5 }}>
                       <b style={{ color: C.ink }}>{p.name}</b>
-                      {p.city && <span style={{ color: C.mut }}>　{p.city}</span>}
+                      {p.city && <span style={{ color: C.mut }}>{'　'}{p.city}</span>}
                       <span style={{ marginLeft: 6, fontSize: 10.5, color: C.gold, border: `1px solid ${C.gold}44`, background: `${C.gold}14`, borderRadius: 6, padding: '1px 7px' }}>{p.status}</span>
                     </div>
                     {p.cognition.length === 0 ? (
@@ -257,30 +265,32 @@ export default function HubPage() {
         </div>
       </div>
 
-      {/* 智能助手 */}
-      <SecLabel title="智能助手" sub="中后期 Agent · 能力分阶段交付" />
+      {/* 智能助手:只上可用的卡片;规划中的收成「即将上岗」一行,不占卡位 */}
+      <SecLabel title="智能助手" sub="AI 同事 · 能力分阶段上岗" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 14 }}>
-        {agents.map((a) => {
-          const ok = a.status === 'ok'
-          return (
-            <div key={a.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                <Avatar text={a.name?.[0] || 'A'} kind="agent" />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{a.name}</div>
-                  <div style={{ fontSize: 12, color: C.mut }}>{a.role}</div>
-                </div>
-                <span style={{ fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap', borderRadius: 7, padding: '2px 9px', color: ok ? C.green : C.mut, border: `1px solid ${ok ? C.green + '55' : C.line}`, background: ok ? `${C.green}18` : 'rgba(255,255,255,.04)', boxShadow: ok ? `0 0 14px ${C.green}33` : 'none' }}>
-                  {ok ? '可用' : '规划中'}
-                </span>
+        {okAgents.map((a) => (
+          <div key={a.id} className="ckcard" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 11, ['--ac']: 'linear-gradient(90deg,#7c5cff,#42a5ff)', ['--gl']: 'rgba(124,92,255,.2)' } as React.CSSProperties}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              <Avatar text={a.name?.[0] || 'A'} kind="agent" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{a.name}</div>
+                <div style={{ fontSize: 12, color: C.mut }}>{a.role}</div>
               </div>
-              <div style={dutyRow}><b style={dutyKey}>负责</b><span style={{ flex: 1 }}>{a.duty}</span></div>
-              <div style={dutyRow}><b style={dutyKey}>输出</b><span style={{ flex: 1 }}>{a.output}</span></div>
+              <span style={{ fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap', borderRadius: 7, padding: '2px 9px', color: C.green, border: `1px solid ${C.green}55`, background: `${C.green}18`, boxShadow: `0 0 14px ${C.green}33` }}>可用</span>
             </div>
-          )
-        })}
+            <div style={dutyRow}><b style={dutyKey}>负责</b><span style={{ flex: 1 }}>{a.duty}</span></div>
+            <div style={dutyRow}><b style={dutyKey}>输出</b><span style={{ flex: 1 }}>{a.output}</span></div>
+          </div>
+        ))}
+        {okAgents.length === 0 && agents.length > 0 && <div style={{ color: C.mut, fontSize: 13, padding: '4px 2px' }}>智能助手筹备中,能力分阶段上岗。</div>}
         {agents.length === 0 && <div style={{ color: C.mut, fontSize: 12, padding: 8 }}>智能助手目录加载中…</div>}
       </div>
+      {plannedAgents.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, color: C.mut2, fontSize: 12, flexWrap: 'wrap' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.mut2, flexShrink: 0 }} />
+          即将上岗：{plannedAgents.map((a) => a.name).join(' · ')}
+        </div>
+      )}
     </div>
   )
 }
