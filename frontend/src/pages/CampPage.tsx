@@ -509,7 +509,7 @@ export default function CampPage() {
       onDragOver={(e) => { e.preventDefault() }}
       onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
       onDrop={onDrop}
-      style={{ minHeight: '100%', position: 'relative', color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em', display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 18% -6%, rgba(124,92,255,.28), transparent 31%), radial-gradient(circle at 86% 4%, rgba(66,165,255,.16), transparent 28%), radial-gradient(circle at 64% 108%, rgba(215,168,110,.11), transparent 32%), linear-gradient(180deg, #030406 0%, #07080c 44%, #030406 100%)' }}>
+      style={{ minHeight: '100%', position: 'relative', color: C.ink, display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 18% -6%, rgba(124,92,255,.28), transparent 31%), radial-gradient(circle at 86% 4%, rgba(66,165,255,.16), transparent 28%), radial-gradient(circle at 64% 108%, rgba(215,168,110,.11), transparent 32%), linear-gradient(180deg, #030406 0%, #07080c 44%, #030406 100%)' }}>
       {view === 'skills' ? skillsView() : view === 'run' ? runView() : view === 'archive' ? archiveView() : view === 'entry' ? entryView() : hero()}
 
       {/* 拖拽接入：发光虚线遮罩 + 接入结果 toast */}
@@ -531,7 +531,7 @@ export default function CampPage() {
 
       {/* 方案评审 · 模式选择 */}
       {picker && (
-        <div onClick={() => setPicker(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'grid', placeItems: 'center', zIndex: 50 }}>
+        <div onClick={() => setPicker(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(10px) saturate(120%)', display: 'grid', placeItems: 'center', zIndex: 50 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(440px,92vw)', borderRadius: 20, border: '1px solid ' + C.line, background: 'linear-gradient(160deg,#0c0e16,#07080c)', padding: 22 }}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>方案评审 · 选模式</div>
             <div style={{ fontSize: 12, color: C.mut, marginBottom: 16 }}>同一份项目认知，两种评图方式。</div>

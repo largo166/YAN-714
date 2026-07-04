@@ -106,7 +106,7 @@ export default function HubPage() {
   const tickerItems = ticker.length ? [...ticker, ...ticker] : []
 
   return (
-    <div style={{ color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }}>
+    <div style={{ color: C.ink }}>
       <header style={{ marginBottom: 22 }}>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: '-.03em' }}>协作平台</h1>
         <p style={{ margin: '8px 0 0', color: C.mut, fontSize: 13 }}>团队 / 智能助手 / 甲方画像 一屏协作 —— 谁在做什么、卡在哪，一眼可见。</p>

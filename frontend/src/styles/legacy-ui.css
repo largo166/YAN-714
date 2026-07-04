@@ -3,7 +3,7 @@
    来源:/c/ROM-AI开发V3-chatgtp/backend/ui/index.html 的两个 <style> 块,逐行抽取。
    原则:视觉权威,勿改配色/间距/字体。仅工程化保留为外部 CSS。
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Noto+Serif+SC:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Noto+Serif+SC:wght@500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap');
 :root{
   --bg:#faf9f5;--panel:#fff;--panel2:#fcfbf6;--ink:#1b1a17;--ink2:#5e5a4e;--mut:#8c8775;
   --line:#ebe7da;--line2:#e6e2d4;--terra:#c2703a;--terra-soft:#c2703a14;--terra-line:#c2703a40;
@@ -637,6 +637,12 @@ body.darkui{
   --line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.12);
   --terra:#7c5cff;--terra-soft:rgba(124,92,255,.15);--terra-line:rgba(124,92,255,.4);
   --ok:#49d18d;--blue:#5fb0ff;--red:#ff6b73;
+  /* 字体权威(P2 字体统一,详见 DESIGN.md):全站唯一无衬线栈——拉丁 Space Grotesk + 中文 Noto Sans SC,
+     离线回退 微软雅黑。修掉旧病根:body 的中文回退曾是 Noto Serif SC(宋体),导致顶栏/抽屉/弹窗
+     吃宋体、页面吃雅黑的"字体混乱"。 */
+  --font-sans:'Space Grotesk','Noto Sans SC','PingFang SC','Microsoft YaHei',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:'Space Mono',ui-monospace,Consolas,monospace;
+  font-family:var(--font-sans);letter-spacing:-.01em;
   background:
     radial-gradient(circle at 18% -6%, rgba(124,92,255,.20), transparent 31%),
     radial-gradient(circle at 86% 4%, rgba(66,165,255,.12), transparent 28%),
@@ -695,6 +701,14 @@ body.darkui .projitem.on .pi-stage{background:rgba(124,92,255,.18);border-color:
 body.darkui .matcard .mname{background:rgba(10,12,18,.85);color:var(--ink2)}
 body.darkui .gov button{background:rgba(20,22,30,.92);color:var(--ink)}
 body.darkui .gov button:hover{background:rgba(30,33,45,.96);color:#c8bcff}
+/* 字体统一:表单控件/按钮默认不继承字体(浏览器给系统默认)→ 强制继承唯一无衬线栈;
+   .mono/code 走等宽。标题归一:.ptitle h1 与暗页内联标题同规格(26/700/-.03em),.serif 在暗色下失效(不再混宋体)。 */
+body.darkui button,body.darkui input,body.darkui textarea,body.darkui select{font-family:inherit}
+body.darkui .mono,body.darkui code,body.darkui pre{font-family:var(--font-mono)}
+body.darkui .serif{font-family:var(--font-sans)}
+body.darkui .ptitle h1{font-size:26px;font-weight:700;letter-spacing:-.03em}
+body.darkui .sechead .stitle{font-weight:600}
+body.darkui .btn,body.darkui .anbtn{font-weight:600;letter-spacing:.01em}
 /* 暗色表单域：.ipt 与裸 input/textarea 原本吃浏览器默认白底 → 走深底 */
 body.darkui .ipt,
 body.darkui textarea,
@@ -709,9 +723,12 @@ body.darkui .ipt::placeholder,body.darkui textarea::placeholder,body.darkui inpu
 body.darkui .searchbar input,body.darkui .composer2 textarea,body.darkui .keyin input,body.darkui .pathin input{background:transparent;border:0}
 /* ── 驾驶舱卡片基元 .ckcard：玻璃 + 顶边光条 + 发光角 + hover 抬升。
    用内联 CSS 变量定制：--ac 顶条色(可渐变)、--gl 角辉光色。跨页统一(驾驶舱/协作/项目中心/数据基地)。 */
-body.darkui .ckcard{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032));transition:transform .16s,box-shadow .16s,border-color .16s}
+body.darkui .ckcard{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032));box-shadow:inset 0 1px 0 rgba(255,255,255,.07);transition:transform .16s,box-shadow .16s,border-color .16s}
 body.darkui .ckcard::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--ac,linear-gradient(90deg,#7c5cff,#42a5ff));opacity:.9}
 body.darkui .ckcard::after{content:"";position:absolute;right:-30px;top:-30px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle,var(--gl,rgba(124,92,255,.3)),transparent 68%);pointer-events:none}
 body.darkui .ckcard>*{position:relative;z-index:1}
-body.darkui .ckcard:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.4);border-color:rgba(124,92,255,.4)}
+body.darkui .ckcard:hover{transform:translateY(-3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 16px 40px rgba(0,0,0,.4);border-color:rgba(124,92,255,.4)}
 body.darkui .ckcard.flat::before{display:none}
+/* 弹层毛玻璃(借 Apple Liquid Glass 手法,只用在浮层不铺全页):遮罩加背景模糊,设置抽屉改半透明厚玻璃 */
+body.darkui .setmask,body.darkui .modal,body.darkui #pjPrev,body.darkui #skillAll,body.darkui .qrmask{backdrop-filter:blur(10px) saturate(120%)}
+body.darkui .setdrawer{background:rgba(10,12,18,.82);backdrop-filter:blur(26px) saturate(130%);border-left:1px solid rgba(255,255,255,.09)}

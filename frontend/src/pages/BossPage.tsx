@@ -173,7 +173,7 @@ export default function BossPage() {
     }
   }
 
-  const fontWrap: React.CSSProperties = { color: C.ink, fontFamily: "'Space Grotesk','Noto Sans SC',ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei',sans-serif", letterSpacing: '-.01em' }
+  const fontWrap: React.CSSProperties = { color: C.ink } // 字体/字距由 body.darkui 统一(DESIGN.md)
   const gateInput = (v: string, set: (s: string) => void, ph: string, onEnter: () => void) => (
     <input type="password" value={v} placeholder={ph} autoComplete="off"
       onChange={(e) => set(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onEnter() }}
