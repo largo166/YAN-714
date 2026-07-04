@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CheckCircle2, Hourglass } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import type { StageProgressOut } from '@/types/schemas'
@@ -54,7 +55,9 @@ export default function StageProgressPanel({ projectId }: { projectId: number | 
 
       {ready.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 4 }}>✅ 可推进（上游已就绪）：</div>
+          <div style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 4 }}>
+            <CheckCircle2 size={13} style={{ verticalAlign: -2, marginRight: 4, color: 'var(--ok)' }} />可推进（上游已就绪）：
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {ready.map((s) => (
               <span key={s.stage} className="statpill live" style={{ fontSize: 11.5 }}>
@@ -70,7 +73,9 @@ export default function StageProgressPanel({ projectId }: { projectId: number | 
 
       {blocked.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 4 }}>⏳ 待上游：</div>
+          <div style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 4 }}>
+            <Hourglass size={13} style={{ verticalAlign: -2, marginRight: 4 }} />待上游：
+          </div>
           <div style={{ display: 'grid', gap: 3 }}>
             {blocked.map((s) => (
               <div key={s.stage} style={{ fontSize: 11.5, color: 'var(--mut)' }}>

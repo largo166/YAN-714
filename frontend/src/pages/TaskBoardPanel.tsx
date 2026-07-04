@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, Clock, Snail, User } from 'lucide-react'
 
 import { api, type TaskAssignment } from '@/lib/api'
 
@@ -86,7 +87,7 @@ export default function TaskBoardPanel({
       </div>
       {(overdueCount > 0 || staleCount > 0) && (
         <div style={{ fontSize: 12, color: 'var(--red)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
-          ⚠ 需关注：
+          <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 4 }} />需关注：
           {overdueCount > 0 && <b>{overdueCount} 项过期</b>}
           {overdueCount > 0 && staleCount > 0 && ' · '}
           {staleCount > 0 && <b>{staleCount} 项卡住（放置 ≥{STALE_DAYS} 天未推进）</b>}
@@ -117,16 +118,20 @@ export default function TaskBoardPanel({
                     >
                       <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{t.task_title}</div>
                       <div style={{ fontSize: 11, color: over ? 'var(--red)' : 'var(--mut)', marginTop: 3 }}>
-                        {t.owner_name && <span>👤 {t.owner_name}{'　'}</span>}
+                        {t.owner_name && (
+                          <span><User size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{t.owner_name}{'　'}</span>
+                        )}
                         {t.due && (
                           <span>
-                            {over ? '⚠ ' : '⏱ '}
+                            {over
+                              ? <AlertTriangle size={11} style={{ verticalAlign: -1, marginRight: 3 }} />
+                              : <Clock size={11} style={{ verticalAlign: -1, marginRight: 3 }} />}
                             {t.due}
                             {over ? '（已过期）' : ''}
                           </span>
                         )}
                         {isStale(t) && (
-                          <span style={{ color: 'var(--terra)' }}>{'　'}🐌 卡住 {ageDays(t.created_at)} 天</span>
+                          <span style={{ color: 'var(--terra)' }}>{'　'}<Snail size={11} style={{ verticalAlign: -1, marginRight: 3 }} />卡住 {ageDays(t.created_at)} 天</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>

@@ -201,12 +201,17 @@ export default function ProjectAnalysisPanel({ projectId }: { projectId: number 
           {current.status === 'ok' && current.sources.length > 0 && (
             <div style={{ marginTop: 12, borderTop: '1px dashed var(--line2)', paddingTop: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mut)', marginBottom: 6 }}>出处（{current.sources.length}）</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {/* 出处=可追溯凭证,不是阅读材料:只列徽章+文件名,原文片段仅悬停可查(不渲染原文碎片) */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {current.sources.map((s, i) => (
-                  <div key={i} style={{ fontSize: 12, color: 'var(--mut)' }}>
-                    <span className="pill l" style={{ marginRight: 6 }}>{s.kind === 'project_file' ? '项目文件' : '知识库'}</span>
-                    《{s.title}》 — {s.snippet}
-                  </div>
+                  <span
+                    key={i}
+                    title={(s.snippet || '').slice(0, 300)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', fontSize: 11.5, color: 'var(--mut)', border: '1px solid var(--line2)', borderRadius: 8, padding: '3px 8px' }}
+                  >
+                    <span className="pill l">{s.kind === 'project_file' ? '项目文件' : '知识库'}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                  </span>
                 ))}
               </div>
             </div>

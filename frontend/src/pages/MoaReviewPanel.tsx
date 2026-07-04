@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Hourglass, Swords, XCircle } from 'lucide-react'
 
 import {
   api,
@@ -86,7 +87,7 @@ function MoaResult({
       </div>
       {cost && (
         <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
-          ⚠ 成本为按字符数粗略估算，非真实账单；准确金额以 DeepSeek 控制台为准。
+          <AlertTriangle size={12} style={{ verticalAlign: -2, marginRight: 4 }} />成本为按字符数粗略估算，非真实账单；准确金额以 DeepSeek 控制台为准。
         </div>
       )}
 
@@ -162,7 +163,7 @@ function MoaResult({
       {/* 冲突项(MoA 核心价值:跨维度矛盾) */}
       {conflicts.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <b style={{ fontSize: 13, color: 'var(--terra)' }}>⚔ 跨维度问题（{conflicts.length}）</b>
+          <b style={{ fontSize: 13, color: 'var(--terra)' }}><Swords size={13} style={{ verticalAlign: -2, marginRight: 4 }} />跨维度问题（{conflicts.length}）</b>
           {conflicts.map((c, i) => (
             <div key={i} style={{ marginTop: 6, border: '1px solid var(--terra-line)', background: 'var(--terra-soft)', borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>
               <div style={{ fontWeight: 600 }}>{c.issue}</div>
@@ -194,7 +195,10 @@ function MoaResult({
           {showExperts && details.map((d, i) => (
             <div key={i} style={{ marginTop: 6, border: '1px solid var(--line2)', borderRadius: 8, padding: '8px 10px' }}>
               <div style={{ fontSize: 12, fontWeight: 600 }}>
-                {d.status === 'success' ? '✅' : '❌'} {d.role}
+                {d.status === 'success'
+                  ? <CheckCircle2 size={13} style={{ verticalAlign: -2, marginRight: 4, color: 'var(--ok)' }} />
+                  : <XCircle size={13} style={{ verticalAlign: -2, marginRight: 4, color: 'var(--red)' }} />}
+                {d.role}
                 <span style={{ fontWeight: 400, color: 'var(--mut)' }}> · {d.model} · {d.latency_ms}ms · ¥{d.cost_yuan}</span>
               </div>
               <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11.5, color: 'var(--ink2)', marginTop: 4, fontFamily: 'inherit' }}>
@@ -303,7 +307,7 @@ export default function MoaReviewPanel({ projectId }: { projectId: number | null
 
       {phase === 'loading' && (
         <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--terra)', background: 'var(--terra-soft)', border: '1px solid var(--terra-line)', borderRadius: 8, padding: '8px 10px' }}>
-          ⏳ 设计委员会进行中…（约 40–60 秒）。三位评图人正分别分析，随后由主审整合输出，请勿离开本页。
+          <Hourglass size={13} style={{ verticalAlign: -2, marginRight: 4 }} />设计委员会进行中…（约 40–60 秒）。三位评图人正分别分析，随后由主审整合输出，请勿离开本页。
         </div>
       )}
 
