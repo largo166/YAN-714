@@ -1,0 +1,14 @@
+
+═══ 数据桥冒烟闸 @ http://127.0.0.1:8000 ═══
+
+✓ PASS  ①a 项目列表非空 — 8 个项目
+✓ PASS  ①b 无 mock 种子污染 — 未命中任何 mock 种子名
+✓ PASS  ①c 项目对象含真实 id/status 字段 — 结构符合 ProjectSchema
+✓ PASS  ② 改名 PUT 后重拉名称已变 — 收件箱 → 收件箱·桥闸探针
+✓ PASS  ②b 还原真库名称 — 已还原为「收件箱」
+✓ PASS  ③ 当前项目选择刷新后持久且命中真实列表 — 持久 id=12 命中库=true
+
+═══ 结果:6/6 绿 · 闸通过 ✓ ═══
+
+
+__RESULT_JSON__{"base":"http://127.0.0.1:8000","passed":true,"results":[{"name":"①a 项目列表非空","ok":true,"detail":"8 个项目"},{"name":"①b 无 mock 种子污染","ok":true,"detail":"未命中任何 mock 种子名"},{"name":"①c 项目对象含真实 id/status 字段","ok":true,"detail":"结构符合 ProjectSchema"},{"name":"② 改名 PUT 后重拉名称已变","ok":true,"detail":"收件箱 → 收件箱·桥闸探针"},{"name":"②b 还原真库名称","ok":true,"detail":"已还原为「收件箱」"},{"name":"③ 当前项目选择刷新后持久且命中真实列表","ok":true,"detail":"持久 id=12 命中库=true"}],"ts_note":"运行时刻见文件 mtime"}

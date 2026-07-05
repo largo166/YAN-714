@@ -1,0 +1,10 @@
+
+═══ b2 像素对照闸 ═══
+baseline : C:/ROM-AI-Claude 开发/verify/b2/baseline.png
+current  : C:/ROM-AI-Claude 开发/verify/b2/current.png
+尺寸     : 1920x1080 (2073600 px)
+差异像素 : 0
+漂移比例 : 0.0000%  (阈值 0.1%)
+diff 图  : C:\ROM-AI-Claude 开发\verify\b2\diff.png
+结论     : 达标 ✓ 构图零漂移(阈值内)
+__RESULT_JSON__{"mismatched":0,"totalPx":2073600,"pct":0,"thresholdPct":0.1,"pass":true,"diffPath":"C:\\ROM-AI-Claude 开发\\verify\\b2\\diff.png"}
