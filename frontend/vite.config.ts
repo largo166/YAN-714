@@ -11,6 +11,15 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      // 双入口:index=主 App(五板块业务),seasky=海天 OS 工程化迁移(视觉母版 prototypes/romai-seasky-os-v2.html)
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        seasky: fileURLToPath(new URL('./seasky.html', import.meta.url)),
+      },
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

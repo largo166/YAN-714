@@ -1,0 +1,72 @@
+/* ═══════════════════════════════════════════════════════════
+   ROM-AI 海天 OS · Design Tokens(工程化迁移自 prototypes/romai-seasky-os-v2.html)
+   视觉母版 = v3-final;此处只声明变量,组件样式走 Tailwind class
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  /* ── 颜色系统(海天设计语言) ── */
+  --sk-background: #0a0c0e;
+  --sk-foreground: #f2f1ee;
+  --sk-muted: #a1a5aa;
+  --sk-muted-2: rgba(161, 165, 170, 0.55);
+  --sk-primary: #7fb3cf;            /* 海天主色 */
+  --sk-primary-deep: #4f7f9e;
+  --sk-primary-glow: rgba(127, 179, 207, 0.16);
+  --sk-ok: #7ec9a5;
+  --sk-warn: #c9b27f;
+  --sk-risk: #cf7f7f;
+  /* 海系四阶(项目分段/日历/工作量共用) */
+  --sk-proj-0: #7fb3cf;
+  --sk-proj-1: #a8cfe0;
+  --sk-proj-2: #4f7f9e;
+  --sk-proj-3: #d7e5ec;
+
+  /* ── 玻璃层级 ── */
+  --sk-card: rgba(10, 12, 14, 0.5);         /* 玻璃地层 */
+  --sk-card-heavy: rgba(10, 12, 14, 0.92);  /* 浮层/下拉 */
+  --sk-composer: rgba(12, 15, 18, 0.72);    /* 输入容器 */
+  --sk-border: rgba(242, 241, 238, 0.09);
+  --sk-hair: rgba(242, 241, 238, 0.12);
+  --sk-hair-soft: rgba(242, 241, 238, 0.06);
+
+  /* ── 阴影层级 ── */
+  --sk-shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --sk-shadow-glow: 0 0 30px rgba(127, 179, 207, 0.16);
+  --sk-shadow-logo: 0 0 34px rgba(127, 179, 207, 0.45), 0 0 90px rgba(127, 179, 207, 0.2);
+
+  /* ── 圆角层级 ── */
+  --sk-r-tile: 10px;
+  --sk-r-card: 16px;
+  --sk-r-panel: 18px;
+  --sk-r-composer: 20px;
+
+  /* ── 字阶(三级封顶:主标题/副题/注释) ── */
+  --sk-font-sans: 'Space Grotesk', 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+  --sk-font-cjk: 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+  --sk-font-mono: 'IBM Plex Mono', monospace;
+  --sk-fs-hero: 33px;      /* 板块主标题 */
+  --sk-fs-title: 15px;     /* 卡片标题 */
+  --sk-fs-body: 12.5px;    /* 正文 */
+  --sk-fs-label: 10.5px;   /* eyebrow/注释 */
+
+  /* ── 间距 ── */
+  --sk-pad-board-x: 48px;  /* 板块横向内边距 */
+  --sk-gap-card: 14px;
+
+  /* ── 动效时长(P1:入场≤600ms) ── */
+  --sk-t-fast: 0.2s;
+  --sk-t-in: 0.55s;
+
+  /* ── z-index 层级(与母版一致) ── */
+  --sk-z-scrim: 1;
+  --sk-z-scene: 5;
+  --sk-z-app: 8;
+  --sk-z-chrome: 20;       /* 顶栏/状态栏 */
+  --sk-z-drop: 40;         /* 下拉 */
+  --sk-z-pop: 46;          /* 锚点浮层 */
+  --sk-z-overlay: 48;      /* 技能库全屏浮层 */
+  --sk-z-vign: 63;
+  --sk-z-grain: 64;
+  --sk-z-cine: 66;         /* 电影黑带 */
+  --sk-z-bar: 70;          /* 进度条/hint */
+  --sk-z-skip: 72;
+}
