@@ -19,6 +19,7 @@ import { IntroFilm } from './IntroFilm'
 import { SeaCanvas } from './SeaCanvas'
 import { CineLayer, SkipIntro, useFluidStage } from './SkipIntro'
 import { StatusBar, TopNavCapsules } from './TopNavCapsules'
+import { SettingsOverlay } from '../system/SettingsOverlay'
 
 /* ═══ 应用外壳:阶段机 film → gate → boards → app(母版等价) ═══ */
 
@@ -29,6 +30,7 @@ export function AppShell() {
   const proj = useProjectBridge()
   const [filmPaused, setFilmPaused] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const appRef = useRef<HTMLDivElement>(null)
   const enteredRef = useRef(false)
 
@@ -136,7 +138,7 @@ export function AppShell() {
 
         {/* app 壳:五板块恒挂载 display 切换 */}
         <div ref={appRef} className="absolute inset-0 z-[8]" style={{ display: phase === 'app' ? 'block' : 'none' }}>
-          <TopNavCapsules board={board} onSwitch={nav.switchBoard} />
+          <TopNavCapsules board={board} onSwitch={nav.switchBoard} onOpenSettings={() => setSettingsOpen(true)} />
           <BoardFrame active={phase === 'app' && board === 0} skipAnim={capture}>
             <ProjectCenterBoard proj={proj} active={phase === 'app' && board === 0} />
           </BoardFrame>
@@ -162,6 +164,7 @@ export function AppShell() {
             />
           </BoardFrame>
           <StatusBar left={statusLeft} />
+          <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         </div>
 
         <CineLayer hideBars={phase === 'app'} />

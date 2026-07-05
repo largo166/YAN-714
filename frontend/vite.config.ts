@@ -13,7 +13,9 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // 双入口:index=主 App(五板块业务),seasky=海天 OS 工程化迁移(视觉母版 prototypes/romai-seasky-os-v2.html)
+      // 退役波(2026-07-06):海天 OS 升唯一主入口——index=seasky 本体;
+      // seasky.html 保留为同一入口的别名(兼容既有 /seasky.html 回归链接)。
+      // 紫黑主 App(src/main.tsx)已无入口指向:代码冻结在库,tag retire-purple-final-20260706 可回滚。
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         seasky: fileURLToPath(new URL('./seasky.html', import.meta.url)),
