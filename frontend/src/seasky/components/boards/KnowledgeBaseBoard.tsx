@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { boardImages } from '../../data/boardImages'
 import { useKnowledgeLive } from '../../hooks/useKnowledgeLive'
 import { DataSourceStrip } from '../data/DataSourceStrip'
-import { CleanupOverlay } from '../data/CleanupOverlay'
+import { CleanupWizard } from '../data/CleanupWizard'
 import { KnowledgeSearch } from '../data/KnowledgeSearch'
 import { Popover } from '../common/Modal'
 import { GhostButton, Label, Pill } from '../common/PillButton'
@@ -101,7 +101,7 @@ export function KnowledgeBaseBoard({ active }: { active: boolean }) {
         </div>
       </div>
       {img && <DataSourceStrip />}
-      <CleanupOverlay open={cleanupOpen} onClose={() => setCleanupOpen(false)} />
+      <CleanupWizard open={cleanupOpen} onClose={() => setCleanupOpen(false)} />
     </>
   )
 }

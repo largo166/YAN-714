@@ -9,6 +9,8 @@ export const knowledgeService = {
   stats: api.getKnowledgeStats,
   listDocs: api.listKnowledgeDocs,
   search: api.searchKnowledge,
+  listDir: api.listDir,
+  workspaceConfig: api.workspaceConfig,
   upload: api.uploadProjectFile,
   index: api.indexProjectFile,
   extractAssets: api.extractFileAssets,
