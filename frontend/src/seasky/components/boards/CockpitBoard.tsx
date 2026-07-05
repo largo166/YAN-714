@@ -1,4 +1,3 @@
-import type { Project } from '../../data/projects.mock'
 import { COCKPIT_KPIS } from '../../data/usage.mock'
 import { cn } from '../../lib/cn'
 import { ProjectCalendar } from '../cockpit/ProjectCalendar'
@@ -8,9 +7,9 @@ import { BroadcastPanel } from '../system/BroadcastPanel'
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { Label } from '../common/PillButton'
 
-/* ═══ b4 管理驾驶舱:数据网格——AI 使用+工作量双数据区,项目日历为主角 ═══ */
+/* ═══ b4 管理驾驶舱:数据网格——AI 使用+工作量双数据区,项目日历为主角(b4 波接真+门禁) ═══ */
 
-export function CockpitBoard({ curProj, projects }: { curProj: number; projects: Project[] }) {
+export function CockpitBoard({ curIdx, projectNames }: { curIdx: number; projectNames: string[] }) {
   return (
     <div className="absolute inset-0 flex flex-col gap-3.5 p-5 px-11">
       {/* 细头带:eyebrow + 行内 KPI */}
@@ -54,7 +53,7 @@ export function CockpitBoard({ curProj, projects }: { curProj: number; projects:
         </GlassCard>
         <GlassCard style={{ gridArea: 'c' }}>
           <CardHead title="项目日历 · 2026-07" en="Calendar" />
-          <ProjectCalendar curProj={curProj} projects={projects} />
+          <ProjectCalendar curIdx={curIdx} names={projectNames} />
         </GlassCard>
         <GlassCard style={{ gridArea: 'd' }}>
           <CardHead title="发全员通知" en="Broadcast" />

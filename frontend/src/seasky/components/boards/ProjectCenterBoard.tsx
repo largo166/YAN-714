@@ -1,6 +1,6 @@
 import { boardImages } from '../../data/boardImages'
 import { MILESTONES, STAGE_NODES } from '../../data/projects.mock'
-import type { useProjectState } from '../../hooks/useProjectState'
+import type { ProjectBridge } from '../../services/projectBridge'
 import { cn } from '../../lib/cn'
 import { AnalysisSummaryCard } from '../project/AnalysisSummaryCard'
 import { MeetingChainCard } from '../project/MeetingTile'
@@ -9,11 +9,11 @@ import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { Dot, Label, Pill } from '../common/PillButton'
 import { MRow, StatBlock } from '../common/StatBlock'
 
-/* ═══ b0 项目中心:左图右文(Garch·OS 构图)——图为主角,判断在右列 ═══ */
+/* ═══ b0 项目中心:左图右文(Garch·OS 构图)——图为主角,判断在右列 ═══
+   数据桥已接:项目名/切换/改名=真源(b0 波再接 HERO 数字/里程碑/研判) */
 
-export function ProjectCenterBoard({ proj }: { proj: ReturnType<typeof useProjectState> }) {
+export function ProjectCenterBoard({ proj }: { proj: ProjectBridge }) {
   const img = boardImages.project
-  const P = proj.current
 
   return (
     <div className="absolute inset-0 flex gap-[26px] p-5 px-11 pb-[18px]">
@@ -44,9 +44,10 @@ export function ProjectCenterBoard({ proj }: { proj: ReturnType<typeof useProjec
           <ProjectSwitcher proj={proj} />
         </div>
         <div className="flex gap-[30px] py-0.5" data-in>
-          <StatBlock compact alignLeft tone="pri" value={P.prog} unit={P.progUnit} label="阶段进度" />
-          <StatBlock compact alignLeft value={P.files} label="文件" />
-          <StatBlock compact alignLeft tone="risk" value={P.focus} label="本周聚焦" />
+          {/* HERO 三数字暂保持占位口径,b0 波接真源(progress/files/focus);项目名/切换/改名已是真 */}
+          <StatBlock compact alignLeft tone="pri" value="—" label="阶段进度" />
+          <StatBlock compact alignLeft value="—" label="文件" />
+          <StatBlock compact alignLeft tone="risk" value="—" label="本周聚焦" />
         </div>
 
         {/* 阶段拆解:16 节点单行横滚 */}

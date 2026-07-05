@@ -6,7 +6,7 @@ import { energy, horizonY, sweepOnce, trigWave } from '../../lib/seaUniforms'
 import { lsSet } from '../../lib/storage'
 import { useBoardNavigation } from '../../hooks/useBoardNavigation'
 import { useCaptureMode } from '../../hooks/useCaptureMode'
-import { useProjectState } from '../../hooks/useProjectState'
+import { useProjectBridge } from '../../services/projectBridge'
 import { AgentCampBoard } from '../boards/AgentCampBoard'
 import { CockpitBoard } from '../boards/CockpitBoard'
 import { HubBoard } from '../boards/HubBoard'
@@ -26,7 +26,7 @@ export function AppShell() {
   const stageRef = useFluidStage()
   const capture = useCaptureMode()
   const nav = useBoardNavigation()
-  const proj = useProjectState()
+  const proj = useProjectBridge()
   const [filmPaused, setFilmPaused] = useState(false)
   const [progress, setProgress] = useState(0)
   const appRef = useRef<HTMLDivElement>(null)
@@ -94,7 +94,9 @@ export function AppShell() {
     return () => removeEventListener('keydown', onKey)
   }, [phase, nav])
 
-  const statusLeft = board === 0 ? `${proj.current.name} · ${proj.current.run}` : BOARD_STATUS[board]
+  const statusLeft = board === 0
+    ? (proj.cur ? `${proj.cur.name} · ${proj.cur.status || '进行中'}` : '项目加载中…')
+    : BOARD_STATUS[board]
 
   const enterFromBoards = useCallback((i: BoardIndex) => nav.enterApp(i), [nav])
 
@@ -142,13 +144,16 @@ export function AppShell() {
             <KnowledgeBaseBoard />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 2} skipAnim={capture}>
-            <AgentCampBoard projectName={proj.current.name} />
+            <AgentCampBoard projectName={proj.cur?.name ?? ''} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 3} skipAnim={capture}>
             <HubBoard />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 4} skipAnim={capture}>
-            <CockpitBoard curProj={proj.cur} projects={proj.projects} />
+            <CockpitBoard
+              curIdx={proj.cur ? Math.max(0, proj.projects.findIndex((p) => p.id === proj.cur!.id)) : 0}
+              projectNames={proj.projects.map((p) => p.name)}
+            />
           </BoardFrame>
           <StatusBar left={statusLeft} />
         </div>

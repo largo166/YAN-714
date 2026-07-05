@@ -22,6 +22,9 @@ type Special =
   | { type: 'slang'; items: SlangItem[] }
 
 /* 共创营地 · 暗色重写（Phase 2）。
+   ⚠️ 冻结令(2026-07-06 用户拍板):紫黑主 App 自此不再新增任何功能代码,只维持可用。
+   海天 OS(src/seasky)=ROM-AI 正式前端本体;五板逐板接通后紫黑路由逐板退役
+   (每板退役前打 tag retire-purple-{板名}-{日期} 可回滚)。本页 W0 对话流保留作对照,不拆不修。
    视觉对齐 DC 暗色霓虹；数据由 /api/skills 驱动；执行接真 runSkill。
    Phase 2：4 入口→子技能展开 + 方案评审「快速评审/设计委员会(MoA)」模式选择 + MoA 暗色渲染。
    已并入：成果归档回查(自 AgentPage 移植;AgentPage 已退役删除,对话流/外发等在 git 历史,
