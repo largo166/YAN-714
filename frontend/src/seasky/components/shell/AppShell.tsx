@@ -141,7 +141,7 @@ export function AppShell() {
             <ProjectCenterBoard proj={proj} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 1} skipAnim={capture}>
-            <KnowledgeBaseBoard />
+            <KnowledgeBaseBoard active={phase === 'app' && board === 1} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 2} skipAnim={capture}>
             <AgentCampBoard projectName={proj.cur?.name ?? ''} />
