@@ -151,7 +151,7 @@ export function AppShell() {
             />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 3} skipAnim={capture}>
-            <HubBoard />
+            <HubBoard active={phase === 'app' && board === 3} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 4} skipAnim={capture}>
             <CockpitBoard
