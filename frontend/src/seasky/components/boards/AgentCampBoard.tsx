@@ -192,6 +192,12 @@ export function AgentCampBoard({
         return
       }
       push({ id: nid(), kind: 'organize', data: { files, skipped, projectId, projectName } })
+      /* 工单§5:识别到文件夹拖入→轻建议去数据基地整理。浏览器拿不到文件夹绝对路径,
+         故只做识别+引导,不预填 workspace 真路径(诚实:预填路径浏览器端做不到) */
+      const isFolder = all.some((f) => (f as File & { webkitRelativePath?: string }).webkitRelativePath?.includes('/'))
+      if (isFolder) {
+        push({ id: nid(), kind: 'hint', text: '检测到整个文件夹——上面已按文件接入;若想扫描清理该目录的临时/副本文件,可点下方「🧹 一键清理」到数据基地整理。' })
+      }
     },
     [projectId, projectName, push],
   )
