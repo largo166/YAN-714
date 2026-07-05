@@ -17,6 +17,7 @@ import { MoaView, SpecialResultView, type Special } from '../agent/MoaView'
 import { OrganizeFlowCard, type OrganizePayload } from '../agent/OrganizeFlowCard'
 import { SkillLibraryPanel } from '../agent/SkillLibraryPanel'
 import { SkillQuickCards } from '../agent/SkillQuickCards'
+import { CAMP_QC_AGENTS, CAMP_QC_ASK } from '../../data/campCards'
 import { GhostButton, Label, Pill } from '../common/PillButton'
 
 /* ═══ b2 共创营地(功能基准板,构图冻结铁律区) ═══
@@ -27,19 +28,7 @@ import { GhostButton, Label, Pill } from '../common/PillButton'
 const DROP_EXTS = ['.txt', '.md', '.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg']
 const SPECIAL_SKILLS = new Set(['caselib', 'condition', 'slang'])
 
-/* 四张快捷卡(截图3 视觉不变):ask=真技能直跑;agents=真技能同 id(与紫黑 AGENTS 口径一致) */
-const QC_ASK = [
-  { i: '◐', t: '复盘进度', s: '总结近期投标推进与卡点', skillId: 'review' },
-  { i: '✦', t: '概念激发', s: '头脑风暴方案概念方向', skillId: 'concept' },
-  { i: '⌗', t: '任务拆解', s: '从纪要与材料提取待办', skillId: 'task' },
-  { i: '✎', t: '汇报提纲', s: '生成甲方汇报提纲与说辞', skillId: 'brief' },
-] as const
-const QC_AGENTS = [
-  { i: '领', t: '方案领航员', s: '从任务书引导到体量概念', skillId: 'concept' },
-  { i: '标', t: '对标研究员', s: '同类型案例检索与条目化对比', skillId: 'compete' },
-  { i: '文', t: '文本起草官', s: '投标文本 · 汇报叙事 · 一页纸', skillId: 'writer' },
-  { i: '督', t: '节点督办官', s: '盯紧里程碑与逾期风险', skillId: 'judge' },
-] as const
+/* 快捷卡数据源已外置到 data/campCards.ts(纪律:组件内不定义与数据源同名的本地常量) */
 
 interface SkillCardData {
   skillId: string
@@ -359,56 +348,54 @@ export function AgentCampBoard({
           ))}
         </div>
 
-        <AgentComposer
-          placeholder={
-            tab === 'ask'
-              ? '写下要共创的事,或按 / 挑一项能力…　Enter 发送 · Shift+Enter 换行'
-              : '写下要交办的任务,或按 / 挑一位设计智能体…　Enter 发送 · Shift+Enter 换行'
-          }
-          model={model}
-          onModelSelect={setModel}
-          onSend={heroSend}
-          onDraft={(t) => { composerText.current = t }}
-          onAttach={startOrganize}
-          onSlash={() => setPaletteOpen(true)}
-          pendingLabel={pending?.title ?? null}
-          onClearPending={clearPending}
-        />
+        {/* 单一内容列 W≈920:composer/四卡/动作行/浏览技能全部左右边缘对齐此列(消除倒三角) */}
+        <div className="mt-[22px] flex w-[min(920px,92vw)] flex-col items-stretch gap-4" data-in>
+          <AgentComposer
+            placeholder={
+              tab === 'ask'
+                ? '写下要共创的事,或按 / 挑一项能力'
+                : '写下要交办的任务,或按 / 挑一位设计智能体'
+            }
+            model={model}
+            onModelSelect={setModel}
+            onSend={heroSend}
+            onDraft={(t) => { composerText.current = t }}
+            onAttach={startOrganize}
+            onSlash={() => setPaletteOpen(true)}
+            pendingLabel={pending?.title ?? null}
+            onClearPending={clearPending}
+          />
 
-        <div className="mt-4 font-sans text-[10.5px] font-medium uppercase tracking-[0.3em] [text-indent:0.3em] text-sk-muted2" data-in>
-          挑一项快捷共创 · 按 / 唤出全部能力 · 或直接开口,带当前项目上下文一起做。
+          <SkillQuickCards
+            cards={tab === 'ask' ? CAMP_QC_ASK : CAMP_QC_AGENTS}
+            onPick={(skillId) => preSelect(skillId, live.byId[skillId]?.title)}
+          />
+
+          {/* 行动条:办事入口(接入/清理/纪要;建会 TOKEN 后置推迟)——点击只插卡,绝不直接执行 */}
+          <div className="flex w-full items-center justify-center gap-2.5">
+            {([
+              ['⬒ 接入资料', () => fileRef.current?.click()],
+              ['🧹 一键清理', openCleanup],
+              ['✎ 会议纪要', openMinute],
+            ] as const).map(([t, fn]) => (
+              <button
+                key={t}
+                className="cursor-pointer rounded-full border-[0.5px] border-sk-hairsoft bg-transparent px-4 py-1.5 font-skcjk text-[11.5px] font-light tracking-[0.1em] text-sk-muted transition-all duration-200 hover:border-[rgba(127,179,207,.4)] hover:text-sk-primary"
+                onClick={fn}
+              >
+                {t}
+              </button>
+            ))}
+            <input ref={fileRef} type="file" multiple hidden accept={DROP_EXTS.join(',')} onChange={(e) => { startOrganize(Array.from(e.target.files || [])); e.target.value = '' }} />
+          </div>
+
+          <button
+            className="flex w-full cursor-pointer items-center justify-center gap-[9px] rounded-[14px] border-[0.5px] border-dashed border-sk-hair bg-transparent p-3 font-skcjk text-[12.5px] font-light tracking-[0.14em] text-sk-muted transition-all duration-200 hover:border-[rgba(127,179,207,.4)] hover:text-sk-primary [&:hover>span]:translate-x-1"
+            onClick={() => setSkillsOpen(true)}
+          >
+            ▤ 浏览全部技能 <span className="transition-transform duration-200">→</span>
+          </button>
         </div>
-
-        <SkillQuickCards
-          cards={tab === 'ask' ? QC_ASK : QC_AGENTS}
-          onPick={(skillId) => preSelect(skillId, live.byId[skillId]?.title)}
-        />
-
-        {/* 行动条:办事入口(接入/清理/纪要;建会 TOKEN 后置推迟)——点击只插卡,绝不直接执行 */}
-        <div className="mt-3 flex w-[min(1020px,94%)] items-center justify-center gap-2.5" data-in>
-          {([
-            ['⬒ 接入资料', () => fileRef.current?.click()],
-            ['🧹 一键清理', openCleanup],
-            ['✎ 会议纪要', openMinute],
-          ] as const).map(([t, fn]) => (
-            <button
-              key={t}
-              className="cursor-pointer rounded-full border-[0.5px] border-sk-hairsoft bg-transparent px-4 py-1.5 font-skcjk text-[11.5px] font-light tracking-[0.1em] text-sk-muted transition-all duration-200 hover:border-[rgba(127,179,207,.4)] hover:text-sk-primary"
-              onClick={fn}
-            >
-              {t}
-            </button>
-          ))}
-          <input ref={fileRef} type="file" multiple hidden accept={DROP_EXTS.join(',')} onChange={(e) => { startOrganize(Array.from(e.target.files || [])); e.target.value = '' }} />
-        </div>
-
-        <button
-          className="mt-3.5 flex w-[min(1020px,94%)] cursor-pointer items-center justify-center gap-[9px] rounded-[14px] border-[0.5px] border-dashed border-sk-hair bg-transparent p-3 font-skcjk text-[12.5px] font-light tracking-[0.14em] text-sk-muted transition-all duration-200 hover:border-[rgba(127,179,207,.4)] hover:text-sk-primary [&:hover>span]:translate-x-1"
-          data-in
-          onClick={() => setSkillsOpen(true)}
-        >
-          ▤ 浏览全部技能 <span className="transition-transform duration-200">→</span>
-        </button>
       </div>
 
       {/* ── 对话流(二级态):真实成果卡+动作卡 ── */}

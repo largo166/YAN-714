@@ -42,7 +42,7 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
   }
 
   return (
-    <div className="mt-[22px] w-[min(760px,86%)]" data-in>
+    <div className="w-full" data-in>
       <div className="relative rounded-skcomposer border-[0.5px] border-sk-border bg-sk-composer p-[18px] pb-3 backdrop-blur-[14px] transition-all duration-[250ms] focus-within:border-[rgba(127,179,207,.45)] focus-within:shadow-[0_0_34px_rgba(127,179,207,.12)]">
         {pendingLabel && (
           <div className="mb-2 flex items-center gap-2">
@@ -55,7 +55,7 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
         )}
         <textarea
           ref={taRef}
-          className="h-16 w-full resize-none border-0 bg-transparent font-skcjk text-[14.5px] font-light leading-[1.8] tracking-[0.05em] text-sk-fg outline-none placeholder:text-sk-muted2"
+          className="h-[92px] w-full resize-none border-0 bg-transparent font-skcjk text-[14.5px] font-light leading-[1.8] tracking-[0.05em] text-sk-fg outline-none placeholder:text-sk-muted2"
           placeholder={pendingLabel ? `为「${pendingLabel}」补充要求…　Enter 确认执行` : placeholder}
           onKeyDown={onKey}
           onChange={(e) => {
@@ -100,6 +100,9 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
             ↑
           </button>
         </div>
+      </div>
+      <div className="mt-1.5 px-1 font-sans text-[10px] font-light tracking-[0.08em] text-[rgba(161,165,170,.45)]">
+        Enter 发送 · Shift+Enter 换行
       </div>
     </div>
   )
