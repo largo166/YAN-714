@@ -8,6 +8,7 @@ import BoardBackdrop from '@/lib/BoardBackdrop'
 import { SkillGlyph } from '@/lib/icons'
 import { useProject } from '@/contexts/useProject'
 import RichText from '@/components/RichText'
+import { ActionCardShell, C, CardBtn, nextMsgId, TonePill, type CardTone } from '@/components/camp/campFlow'
 import type { Skill, SkillRun, SkillResult, KnowledgeHit, ProjectCognition } from '@/types/schemas'
 
 // caselib/condition/slang 接真实端点(非技能执行),各自渲染
@@ -24,14 +25,19 @@ type Special =
    视觉对齐 DC 暗色霓虹；数据由 /api/skills 驱动；执行接真 runSkill。
    Phase 2：4 入口→子技能展开 + 方案评审「快速评审/设计委员会(MoA)」模式选择 + MoA 暗色渲染。
    已并入：成果归档回查(自 AgentPage 移植;AgentPage 已退役删除,对话流/外发等在 git 历史,
-   追问系统立项时再复活)。未做（Phase 3+）：富对话追问、对话流历史。 */
+   追问系统立项时再复活)。
+   W0(2026-07-05)：单次成果视图升级为会话内对话流(convo)——技能成果包成流内卡,composer 补
+   Enter 发送/发送键;流仅存内存(刷新即清,成果有 SkillResult 归档兜底;持久化列 P2 首位)。 */
 
-const C = {
-  purple: '#7c5cff', blue: '#42a5ff', gold: '#d7a86e', cyan: '#36e6d4', red: '#ff5e66', amber: '#fdab3d',
-  ink: '#f4f1ea', ink2: '#d8d4cc', mut: '#8f96a5', mut2: '#5f6674',
-  line: 'rgba(255,255,255,.08)', glass: 'linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.028))',
-}
+// 色票 C 从 campFlow 引入(与原值相同);动作卡外壳/三态 pill 同源,状态语言对齐 seasky 规格
 const CAT_ORDER = ['概念与方案', '竞品与研究', '文本与汇报', '出图与表现', '审查与合规']
+
+// 对话流消息:用户文本 / 中性提示 / 技能卡(W1-W4 再加 organize/cleanup/minute 动作卡)
+type SkillCardData = { skillId: string; skill: Skill | null; moa: boolean; input: string; busy: boolean; err: string; result: SkillRun | null; special: Special | null }
+type FlowMsg =
+  | { id: number; kind: 'user'; text: string }
+  | { id: number; kind: 'hint'; text: string }
+  | { id: number; kind: 'skill'; data: SkillCardData }
 
 // 4 个 ASK 入口 → 各自子技能（点入口先展开，不直接跑）
 const ENTRIES: Record<string, { title: string; subs: string[] }> = {
@@ -179,16 +185,29 @@ export default function CampPage() {
   const { cur } = useProject()
   const [skills, setSkills] = useState<Skill[]>([])
   const [tab, setTab] = useState<'ask' | 'agents'>('ask')
-  const [view, setView] = useState<'hero' | 'entry' | 'skills' | 'run' | 'archive'>('hero')
+  const [view, setView] = useState<'hero' | 'entry' | 'skills' | 'convo' | 'archive'>('hero')
   const [entry, setEntry] = useState<string>('')          // 当前展开的入口
   const [text, setText] = useState('')
-  const [active, setActive] = useState<Skill | null>(null)
-  const [result, setResult] = useState<SkillRun | null>(null)
-  const [moaMode, setMoaMode] = useState(false)
   const [picker, setPicker] = useState(false)             // 方案评审「快速/设计委员会」选择
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const [special, setSpecial] = useState<Special | null>(null)
+  // W0 对话流:消息数组仅存内存(刷新即清;成果有 SkillResult 归档兜底;持久化=P2 第一优先)
+  const [msgs, setMsgs] = useState<FlowMsg[]>([])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const msgsRef = useRef(msgs)
+  msgsRef.current = msgs
+  const toBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      const s = scrollRef.current
+      if (s) s.scrollTop = s.scrollHeight
+    })
+  }, [])
+  const pushMsg = useCallback((m: FlowMsg) => {
+    setMsgs((arr) => [...arr, m])
+    toBottom()
+  }, [toBottom])
+  const patchSkillCard = useCallback((id: number, patch: Partial<SkillCardData>) => {
+    setMsgs((arr) => arr.map((m) => (m.id === id && m.kind === 'skill' ? { ...m, data: { ...m.data, ...patch } } : m)))
+    toBottom()
+  }, [toBottom])
   // 成果归档(自 AgentPage 移植)：项目历史成果回查——过几天翻出上次的评图/PPT/图
   const [archItems, setArchItems] = useState<SkillResult[]>([])
   const [archBusy, setArchBusy] = useState(false)
@@ -246,40 +265,80 @@ export default function CampPage() {
   }, [skills])
 
   const run = useCallback(async (skillId: string, mode = '') => {
-    setActive(byId[skillId] || null)
-    setView('run'); setResult(null); setSpecial(null); setErr(''); setMoaMode(mode === 'moa'); setPicker(false)
-    if (!cur) { setErr('请先在顶部选择作用项目，再共创。'); return }
-    setBusy(true)
+    const skill = byId[skillId] || null
+    setPicker(false)
+    setView('convo')
+    const input = text.trim()
+    if (input) pushMsg({ id: nextMsgId(), kind: 'user', text: input })
+    if (!cur) { pushMsg({ id: nextMsgId(), kind: 'hint', text: '请先在顶部选择作用项目,再共创。' }); return }
+    const cardId = nextMsgId()
+    pushMsg({ id: cardId, kind: 'skill', data: { skillId, skill, moa: mode === 'moa', input, busy: true, err: '', result: null, special: null } })
+    setText('')
     try {
-      setResult(await api.runSkill(cur.id, skillId, text.trim(), '', 0, '', '', mode))
+      const r = await api.runSkill(cur.id, skillId, input, '', 0, '', '', mode)
+      patchSkillCard(cardId, { busy: false, result: r })
     } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setBusy(false)
+      patchSkillCard(cardId, { busy: false, err: (e as Error).message })
     }
-  }, [cur, text, byId])
+  }, [cur, text, byId, pushMsg, patchSkillCard])
 
   // caselib/condition/slang 接真实端点(知识检索/认知读取/黑话词典),不走技能执行
   const runSpecial = useCallback(async (skillId: string) => {
-    setActive(byId[skillId] || null)
-    setView('run'); setResult(null); setSpecial(null); setErr(''); setMoaMode(false); setPicker(false)
-    if (!cur) { setErr('请先在顶部选择作用项目，再共创。'); return }
-    setBusy(true)
+    const skill = byId[skillId] || null
+    setPicker(false)
+    setView('convo')
+    const input = text.trim()
+    if (input) pushMsg({ id: nextMsgId(), kind: 'user', text: input })
+    if (!cur) { pushMsg({ id: nextMsgId(), kind: 'hint', text: '请先在顶部选择作用项目,再共创。' }); return }
+    const cardId = nextMsgId()
+    pushMsg({ id: cardId, kind: 'skill', data: { skillId, skill, moa: false, input, busy: true, err: '', result: null, special: null } })
+    setText('')
     try {
       if (skillId === 'caselib') {
-        const r = await api.searchKnowledge(text.trim() || cur.name, 8)
-        setSpecial({ type: 'knowledge', hits: r.hits })
+        const r = await api.searchKnowledge(input || cur.name, 8)
+        patchSkillCard(cardId, { busy: false, special: { type: 'knowledge', hits: r.hits } })
       } else if (skillId === 'condition') {
-        setSpecial({ type: 'cognition', items: await api.listCognition(cur.id) })
+        patchSkillCard(cardId, { busy: false, special: { type: 'cognition', items: await api.listCognition(cur.id) } })
       } else {
-        setSpecial({ type: 'slang', items: await api.querySlang(cur.id, text.trim()) })
+        patchSkillCard(cardId, { busy: false, special: { type: 'slang', items: await api.querySlang(cur.id, input) } })
       }
     } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setBusy(false)
+      patchSkillCard(cardId, { busy: false, err: (e as Error).message })
     }
-  }, [cur, text, byId])
+  }, [cur, text, byId, pushMsg, patchSkillCard])
+
+  // 卡内重试:同参重跑(仅重置本卡)
+  const retrySkillCard = useCallback(async (cardId: number, d: SkillCardData) => {
+    if (!cur) return
+    patchSkillCard(cardId, { busy: true, err: '' })
+    try {
+      if (SPECIAL_SKILLS.has(d.skillId)) {
+        if (d.skillId === 'caselib') {
+          const r = await api.searchKnowledge(d.input || cur.name, 8)
+          patchSkillCard(cardId, { busy: false, special: { type: 'knowledge', hits: r.hits } })
+        } else if (d.skillId === 'condition') {
+          patchSkillCard(cardId, { busy: false, special: { type: 'cognition', items: await api.listCognition(cur.id) } })
+        } else {
+          patchSkillCard(cardId, { busy: false, special: { type: 'slang', items: await api.querySlang(cur.id, d.input) } })
+        }
+      } else {
+        const r = await api.runSkill(cur.id, d.skillId, d.input, '', 0, '', '', d.moa ? 'moa' : '')
+        patchSkillCard(cardId, { busy: false, result: r })
+      }
+    } catch (e) {
+      patchSkillCard(cardId, { busy: false, err: (e as Error).message })
+    }
+  }, [cur, patchSkillCard])
+
+  // composer 纯文本发送(Enter/发送键):非命令文本如实提示——后端无自由对话 NLU,不假装能聊
+  const sendText = useCallback(() => {
+    const t = text.trim()
+    if (!t) return
+    setView('convo')
+    pushMsg({ id: nextMsgId(), kind: 'user', text: t })
+    pushMsg({ id: nextMsgId(), kind: 'hint', text: '这段话我会作为下一次技能执行的输入。请点一张技能卡(或「+」打开技能库)开始共创;自由对话在后续版本接入。' })
+    setText('')
+  }, [text, pushMsg])
 
   // 子技能点击：方案评审 → 弹模式选择;caselib/condition/slang → 真实端点;其余跑技能
   const handleSub = (skillId: string) => {
@@ -291,11 +350,15 @@ export default function CampPage() {
   const composer = (big: boolean) => (
     <div style={{ padding: 2, borderRadius: 22, background: 'linear-gradient(120deg,rgba(124,92,255,.85),rgba(66,165,255,.6) 42%,rgba(215,168,110,.7))', boxShadow: '0 0 50px rgba(124,92,255,.22)' }}>
       <div style={{ borderRadius: 20, background: 'rgba(8,10,16,.92)', padding: '14px 16px 12px', minHeight: big ? 132 : 'auto', display: 'flex', flexDirection: 'column' }}>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'agents' ? '描述拖慢团队的重复工作，让智能体接管…' : '从一个想法到一套方案，把要共创的事告诉我…'} rows={big ? 3 : 2}
+        <textarea value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText() } }}
+          placeholder={tab === 'agents' ? '描述拖慢团队的重复工作，让智能体接管…　Enter 发送 · Shift+Enter 换行' : '从一个想法到一套方案，把要共创的事告诉我…　Enter 发送 · Shift+Enter 换行'} rows={big ? 3 : 2}
           style={{ flex: big ? 1 : 'none', background: 'transparent', border: 'none', outline: 'none', resize: 'none', color: C.ink, fontSize: 15, fontFamily: 'inherit', padding: 0, marginBottom: 8 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" title="打开技能库" onClick={() => setView('skills')} style={{ width: 30, height: 30, borderRadius: 9, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: C.ink2, fontSize: 17, cursor: 'pointer' }}>+</button>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7, height: 32, padding: '0 11px', borderRadius: 10, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', color: C.ink2, fontSize: 13 }}><BrandMark size={15} /> ROM Max ▾</span>
+          <button type="button" title="发送 · Enter" onClick={sendText}
+            style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', background: text.trim() ? 'linear-gradient(145deg,#8d72ff,#6a4fe0)' : 'rgba(255,255,255,.08)', color: text.trim() ? '#fff' : C.mut, fontSize: 15, display: 'grid', placeItems: 'center', transition: 'all .2s' }}>↑</button>
         </div>
       </div>
     </div>
@@ -466,44 +529,69 @@ export default function CampPage() {
     </div>
   )
 
-  const runView = () => {
+  // W0 对话流:消息自上而下追加;技能卡三态(⏳/成果/失败+重试);底部 composer 常驻
+  const skillCard = (id: number, d: SkillCardData) => {
     let moaChecklist: Record<string, unknown> | null = null
-    if (moaMode && result?.status === 'ok' && result.output_json) {
-      try { const d = JSON.parse(result.output_json); moaChecklist = (d && d.checklist) || null } catch { moaChecklist = null }
+    if (d.moa && d.result?.status === 'ok' && d.result.output_json) {
+      try { const j = JSON.parse(d.result.output_json); moaChecklist = (j && j.checklist) || null } catch { moaChecklist = null }
     }
+    const tone: CardTone = d.busy ? 'pending' : d.err || d.result?.status === 'error' ? 'error'
+      : d.result?.status === 'not_configured' || d.result?.status === 'no_material' ? 'neutral' : 'ok'
+    const pillText = d.busy ? (d.moa ? '设计委员会评审中' : '共创中') : tone === 'error' ? '失败' : tone === 'neutral' ? (d.result?.status === 'not_configured' ? '未配置' : '无材料') : '完成'
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ height: 58, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 26px', borderBottom: '1px solid ' + C.line, background: 'rgba(3,4,6,.4)' }}>
-          <button type="button" onClick={() => setView(entry ? 'entry' : 'hero')} style={{ fontFamily: 'inherit', cursor: 'pointer', height: 34, padding: '0 13px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.05)', color: C.ink2, fontSize: 13 }}>← 返回</button>
-          <BrandMark size={22} />
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{active?.title || '共创'}{moaMode && <span style={{ fontSize: 11, color: C.purple, marginLeft: 8 }}>· 设计委员会</span>}</div>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 26 }}>
-          <div style={{ maxWidth: 760, margin: '0 auto', color: C.ink2, fontSize: 14, lineHeight: 1.7 }}>
-            {busy && <div style={{ color: C.cyan }}>⏳ {moaMode ? '正在召集设计委员会（三位评图人 + 主审，约 15–60 秒）…' : `正在共创「${active?.title}」…`}</div>}
-            {!busy && err && <div style={{ color: C.red }}>执行失败：{err}<button type="button" onClick={() => { if (!active) return; if (SPECIAL_SKILLS.has(active.id)) runSpecial(active.id); else run(active.id, moaMode ? 'moa' : '') }} style={{ marginLeft: 10, cursor: 'pointer', background: 'transparent', border: '1px solid ' + C.line, color: C.ink2, borderRadius: 8, padding: '2px 10px' }}>重试</button></div>}
-            {!busy && special && <SpecialView s={special} />}
-            {!busy && result && result.status !== 'ok' && (
-              <div style={{ color: C.mut }}>
-                {result.status === 'not_configured' && '尚未配置 AI 引擎。到「设置」填入 DeepSeek API Key 后即可共创。'}
-                {result.status === 'no_material' && '本项目暂无可用材料。请先到数据基地上传/索引资料。'}
-                {result.status === 'error' && `执行失败：${result.error_message || result.content}`}
-              </div>
-            )}
-            {!busy && result && result.status === 'ok' && (
-              moaChecklist ? <MoaDark cl={moaChecklist} />
-                : result.image_url && cur ? (
-                  <a href={api.projectImageUrl(cur.id, result.image_url)} target="_blank" rel="noreferrer"><img src={api.projectImageUrl(cur.id, result.image_url)} alt={active?.title} style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid ' + C.line }} /></a>
-                ) : <div style={{ color: C.ink }}><RichText text={result.content} /></div>
-            )}
+      <ActionCardShell key={id} icon={<SkillGlyph id={d.skillId} fallback={d.skill?.icon} size={15} />}
+        title={(d.skill?.title || d.skillId) + (d.moa ? ' · 设计委员会' : '')} pill={<TonePill tone={tone} text={pillText} />}>
+        {d.busy && <div style={{ color: C.cyan }}>⏳ {d.moa ? '正在召集设计委员会（三位评图人 + 主审，约 15–60 秒）…' : `正在共创「${d.skill?.title || d.skillId}」…`}</div>}
+        {!d.busy && d.err && (
+          <div style={{ color: C.red }}>执行失败：{d.err}
+            <span style={{ marginLeft: 10 }}><CardBtn onClick={() => retrySkillCard(id, d)}>重试</CardBtn></span>
           </div>
-        </div>
-        <div style={{ flexShrink: 0, padding: '14px 26px 22px', borderTop: '1px solid ' + C.line, background: 'rgba(3,4,6,.4)' }}>
-          <div style={{ maxWidth: 760, margin: '0 auto' }}>{composer(false)}</div>
-        </div>
-      </div>
+        )}
+        {!d.busy && d.special && <SpecialView s={d.special} />}
+        {!d.busy && d.result && d.result.status !== 'ok' && (
+          <div style={{ color: C.mut }}>
+            {d.result.status === 'not_configured' && '尚未配置 AI 引擎。到「设置」填入 DeepSeek API Key 后即可共创。'}
+            {d.result.status === 'no_material' && '本项目暂无可用材料。请先到数据基地上传/索引资料。'}
+            {d.result.status === 'error' && `执行失败：${d.result.error_message || d.result.content}`}
+          </div>
+        )}
+        {!d.busy && d.result && d.result.status === 'ok' && (
+          moaChecklist ? <MoaDark cl={moaChecklist} />
+            : d.result.image_url && cur ? (
+              <a href={api.projectImageUrl(cur.id, d.result.image_url)} target="_blank" rel="noreferrer"><img src={api.projectImageUrl(cur.id, d.result.image_url)} alt={d.skill?.title} style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid ' + C.line }} /></a>
+            ) : <div style={{ color: C.ink }}><RichText text={d.result.content} /></div>
+        )}
+      </ActionCardShell>
     )
   }
+
+  const convoView = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ height: 58, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 26px', borderBottom: '1px solid ' + C.line, background: 'rgba(3,4,6,.4)' }}>
+        <button type="button" onClick={() => setView(entry ? 'entry' : 'hero')} style={{ fontFamily: 'inherit', cursor: 'pointer', height: 34, padding: '0 13px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.05)', color: C.ink2, fontSize: 13 }}>← 返回营地</button>
+        <BrandMark size={22} />
+        <div style={{ fontSize: 14, fontWeight: 700 }}>共创对话流</div>
+        <div style={{ fontSize: 11.5, color: C.mut2, marginLeft: 'auto' }}>{cur ? `${cur.name} · 本次会话 · 成果自动归档` : '未选择项目'}</div>
+      </div>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 26 }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {msgs.length === 0 && <div style={{ color: C.mut, fontSize: 13, textAlign: 'center', marginTop: 40 }}>从下方输入,或回营地挑一张技能卡开始。</div>}
+          {msgs.map((m) => {
+            if (m.kind === 'user') return (
+              <div key={m.id} style={{ alignSelf: 'flex-end', maxWidth: '82%', background: 'rgba(124,92,255,.14)', border: '1px solid rgba(124,92,255,.3)', borderRadius: '16px 4px 16px 16px', padding: '10px 14px', fontSize: 13.5, color: C.ink, lineHeight: 1.65 }}>{m.text}</div>
+            )
+            if (m.kind === 'hint') return (
+              <div key={m.id} style={{ alignSelf: 'center', maxWidth: '88%', color: C.mut, fontSize: 12.5, textAlign: 'center', border: '1px dashed ' + C.line, borderRadius: 12, padding: '8px 14px' }}>{m.text}</div>
+            )
+            return skillCard(m.id, m.data)
+          })}
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: '14px 26px 22px', borderTop: '1px solid ' + C.line, background: 'rgba(3,4,6,.4)' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto' }}>{composer(false)}</div>
+      </div>
+    </div>
+  )
 
   return (
     <div
@@ -512,7 +600,7 @@ export default function CampPage() {
       onDragLeave={(e) => { e.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDrag(false) }}
       onDrop={onDrop}
       style={{ minHeight: '100%', position: 'relative', color: C.ink, display: 'flex', flexDirection: 'column', background: 'radial-gradient(circle at 18% -6%, rgba(124,92,255,.28), transparent 31%), radial-gradient(circle at 86% 4%, rgba(66,165,255,.16), transparent 28%), radial-gradient(circle at 64% 108%, rgba(215,168,110,.11), transparent 32%), linear-gradient(180deg, #030406 0%, #07080c 44%, #030406 100%)' }}>
-      {view === 'skills' ? skillsView() : view === 'run' ? runView() : view === 'archive' ? archiveView() : view === 'entry' ? entryView() : hero()}
+      {view === 'skills' ? skillsView() : view === 'convo' ? convoView() : view === 'archive' ? archiveView() : view === 'entry' ? entryView() : hero()}
 
       {/* 拖拽接入：发光虚线遮罩 + 接入结果 toast */}
       {drag && (
