@@ -138,7 +138,7 @@ export function AppShell() {
         <div ref={appRef} className="absolute inset-0 z-[8]" style={{ display: phase === 'app' ? 'block' : 'none' }}>
           <TopNavCapsules board={board} onSwitch={nav.switchBoard} />
           <BoardFrame active={phase === 'app' && board === 0} skipAnim={capture}>
-            <ProjectCenterBoard proj={proj} />
+            <ProjectCenterBoard proj={proj} active={phase === 'app' && board === 0} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 1} skipAnim={capture}>
             <KnowledgeBaseBoard active={phase === 'app' && board === 1} />
