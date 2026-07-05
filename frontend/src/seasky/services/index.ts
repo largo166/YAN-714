@@ -31,6 +31,7 @@ export const projectService = {
   quickTencentMeeting: api.quickTencentMeeting,
   listMeetings: api.listMeetings,
   getLatestMinute: api.getLatestMinute,
+  generateMinute: api.generateMinute,
   syncTencentMinutes: api.syncTencentMinutes,
   minuteDocxUrl: api.minuteDocxUrl,
   minutePrintUrl: api.minutePrintUrl,

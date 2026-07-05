@@ -144,7 +144,11 @@ export function AppShell() {
             <KnowledgeBaseBoard active={phase === 'app' && board === 1} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 2} skipAnim={capture}>
-            <AgentCampBoard projectName={proj.cur?.name ?? ''} />
+            <AgentCampBoard
+              projectId={proj.cur?.id ?? null}
+              projectName={proj.cur?.name ?? ''}
+              onGoBoard={(i) => nav.switchBoard(i as BoardIndex)}
+            />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 3} skipAnim={capture}>
             <HubBoard />
