@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { boardImages } from '../../data/boardImages'
 import { useKnowledgeLive } from '../../hooks/useKnowledgeLive'
@@ -17,6 +17,13 @@ export function KnowledgeBaseBoard({ active }: { active: boolean }) {
   const [recentOpen, setRecentOpen] = useState(false)
   const [cleanupOpen, setCleanupOpen] = useState(false)
   const img = boardImages.data
+
+  /* 营地清理卡跳板信号:切到 b1 后自动打开清理浮层(破坏动作在此权威面执行,ADR-001) */
+  useEffect(() => {
+    const open = () => setCleanupOpen(true)
+    window.addEventListener('romai:seasky:open-cleanup', open)
+    return () => window.removeEventListener('romai:seasky:open-cleanup', open)
+  }, [])
 
   const big = live.stats ? String(live.stats.documents) : live.loading ? '…' : '—'
   const idxRate = live.stats && live.stats.documents > 0

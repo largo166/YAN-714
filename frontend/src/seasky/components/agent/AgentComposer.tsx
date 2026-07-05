@@ -13,9 +13,12 @@ interface AgentComposerProps {
   onSend: (text: string) => void
   onDraft?: (text: string) => void
   onAttach?: (files: File[]) => void
+  onSlash?: () => void
+  pendingLabel?: string | null
+  onClearPending?: () => void
 }
 
-export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDraft, onAttach }: AgentComposerProps) {
+export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDraft, onAttach, onSlash, pendingLabel, onClearPending }: AgentComposerProps) {
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [hasText, setHasText] = useState(false)
@@ -24,7 +27,8 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
     const ta = taRef.current
     if (!ta) return
     const txt = ta.value.trim()
-    if (!txt) return
+    /* 有预填技能时空文本也可确认执行;否则需有文本 */
+    if (!txt && !pendingLabel) return
     ta.value = ''
     setHasText(false)
     onDraft?.('')
@@ -40,14 +44,31 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
   return (
     <div className="mt-[22px] w-[min(760px,86%)]" data-in>
       <div className="relative rounded-skcomposer border-[0.5px] border-sk-border bg-sk-composer p-[18px] pb-3 backdrop-blur-[14px] transition-all duration-[250ms] focus-within:border-[rgba(127,179,207,.45)] focus-within:shadow-[0_0_34px_rgba(127,179,207,.12)]">
+        {pendingLabel && (
+          <div className="mb-2 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border-[0.5px] border-[rgba(127,179,207,.4)] bg-[rgba(127,179,207,.1)] px-2.5 py-1 font-skcjk text-[11.5px] font-normal text-sk-primary">
+              已选:{pendingLabel}
+              <button className="cursor-pointer text-sk-muted2 hover:text-sk-fg" title="取消" onClick={onClearPending}>✕</button>
+            </span>
+            <span className="font-skcjk text-[10.5px] font-light text-sk-muted2">补充要求(可留空),回车确认执行</span>
+          </div>
+        )}
         <textarea
           ref={taRef}
           className="h-16 w-full resize-none border-0 bg-transparent font-skcjk text-[14.5px] font-light leading-[1.8] tracking-[0.05em] text-sk-fg outline-none placeholder:text-sk-muted2"
-          placeholder={placeholder}
+          placeholder={pendingLabel ? `为「${pendingLabel}」补充要求…　Enter 确认执行` : placeholder}
           onKeyDown={onKey}
           onChange={(e) => {
-            setHasText(!!e.target.value.trim())
-            onDraft?.(e.target.value)
+            const v = e.target.value
+            setHasText(!!v.trim())
+            onDraft?.(v)
+            /* 空框首字符输入 "/" → 唤出命令面板(经典 slash 行为),并清掉那个 "/" */
+            if (v === '/' && onSlash) {
+              e.target.value = ''
+              setHasText(false)
+              onDraft?.('')
+              onSlash()
+            }
           }}
         />
         <div className="mt-2 flex items-center gap-2">
@@ -71,7 +92,7 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
           <ModelSelector model={model} onSelect={onModelSelect} />
           <button
             className={`grid h-[34px] w-[34px] flex-none cursor-pointer place-items-center rounded-full border-0 text-[15px] transition-colors duration-200 ${
-              hasText ? 'bg-sk-primary text-[#0a0c0e] hover:bg-[#8fc0da]' : 'bg-[rgba(242,241,238,.08)] text-sk-muted'
+              hasText || pendingLabel ? 'bg-sk-primary text-[#0a0c0e] hover:bg-[#8fc0da]' : 'bg-[rgba(242,241,238,.08)] text-sk-muted'
             }`}
             title="发送 · Enter"
             onClick={send}

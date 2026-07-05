@@ -10,6 +10,7 @@ import { cn } from '../../lib/cn'
 import { campService as cs } from '../../services'
 import { AgentComposer } from '../agent/AgentComposer'
 import { CleanupFlowCard } from '../agent/CleanupFlowCard'
+import { CommandPalette, type PaletteItem } from '../agent/CommandPalette'
 import { FlowBtn, FlowCard, FlowTonePill, type CardTone } from '../agent/flowKit'
 import { MinuteFlowCard } from '../agent/MinuteFlowCard'
 import { MoaView, SpecialResultView, type Special } from '../agent/MoaView'
@@ -76,6 +77,8 @@ export function AgentCampBoard({
   const [view, setView] = useState<'hero' | 'convo'>('hero')
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [picker, setPicker] = useState(false) /* 方案评审:快速/设计委员会 模式选择(紫黑同款能力) */
+  const [paletteOpen, setPaletteOpen] = useState(false) /* 命令面板(/ 触发,能力总线确认基座) */
+  const [pending, setPending] = useState<PaletteItem | null>(null) /* 已预填技能:发送键=确认执行,永不静默 */
   const [msgs, setMsgs] = useState<FlowMsg[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const convoTaRef = useRef<HTMLTextAreaElement>(null)
@@ -160,19 +163,29 @@ export function AgentCampBoard({
     [projectId, projectName, patchSkill],
   )
 
-  /* ── 快捷卡/技能库点击:review 弹模式选择,其余直跑(紫黑同交互) ── */
+  /* ── 快捷卡/技能库/命令面板点击:预填而非直跑(ADR-001 确认基座) ──
+     review 仍弹模式选择(其本身即确认场景);其余技能落 pending,发送键=确认执行。 */
   const composerText = useRef('')
-  const handleSkill = useCallback(
-    (skillId: string) => {
+  const preSelect = useCallback(
+    (skillId: string, title?: string, category = '', slash?: string, confirm?: boolean) => {
       if (skillId === 'review') {
         setPicker(true)
         return
       }
-      void runSkill(skillId, composerText.current.trim())
-      composerText.current = ''
+      /* 特殊检索类(caselib/condition/slang)是只读、无副作用、无参数 → 预填后即可发,但仍需用户按发送确认 */
+      setPending({ skillId, title: title ?? skillId, desc: '', category, slash, confirm })
     },
-    [runSkill],
+    [],
   )
+  /* 命令面板选中:统一走预填 */
+  const pickFromPalette = useCallback(
+    (it: PaletteItem) => {
+      setPaletteOpen(false)
+      preSelect(it.skillId, it.title, it.category, it.slash, it.confirm)
+    },
+    [preSelect],
+  )
+  const clearPending = useCallback(() => setPending(null), [])
 
   /* ── 动作卡入口(行动条/附件) ── */
   const startOrganize = useCallback(
@@ -204,15 +217,28 @@ export function AgentCampBoard({
 
   const heroSend = useCallback(
     (txt: string) => {
-      /* hero 发送:文本作为「智能研判」输入直接共创(真技能,与紫黑 hero 语义一致) */
-      void runSkill('judge', txt)
+      /* 发送=确认执行:有预填技能则跑它(消费后清空),否则自由文本走智能研判 judge */
+      if (pending) {
+        const sid = pending.skillId
+        setPending(null)
+        void runSkill(sid, txt)
+      } else if (txt) {
+        void runSkill('judge', txt)
+      }
     },
-    [runSkill],
+    [runSkill, pending],
   )
   const convoSend = () => {
     const ta = convoTaRef.current
     if (!ta) return
     const txt = ta.value.trim()
+    if (pending) {
+      const sid = pending.skillId
+      setPending(null)
+      ta.value = ''
+      void runSkill(sid, txt)
+      return
+    }
     if (!txt) return
     ta.value = ''
     void runSkill('judge', txt)
@@ -336,23 +362,26 @@ export function AgentCampBoard({
         <AgentComposer
           placeholder={
             tab === 'ask'
-              ? '从一个想法到一套方案,把要共创的事告诉我…　Enter 发送 · Shift+Enter 换行'
-              : '把任务交给一位设计智能体…　Enter 发送 · Shift+Enter 换行'
+              ? '写下要共创的事,或按 / 挑一项能力…　Enter 发送 · Shift+Enter 换行'
+              : '写下要交办的任务,或按 / 挑一位设计智能体…　Enter 发送 · Shift+Enter 换行'
           }
           model={model}
           onModelSelect={setModel}
           onSend={heroSend}
           onDraft={(t) => { composerText.current = t }}
           onAttach={startOrganize}
+          onSlash={() => setPaletteOpen(true)}
+          pendingLabel={pending?.title ?? null}
+          onClearPending={clearPending}
         />
 
         <div className="mt-4 font-sans text-[10.5px] font-medium uppercase tracking-[0.3em] [text-indent:0.3em] text-sk-muted2" data-in>
-          挑一个快捷共创,或直接开口 — 我会带着你的项目上下文一起想。
+          挑一项快捷共创 · 按 / 唤出全部能力 · 或直接开口,带当前项目上下文一起做。
         </div>
 
         <SkillQuickCards
           cards={tab === 'ask' ? QC_ASK : QC_AGENTS}
-          onPick={(skillId) => handleSkill(skillId)}
+          onPick={(skillId) => preSelect(skillId, live.byId[skillId]?.title)}
         />
 
         {/* 行动条:办事入口(接入/清理/纪要;建会 TOKEN 后置推迟)——点击只插卡,绝不直接执行 */}
@@ -407,17 +436,29 @@ export function AgentCampBoard({
                 </div>
               )
             if (m.kind === 'organize') return <OrganizeFlowCard key={m.id} p={m.data} onGoKnow={() => onGoBoard(1)} />
-            if (m.kind === 'cleanup') return <CleanupFlowCard key={m.id} />
+            if (m.kind === 'cleanup') return <CleanupFlowCard key={m.id} onGoCleanup={() => { onGoBoard(1); window.dispatchEvent(new CustomEvent('romai:seasky:open-cleanup')) }} />
             if (m.kind === 'minute') return <MinuteFlowCard key={m.id} projectId={projectId} onGoProject={() => onGoBoard(0)} />
             return renderSkillCard(m.id, m.data)
           })}
         </div>
         <div className="px-14 pb-[22px]">
           <div className="relative rounded-[18px] border-[0.5px] border-sk-border bg-sk-composer p-4 px-[18px] pb-3 backdrop-blur-[14px] transition-all duration-[250ms] focus-within:border-[rgba(127,179,207,.45)] focus-within:shadow-[0_0_30px_rgba(127,179,207,.1)]">
+            {pending && (
+              <div className="mb-2 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border-[0.5px] border-[rgba(127,179,207,.4)] bg-[rgba(127,179,207,.1)] px-2.5 py-1 font-skcjk text-[11.5px] font-normal text-sk-primary">
+                  已选:{pending.title}
+                  <button className="cursor-pointer text-sk-muted2 hover:text-sk-fg" title="取消" onClick={clearPending}>✕</button>
+                </span>
+                <span className="font-skcjk text-[10.5px] font-light text-sk-muted2">补充要求(可留空),回车确认执行</span>
+              </div>
+            )}
             <textarea
               ref={convoTaRef}
               className="h-[52px] w-full resize-none border-0 bg-transparent font-skcjk text-[14px] font-light leading-[1.8] tracking-[0.05em] text-sk-fg outline-none placeholder:text-sk-muted2"
-              placeholder="继续布置(作为「智能研判」输入直接共创)…　Enter 发送 · Shift+Enter 换行"
+              placeholder={pending ? `为「${pending.title}」补充要求…　Enter 确认执行` : '继续布置,或按 / 挑一项能力…　Enter 发送 · Shift+Enter 换行'}
+              onChange={(e) => {
+                if (e.target.value === '/') { e.target.value = ''; setPaletteOpen(true) }
+              }}
               onKeyDown={onConvoKey}
             />
             <div className="mt-2 flex items-center gap-2">
@@ -455,9 +496,12 @@ export function AgentCampBoard({
         err={live.err}
         onPick={(skillId) => {
           setSkillsOpen(false)
-          handleSkill(skillId)
+          preSelect(skillId, live.byId[skillId]?.title)
         }}
       />
+
+      {/* 命令面板(/ 触发,能力总线确认基座:type-to-filter → 预填 → 发送确认) */}
+      <CommandPalette open={paletteOpen} cats={live.cats} onPick={pickFromPalette} onClose={() => setPaletteOpen(false)} />
 
       {/* 方案评审 · 模式选择(快速/设计委员会 MoA,紫黑同款能力海天化) */}
       {picker && (
