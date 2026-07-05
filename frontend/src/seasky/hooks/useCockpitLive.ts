@@ -1,0 +1,143 @@
+import { useCallback, useEffect, useState } from 'react'
+
+import type { AiUsageItem, BossDashboard, Broadcast, WorkloadItem } from '@/types/schemas'
+
+import { cockpitService as cks } from '../services'
+
+/* b4 驾驶舱真源:门禁(sessionStorage 记住本次解锁)+ 用量/工作量/大盘/广播;
+   日历=前端聚合(里程碑单源起步,会议聚合后补——降级预案已批) */
+
+export interface CalendarEvent {
+  date: string /* YYYY-MM-DD */
+  label: string
+  projIdx: number
+}
+
+export interface CockpitLive {
+  gate: 'checking' | 'locked' | 'setup' | 'open'
+  gateErr: string
+  unlock: (pw: string) => Promise<void>
+  setup: (pw: string) => Promise<void>
+  loading: boolean
+  usage: AiUsageItem[]
+  workload: WorkloadItem[]
+  dash: BossDashboard | null
+  broadcasts: Broadcast[]
+  calEvents: CalendarEvent[]
+  sendBroadcast: (text: string) => Promise<void>
+}
+
+const SS_KEY = 'romai_seasky_cockpit_open'
+
+export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLive {
+  const [gate, setGate] = useState<CockpitLive['gate']>('checking')
+  const [gateErr, setGateErr] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [usage, setUsage] = useState<AiUsageItem[]>([])
+  const [workload, setWorkload] = useState<WorkloadItem[]>([])
+  const [dash, setDash] = useState<BossDashboard | null>(null)
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
+  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
+  const [dataVer, setDataVer] = useState(0)
+
+  /* 门禁状态:configured=有口令→locked;未配置→setup;本会话已解锁→open */
+  useEffect(() => {
+    if (!active || gate !== 'checking') return
+    if (sessionStorage.getItem(SS_KEY) === '1') {
+      setGate('open')
+      return
+    }
+    cks.adminStatus()
+      .then((s) => setGate(s.configured ? 'locked' : 'setup'))
+      .catch((e) => {
+        setGate('locked')
+        setGateErr((e as Error).message)
+      })
+  }, [active, gate])
+
+  const unlock = useCallback(async (pw: string) => {
+    setGateErr('')
+    try {
+      const r = await cks.adminLogin(pw)
+      if (r.ok) {
+        sessionStorage.setItem(SS_KEY, '1')
+        setGate('open')
+      } else {
+        setGateErr('口令不正确')
+      }
+    } catch (e) {
+      setGateErr((e as Error).message)
+    }
+  }, [])
+
+  const setup = useCallback(async (pw: string) => {
+    setGateErr('')
+    try {
+      const r = await cks.adminSetup(pw)
+      if (r.ok) {
+        sessionStorage.setItem(SS_KEY, '1')
+        setGate('open')
+      } else {
+        setGateErr('设置失败')
+      }
+    } catch (e) {
+      setGateErr((e as Error).message)
+    }
+  }, [])
+
+  /* 解锁后拉数据 */
+  useEffect(() => {
+    if (!active || gate !== 'open') return
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      const [u, w, d, b] = await Promise.allSettled([
+        cks.getAiUsage(),
+        cks.getWorkload(),
+        cks.getBossDashboard(),
+        cks.listBroadcasts(),
+      ])
+      if (!alive) return
+      if (u.status === 'fulfilled') setUsage(u.value)
+      if (w.status === 'fulfilled') setWorkload(w.value)
+      if (d.status === 'fulfilled') setDash(d.value)
+      if (b.status === 'fulfilled') setBroadcasts(b.value)
+      setLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [active, gate, dataVer])
+
+  /* 日历:里程碑单源前端聚合(每项目一请求;项目多/慢时已批降级路径就是本形态) */
+  useEffect(() => {
+    if (!active || gate !== 'open' || projectIds.length === 0) return
+    let alive = true
+    ;(async () => {
+      const settled = await Promise.allSettled(
+        projectIds.slice(0, 8).map((pid) => cks.listMilestones(pid).then((ms) => ({ pid, ms }))),
+      )
+      if (!alive) return
+      const evs: CalendarEvent[] = []
+      settled.forEach((r, idx) => {
+        if (r.status !== 'fulfilled') return
+        for (const m of r.value.ms) {
+          /* 里程碑 due 是自然语言(今日/周五前),只收 YYYY-MM-DD 形款进日历,其余不硬编日期(不伪造) */
+          const m2 = m.due.match(/(\d{4})-(\d{2})-(\d{2})/)
+          if (m2) evs.push({ date: m2[0], label: m.title.slice(0, 24), projIdx: idx })
+        }
+      })
+      setCalEvents(evs)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [active, gate, projectIds])
+
+  const sendBroadcast = useCallback(async (text: string) => {
+    await cks.createBroadcast(text)
+    setDataVer((v) => v + 1)
+  }, [])
+
+  return { gate, gateErr, unlock, setup, loading, usage, workload, dash, broadcasts, calEvents, sendBroadcast }
+}

@@ -155,7 +155,9 @@ export function AppShell() {
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 4} skipAnim={capture}>
             <CockpitBoard
+              active={phase === 'app' && board === 4}
               curIdx={proj.cur ? Math.max(0, proj.projects.findIndex((p) => p.id === proj.cur!.id)) : 0}
+              projectIds={proj.projects.map((p) => p.id)}
               projectNames={proj.projects.map((p) => p.name)}
             />
           </BoardFrame>
