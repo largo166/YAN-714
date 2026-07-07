@@ -51,6 +51,14 @@ export function CleanupOverlay({ open, onClose }: { open: boolean; onClose: () =
     if (open) void boot()
   }, [open, boot])
 
+  /* 设置浮层改了工作目录 → 重读(杜绝「设置改了工作目录、清理浮层还是旧值」;仅浮层开着时) */
+  useEffect(() => {
+    if (!open) return
+    const reboot = () => { void boot() }
+    window.addEventListener('romai:settings-updated', reboot)
+    return () => window.removeEventListener('romai:settings-updated', reboot)
+  }, [open, boot])
+
   const doPreview = async () => {
     setBusy(true); setErr('')
     try {

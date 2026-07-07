@@ -56,11 +56,16 @@ export function useKnowledgeLive(active: boolean): KnowledgeLive {
     }
   }, [active, ver])
 
-  /* 入库/知识库变更事件 → 触发重拉(仅活跃时;不活跃时下次进板的 active 变化会自然重拉) */
+  /* 入库/知识库变更事件 → 触发重拉(仅活跃时;不活跃时下次进板的 active 变化会自然重拉)。
+     settings-updated 一并触发:设置改了收件箱路径 → 首页收件箱 pill 需即时反映(inbox 状态随 ver 重拉)。 */
   useEffect(() => {
     const bump = () => setVer((v) => v + 1)
     window.addEventListener('romai:knowledge-updated', bump)
-    return () => window.removeEventListener('romai:knowledge-updated', bump)
+    window.addEventListener('romai:settings-updated', bump)
+    return () => {
+      window.removeEventListener('romai:knowledge-updated', bump)
+      window.removeEventListener('romai:settings-updated', bump)
+    }
   }, [])
 
   /* 收件箱状态:随 ver 同刷(入库后待处理数可能变),失败不拖垮主数据 */

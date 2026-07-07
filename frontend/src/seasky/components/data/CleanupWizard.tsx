@@ -87,6 +87,14 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
   /* 关闭时清理 SSE */
   useEffect(() => () => { esRef.current?.close() }, [])
 
+  /* 设置浮层改了路径 → 重读仓库根(杜绝「设置改了仓库、向导还是旧值」;仅抽屉开着时重读) */
+  useEffect(() => {
+    if (!open) return
+    const reboot = () => { void boot() }
+    window.addEventListener('romai:settings-updated', reboot)
+    return () => window.removeEventListener('romai:settings-updated', reboot)
+  }, [open, boot])
+
   /* 选仓库根(FolderPicker 降级;exe 走原生桥) → 写 repository_root_path */
   const onPickRepo = async (abs: string) => {
     setPicker(null); setBusy('cfg'); setCfgErr('')
