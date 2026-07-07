@@ -11,20 +11,32 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
-from .. import ingest, schemas
+from .. import ingest, models, project_naming, schemas
+from ..database import get_db
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
 
 @router.post("", response_model=schemas.IngestStartOut)
-def start(payload: schemas.StagingIn) -> schemas.IngestStartOut:
-    """启动入库 job。复用 staging 的路径入参形态（文件/文件夹混合，后台递归展开）。"""
+def start(payload: schemas.StagingIn, db: Session = Depends(get_db)) -> schemas.IngestStartOut:
+    """启动入库 job（复用 staging 的路径入参形态）。
+
+    名字守卫(块2·B):建项前硬拒绝仓库根/系统目录/盘符根——防前端之外的入口(API 直调)
+    绕过建出脏项目(如「数据基地」=仓库根)。命中即整批 400 报错,不建 job/项目,前端弹对话框。
+    """
     paths = [p.strip() for p in (payload.paths or []) if p and p.strip()]
     if not paths:
         raise HTTPException(400, "未选择任何文件或文件夹")
+    cfg = db.get(models.AppSetting, 1)
+    repo_root = (cfg.repository_root_path if cfg else "") or ""
+    for p in paths:
+        reason = project_naming.reject_as_project(p, repo_root or None)
+        if reason:
+            raise HTTPException(400, reason)
     job_id = ingest.start_ingest(paths)
     return schemas.IngestStartOut(job_id=job_id)
 
