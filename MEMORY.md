@@ -1,0 +1,6 @@
+- [改完前端默认dev:clean重启](romai-frontend-devclean-after-edit.md) — HMR 对底层文件不可靠;改完前端默认 npm run dev:clean,用户只需刷新
+- [检查点0数据库地基事实](checkpoint0-db-groundtruth.md) — 启动不跑alembic upgrade/exe漏打包alembic目录/DB无备份;顺序:检查点0先落地验收再动①
+- [检查点①入库管线事实](checkpoint1-ingest-groundtruth.md) — 解析/切块/FTS5/抽图四管线已存在可复用;SSE+worker/content_hash/staging三处NEW;storage_root自带物理根
+- [海天三态诚实范式](seasky-three-states-doctrine.md) — 加载/失败/空态标准范式+范本锚点(KnowledgeSearch:68/ProjectCenterBoard:96);新板DoD硬性项非打磨;空态统一句式「暂无X。下一步指引。」;失败显后端原文+重试;live(active)契约
+- [验证成本红线](verification-cost-ceiling.md) — 验证成本>修复成本2×必停下换策略并上报;选型:状态逻辑→组件测试/接口→API断言/观感→截图人审/端到端点击只留集成路径;preview与CDP是两个独立浏览器实例
+- [海天浮层Portal铁律](seasky-floating-layer-portal-rule.md) — 任何浮层(下拉/弹窗/结果层)必须Portal到#sk-overlay+锚点实测坐标,禁就地absolute;病根咬3次(DropMenu/项目选择器/Popover)都被卡片层叠盖;改共享组件别只挪一个消费者
