@@ -375,6 +375,14 @@ export const api = {
   async listKnowledgeDocs() {
     return KnowledgeDocListSchema.parse(await request('/api/knowledge/documents'))
   },
+  /** 库完整性体检(只读):四态计数 + root 脱节。真库清洗前置。 */
+  async knowledgeHealth(): Promise<{
+    total_records: number
+    counts: { ok: number; missing: number; detached: number; orphan: number }
+    root_detached: { storage_root: string; root_state: string; record_count: number }[]
+  }> {
+    return request('/api/knowledge/health')
+  },
   async getKnowledgeDoc(id: number): Promise<KnowledgeDoc> {
     return KnowledgeDocSchema.parse(await request(`/api/knowledge/documents/${id}`))
   },

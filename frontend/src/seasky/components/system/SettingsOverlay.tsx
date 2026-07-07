@@ -30,6 +30,16 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const [picker, setPicker] = useState<PickTarget | null>(null)
+  /* 库健康体检(只读):四态计数 + root 脱节 */
+  const [health, setHealth] = useState<Awaited<ReturnType<typeof api.knowledgeHealth>> | null>(null)
+  const [healthBusy, setHealthBusy] = useState(false)
+  const [healthErr, setHealthErr] = useState('')
+  const runHealth = async () => {
+    setHealthBusy(true); setHealthErr(''); setHealth(null)
+    try { setHealth(await api.knowledgeHealth()) }
+    catch (e) { setHealthErr((e as Error).message) }
+    finally { setHealthBusy(false) }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -151,6 +161,36 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
               <GhostButton pri onClick={() => void save()}>{busy ? '保存中…' : '保存'}</GhostButton>
               {msg && <span className="font-skcjk text-[11.5px] font-light text-sk-ok">{msg}</span>}
               {err && <span className="font-skcjk text-[11.5px] font-light text-sk-risk">{err}</span>}
+            </div>
+            {/* 库健康体检(只读):四态计数 + root 脱节警示。数据操作前的诚实体检。 */}
+            <div className="mt-3 border-t-[0.5px] border-sk-hairsoft pt-3">
+              <div className="flex items-center gap-3">
+                <GhostButton onClick={() => void runHealth()}>{healthBusy ? '体检中…' : '库健康体检'}</GhostButton>
+                {healthErr && <span className="font-skcjk text-[11.5px] font-light text-sk-risk">{healthErr}</span>}
+              </div>
+              {health && (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap gap-x-5 gap-y-1">
+                    {([['正常', health.counts.ok, 'ok'], ['文件丢失', health.counts.missing, 'risk'], ['仓库根脱节', health.counts.detached, 'risk'], ['孤儿文件', health.counts.orphan, 'warn']] as const).map(([k, v, tone]) => (
+                      <span key={k} className="font-skcjk text-[11.5px] text-sk-muted"><b className={`mr-1 font-sans text-[15px] font-medium [font-variant-numeric:tabular-nums] ${v ? (tone === 'risk' ? 'text-sk-risk' : tone === 'warn' ? 'text-sk-warn' : 'text-sk-ok') : 'text-sk-muted2'}`}>{v}</b>{k}</span>
+                    ))}
+                    <span className="font-skcjk text-[11px] text-sk-muted2">共 {health.total_records} 条记录</span>
+                  </div>
+                  {health.root_detached.length > 0 && (
+                    <div className="rounded-[8px] border-[0.5px] border-sk-risk/40 bg-[rgba(207,127,127,.06)] px-3 py-2">
+                      <div className="font-skcjk text-[11.5px] font-medium text-sk-risk">⚠ 检测到 {health.root_detached.length} 个仓库根脱节(整根文件访问不到)</div>
+                      {health.root_detached.map((r) => (
+                        <div key={r.storage_root} className="mt-0.5 break-all font-skmono text-[10.5px] text-sk-muted">
+                          {r.root_state === 'missing' ? '🔴 不存在' : '🟡 空置'} · {r.storage_root || '(空)'} · {r.record_count} 条记录受影响
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {health.counts.ok === health.total_records && health.total_records > 0 && (
+                    <span className="font-skcjk text-[11px] font-light text-sk-ok">✓ 全部文件在位,库健康</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

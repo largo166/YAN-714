@@ -5,10 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .. import knowledge_meta, llm, models, retrieval, safe_json, schemas
+from .. import knowledge_meta, llm, models, retrieval, safe_json, schemas, storage_probe
 from ..database import get_db
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+
+
+@router.get("/health")
+def library_health(db: Session = Depends(get_db)) -> dict:
+    """库完整性体检(只读):四态(记录在文件在/文件丢/孤儿/root脱节)。
+    汇总计数全量真值;明细默认前 200 带 total。真库清洗前置(数据操作铁律第0条)。"""
+    return storage_probe.check_library(db)
 
 NOT_CONFIGURED_MSG = "AI 引擎未配置，请先在设置中配置 API Key"
 NO_MATERIAL_MSG = "文档无正文，无法生成摘要（不伪造）。"
