@@ -26,6 +26,13 @@ dist/
 logs/
 *.log
 
+# ── 运行产物 / 临时工作目录(2026-07-07:CDP验收脚本·截图·解包临时目录·可分发链接,一律不入库) ──
+.tmp_run_logs/
+_tmp_*/
+*.lnk
+# 内测分发包(exe+文档 zip,体积大/含可分发产物,不入库;归档在本地 release-internal/)
+release-internal/
+
 # ── OS / IDE ──
 .DS_Store
 Thumbs.db

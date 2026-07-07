@@ -1,0 +1,16 @@
+# 统一换行符为 LF，绝掉 core.autocrlf 造成的整文件 diff 噪音（2026-07-07）
+* text=auto eol=lf
+
+# 二进制/产物显式标注，避免被当文本做 eol 转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.exe binary
+*.lnk binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
