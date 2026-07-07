@@ -51,7 +51,9 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
   const [cfgErr, setCfgErr] = useState('')
   const [picker, setPicker] = useState<null | 'repo' | 'select'>(null)
   const [staging, setStaging] = useState<StagingResult | null>(null)
-  const [pickedPaths, setPickedPaths] = useState<string[]>([])
+  const [checkedDirs, setCheckedDirs] = useState<Set<string>>(new Set()) /* A语义:勾选的项目(group.source_dir) */
+  const [selectRaw, setSelectRaw] = useState<string>('')                 /* 原始选中路径,供"整目录作为一个项目"重扫 */
+  const [forceSingle, setForceSingle] = useState(false)                  /* 覆盖:把父目录当单个项目 */
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   /* 执行态 */
@@ -63,7 +65,8 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
 
   /* 读受管资料库根(唯一真源:getSettings.repository_root_path) */
   const boot = useCallback(async () => {
-    setErr(''); setStep(1); setStaging(null); setPickedPaths([]); setReceipt(null); setEvents([])
+    setErr(''); setStep(1); setStaging(null); setReceipt(null); setEvents([])
+    setCheckedDirs(new Set()); setForceSingle(false); setSelectRaw('')
     try {
       const s = await api.getSettings()
       setRepoPath(s.repository_root_path || null)
@@ -108,24 +111,40 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
     } finally { setBusy('') }
   }
 
-  /* 选取资料(文件夹) → staging 收料单 */
+  /* 选取资料(文件夹) → staging 收料单。A语义:后端可能把父目录拆成多项目组。
+     forceSingle=true 时把整目录当单个项目(前端不重扫,后端已给 groups;单目录选取本就 single)。 */
   const onPickSelect = async (abs: string) => {
-    setPicker(null); setBusy('staging'); setErr('')
+    setPicker(null); setBusy('staging'); setErr(''); setForceSingle(false); setSelectRaw(abs)
     try {
       const paths = [abs]
       const sg = await api.staging(paths)
       setStaging(sg)
-      setPickedPaths(paths)
+      /* 默认全勾所有项目组 */
+      setCheckedDirs(new Set(sg.groups.map((g) => g.source_dir)))
       setStep(2)
     } catch (e) { setErr((e as Error).message) } finally { setBusy('') }
   }
 
+  /* 执行入库的有效路径(A语义):
+     - forceSingle → 整个原始选取目录作为一个项目(传 selectRaw);
+     - 否则 → 勾选的项目组(group.source_dir)各建一个项目。 */
+  const effectiveIngestPaths = (): string[] =>
+    forceSingle && selectRaw ? [selectRaw] : (staging?.groups ?? []).filter((g) => checkedDirs.has(g.source_dir)).map((g) => g.source_dir)
+
+  /* 勾选范围内的可入库文件数(A语义:multi 部分勾选时,执行数/门控要按勾选算,不用全量) */
+  const selectedSupportedCount = (): number => {
+    if (!staging) return 0
+    if (forceSingle || staging.selection_mode !== 'multi') return staging.supported_files
+    return staging.groups.filter((g) => checkedDirs.has(g.source_dir)).reduce((n, g) => n + g.files.filter((f) => f.supported && !f.already_indexed).length, 0)
+  }
+
   /* 执行:启动 ingest job + 订阅 SSE 逐文件逐段进度 */
   const doIngest = async () => {
-    if (pickedPaths.length === 0) return
+    const paths = effectiveIngestPaths()
+    if (paths.length === 0) return
     setBusy('ingest'); setErr(''); setEvents([]); setReceipt(null); setRunning(true); setStep(3)
     try {
-      const { job_id } = await api.ingestStart(pickedPaths)
+      const { job_id } = await api.ingestStart(paths)
       const es = new EventSource(`/api/ingest/${job_id}/stream`)
       esRef.current = es
       /* 正常完成标志:后端发完 eof 会主动关连接,而 EventSource 规范把「服务端关连接」也当断线触发 onerror。
@@ -163,12 +182,13 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
     const active = step === n
     const done = step > n
     /* 回退语义(P0·入库主链路数据可信度红线):退回到「仓库」步 = 放弃本次选取,
-       清 staging/pickedPaths/回执/事件——杜绝「以为选了/其实是上次的、以为入了/其实没入」。
-       3→2 回看不清(仍是同一批选取,只是复核收料单)。 */
+       清 staging/勾选/回执/事件——杜绝「以为选了/其实是上次的、以为入了/其实没入」。
+       3→2 回看不清(仍是同一批选取,只是复核收料单/勾选)。 */
     const goBack = (target: WizStep) => {
       if (target >= step || running) return
       if (target === 1) {
-        setStaging(null); setPickedPaths([]); setReceipt(null); setEvents([]); setErr('')
+        setStaging(null); setReceipt(null); setEvents([]); setErr('')
+        setCheckedDirs(new Set()); setForceSingle(false); setSelectRaw('')
       }
       setStep(target)
     }
@@ -249,10 +269,35 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
                   <div className="flex flex-wrap gap-1.5">{Object.entries(staging.type_stats || {}).slice(0, 10).map(([t, n]) => <Pill key={t}>{t} {n}</Pill>)}</div>
                   {staging.error && <div className="font-skcjk text-[11.5px] text-sk-warn">{staging.error}</div>}
 
-                  {staging.groups.map((g) => (
-                    <div key={g.source_dir} className="rounded-skcard border-[0.5px] border-sk-border">
-                      <div className="flex items-center justify-between border-b-[0.5px] border-sk-hairsoft px-3 py-2">
+                  {/* A语义:multi=父目录拆成多项目,给项目确认(勾选/默认全勾/整目录切换) */}
+                  {staging.selection_mode === 'multi' && !forceSingle && (
+                    <div className="flex items-center justify-between rounded-skcard border-[0.5px] border-[rgba(127,179,207,.25)] bg-[rgba(127,179,207,.05)] px-3 py-2">
+                      <span className="font-skcjk text-[12px] text-sk-fg">检测到 <b className="text-sk-primary">{staging.groups.length}</b> 个项目(每个子文件夹一个)· 已勾 {checkedDirs.size}</span>
+                      <button className="font-skcjk text-[11px] text-sk-muted2 underline-offset-2 transition-colors hover:text-sk-primary hover:underline" onClick={() => setForceSingle(true)}>其实是同一个项目 →</button>
+                    </div>
+                  )}
+                  {forceSingle && (
+                    <div className="flex items-center justify-between rounded-skcard border-[0.5px] border-[rgba(127,179,207,.25)] bg-[rgba(127,179,207,.05)] px-3 py-2">
+                      <span className="font-skcjk text-[12px] text-sk-fg">整个目录作为 <b className="text-sk-primary">一个</b> 项目</span>
+                      <button className="font-skcjk text-[11px] text-sk-muted2 underline-offset-2 transition-colors hover:text-sk-primary hover:underline" onClick={() => setForceSingle(false)}>← 按子文件夹分开</button>
+                    </div>
+                  )}
+                  {/* 散落文件提示(忽略但不静默) */}
+                  {(staging.loose_files ?? 0) > 0 && !forceSingle && (
+                    <div className="font-skcjk text-[11.5px] font-light text-sk-warn">该目录下有 {staging.loose_files} 个散落文件未归入任何项目,本次不入库(如需入库,请把它们放进某个项目文件夹再选取)。</div>
+                  )}
+
+                  {staging.groups.map((g) => {
+                    const checked = forceSingle || checkedDirs.has(g.source_dir)
+                    const selectable = staging.selection_mode === 'multi' && !forceSingle
+                    return (
+                    <div key={g.source_dir} className={`rounded-skcard border-[0.5px] ${checked ? 'border-sk-border' : 'border-sk-hairsoft opacity-55'}`}>
+                      <div className="flex items-center gap-2 border-b-[0.5px] border-sk-hairsoft px-3 py-2">
+                        {selectable && (
+                          <input type="checkbox" checked={checked} className="accent-sk-primary" onChange={() => setCheckedDirs((prev) => { const n = new Set(prev); n.has(g.source_dir) ? n.delete(g.source_dir) : n.add(g.source_dir); return n })} />
+                        )}
                         <span className="min-w-0 flex-1 truncate font-skcjk text-[12.5px] text-sk-fg">{g.project_hint} <span className="text-sk-muted2">· {g.files.length} 文件</span></span>
+                        {g.warn_reason && <span className="flex-none font-skcjk text-[10px] text-sk-warn" title={g.warn_reason}>⚠ 疑似内部目录</span>}
                         {g.project_id > 0 && <Pill tone="ok">已建项目</Pill>}
                       </div>
                       <div className="max-h-[220px] overflow-y-auto sk-scroll px-1 py-1">
@@ -267,7 +312,8 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
                         {g.files.length > 40 && <div className="px-2 py-1 font-skcjk text-[10.5px] text-sk-muted2">…另 {g.files.length - 40} 项(执行时一并处理)</div>}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                   <div><GhostButton onClick={() => setPicker('select')}>重新选取</GhostButton></div>
                 </>
               )}
@@ -280,11 +326,11 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
               {!running && !receipt && (
                 <>
                   <div className="rounded-skcard border-[0.5px] border-sk-border bg-sk-card p-4">
-                    <div className="font-skcjk text-[13px] text-sk-fg">将入库 <b className="text-sk-primary">{staging?.supported_files ?? 0}</b> 个可解析文件</div>
+                    <div className="font-skcjk text-[13px] text-sk-fg">将入库 <b className="text-sk-primary">{selectedSupportedCount()}</b> 个可解析文件{staging?.selection_mode === 'multi' && !forceSingle ? `（${effectiveIngestPaths().length} 个项目）` : ''}</div>
                     <div className="mt-1 break-all font-skmono text-[11px] text-sk-muted2">目标仓库:{repoPath}</div>
                     <div className="mt-2 font-skcjk text-[12px] font-medium text-sk-ok">五段:识别 → 抽取 → 切块 → 索引 → 归档</div>
                   </div>
-                  <div><GhostButton pri disabled={!staging?.supported_files} onClick={() => void doIngest()}>开始入库</GhostButton></div>
+                  <div><GhostButton pri disabled={selectedSupportedCount() === 0} onClick={() => void doIngest()}>开始入库</GhostButton></div>
                 </>
               )}
 
@@ -330,8 +376,8 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
         {step === 2 && staging && (
           <div className="flex-none border-t-[0.5px] border-sk-hairsoft px-6 py-3">
             <div className="flex items-center justify-between">
-              <span className="font-skcjk text-[12px] text-sk-muted">可入库 <b className="text-sk-fg">{staging.supported_files}</b> 个 · 已在库 {staging.already_indexed} 个</span>
-              <GhostButton pri disabled={!staging.supported_files} onClick={() => setStep(3)}>下一步:执行 →</GhostButton>
+              <span className="font-skcjk text-[12px] text-sk-muted">可入库 <b className="text-sk-fg">{selectedSupportedCount()}</b> 个 · 已在库 {staging.already_indexed} 个</span>
+              <GhostButton pri disabled={effectiveIngestPaths().length === 0} onClick={() => setStep(3)}>下一步:执行 →</GhostButton>
             </div>
           </div>
         )}

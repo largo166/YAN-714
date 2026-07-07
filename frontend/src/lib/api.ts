@@ -1018,6 +1018,7 @@ export interface StagingGroup {
   source_dir: string
   project_hint: string
   project_id: number
+  warn_reason?: string          // 名字软警示（编号前缀/通用词），前端标黄不拦
   files: StagingFile[]
 }
 export interface StagingResult {
@@ -1027,5 +1028,7 @@ export interface StagingResult {
   already_indexed: number
   type_stats: Record<string, number>
   skipped_unsupported: number
+  selection_mode?: 'multi' | 'single'   // multi=父目录已拆成多项目
+  loose_files?: number                   // 父目录直属散落文件数（本次不入库，提示不静默）
   error: string
 }

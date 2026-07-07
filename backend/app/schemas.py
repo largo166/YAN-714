@@ -1132,6 +1132,7 @@ class StagingGroupOut(BaseModel):
     source_dir: str           # 该组来源文件夹绝对路径
     project_hint: str         # 建议项目名（文件夹名）
     project_id: int = 0       # 若该来源文件夹已建过项目则为其 id（0=尚未建）
+    warn_reason: str = ""     # 名字软警示（编号前缀/通用词），前端标黄不拦；空=无警示
     files: List[StagingFileOut] = []
 
 
@@ -1143,6 +1144,9 @@ class StagingOut(BaseModel):
     already_indexed: int = 0             # 已在库的文件数（标灰）
     type_stats: dict[str, int] = {}      # 扩展名 → 计数
     skipped_unsupported: int = 0
+    # A 语义（2026-07-07）：
+    selection_mode: str = "single"       # multi=选中父目录已按一级子目录拆成多项目 / single=单项目
+    loose_files: int = 0                 # 父目录直属散落文件数（不归入任何项目，本次不入库；前端提示不静默）
     error: str = ""
 
 
