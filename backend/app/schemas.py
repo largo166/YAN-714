@@ -1114,3 +1114,43 @@ class MeetingMinuteOut(BaseModel):
     model: str
     error_message: str
     created_at: datetime
+
+
+# ── staging 收料单（检查点① 铁条2：选文件→只读盘出分组/统计/去重预览，不落库不拷贝）──
+class StagingFileOut(BaseModel):
+    """收料单里的单个文件（只读盘扫描出，尚未入库）。"""
+    abs_path: str
+    name: str
+    ext: str
+    size: int
+    supported: bool          # 能否被解析链接入（不支持的类型如实标）
+    already_indexed: bool     # 是否已在库（同名同大小；content_hash 去重等 0023 后升级）
+
+
+class StagingGroupOut(BaseModel):
+    """按来源文件夹分组的一组文件。"""
+    source_dir: str           # 该组来源文件夹绝对路径
+    project_hint: str         # 建议项目名（文件夹名）
+    project_id: int = 0       # 若该来源文件夹已建过项目则为其 id（0=尚未建）
+    files: List[StagingFileOut] = []
+
+
+class StagingOut(BaseModel):
+    """收料单：分组 + 汇总统计 + 去重计数。"""
+    groups: List[StagingGroupOut] = []
+    total_files: int = 0
+    supported_files: int = 0
+    already_indexed: int = 0             # 已在库的文件数（标灰）
+    type_stats: dict[str, int] = {}      # 扩展名 → 计数
+    skipped_unsupported: int = 0
+    error: str = ""
+
+
+class StagingIn(BaseModel):
+    """选取的绝对路径列表（文件或文件夹混合）；文件夹递归展开。"""
+    paths: List[str] = []
+
+
+class IngestStartOut(BaseModel):
+    """启动入库 job 的返回。"""
+    job_id: str

@@ -520,6 +520,16 @@ export const api = {
     })
   },
 
+  // ── 检查点① 铁条2/3：staging 收料单 + ingest 入库 job ──
+  /** 选取的绝对路径列表(文件/文件夹混合)→ 只读盘扫成收料单(分组/统计/去重标灰)。 */
+  async staging(paths: string[]): Promise<StagingResult> {
+    return request('/api/staging', { method: 'POST', body: JSON.stringify({ paths }) })
+  },
+  /** 启动入库 job(五段流水线)，返回 job_id;进度经 /api/ingest/{id}/stream 的 SSE 推。 */
+  async ingestStart(paths: string[]): Promise<{ job_id: string }> {
+    return request('/api/ingest', { method: 'POST', body: JSON.stringify({ paths }) })
+  },
+
   // ── 4D: 项目文件 ──
   /** 上传文件（XHR 以拿到上传进度；onProgress 0-100）。 */
   uploadProjectFile(
@@ -993,4 +1003,29 @@ export interface CleanupPreview {
   review_count?: number
   candidates?: WsFile[]
   note?: string
+}
+
+// ── staging 收料单（检查点① 铁条2）──
+export interface StagingFile {
+  abs_path: string
+  name: string
+  ext: string
+  size: number
+  supported: boolean
+  already_indexed: boolean
+}
+export interface StagingGroup {
+  source_dir: string
+  project_hint: string
+  project_id: number
+  files: StagingFile[]
+}
+export interface StagingResult {
+  groups: StagingGroup[]
+  total_files: number
+  supported_files: number
+  already_indexed: number
+  type_stats: Record<string, number>
+  skipped_unsupported: number
+  error: string
 }

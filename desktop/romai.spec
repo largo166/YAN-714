@@ -27,6 +27,17 @@ if str(BACKEND) not in sys.path:
 # ── 前端构建产物随包，运行时解到 _MEIPASS/frontend_dist ──
 datas = [(str(DIST_FRONT), "frontend_dist")]
 
+# ── alembic 迁移随包（检查点0 · exe 化最易漏的坑）──
+# database._alembic_dir() 冻结态取 _MEIPASS/alembic；_run_migrations() 取 _MEIPASS/alembic.ini。
+# 必须把整个 backend/alembic 目录(含 versions/*.py，保结构)与 alembic.ini 打进去，
+# 否则 exe 启动跑 alembic upgrade 时找不到迁移脚本 → dev 全绿、打包那刻才炸、报错隐晦。
+ALEMBIC_DIR = BACKEND / "alembic"
+ALEMBIC_INI = BACKEND / "alembic.ini"
+if ALEMBIC_DIR.is_dir():
+    datas.append((str(ALEMBIC_DIR), "alembic"))          # → _MEIPASS/alembic/（versions/ 结构保留）
+if ALEMBIC_INI.is_file():
+    datas.append((str(ALEMBIC_INI), "."))                # → _MEIPASS/alembic.ini
+
 # ── 预置 key 分发(可选):若 desktop/.env.bundle 存在,打进 _MEIPASS 根 ──
 # 不入 git(.gitignore 的 .env.*)。首启 config._bootstrap_bundled_env 复制到 DATA_DIR/.env。
 # 无此文件时正常打包(空 key,收件人自己在设置页填)。

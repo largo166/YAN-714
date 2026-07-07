@@ -24,6 +24,8 @@ from .routers import skills
 from .routers import filesystem
 from .routers import review_checklist
 from .routers import admin
+from .routers import staging
+from .routers import ingest
 
 
 @asynccontextmanager
@@ -65,6 +67,8 @@ app.include_router(broadcast.router)
 app.include_router(boss.router)
 app.include_router(result_send.router)
 app.include_router(admin.router)
+app.include_router(staging.router)
+app.include_router(ingest.router)
 
 
 # ── 前端托管：构建产物存在时(exe / 生产)同源托管 dist，免第二个端口/CORS ──

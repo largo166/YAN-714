@@ -41,6 +41,28 @@ def _resolve_data_dir() -> Path:
 DATA_DIR = _resolve_data_dir()
 ENV_FILE = DATA_DIR / ".env" if _is_frozen() else (BASE_DIR / ".env")
 
+# 本地仓库根（检查点0·D1）：固定 = DATA_DIR/'repos'，不另立可覆盖根（避免复杂根解析）。
+# 建仓（检查点①）在此目录下按项目名 mkdir 子目录。与 uploads(程序内部副本) 平级、互不嵌套。
+REPOS_ROOT = DATA_DIR / "repos"
+
+
+def _ensure_repos_root() -> None:
+    """确保 REPOS_ROOT 存在且可写；不可建/不可写 → fail closed 抛错（不静默降级到别处）。
+
+    只做一次探针写：建根目录 + 建删一个临时子目录确认写权限。失败即抛 RuntimeError，
+    让启动尽早暴露「数据目录不可写」这类环境问题，而非等到建仓时才炸。
+    """
+    try:
+        REPOS_ROOT.mkdir(parents=True, exist_ok=True)
+        probe = REPOS_ROOT / ".romai_write_probe"
+        probe.mkdir(exist_ok=True)
+        probe.rmdir()
+    except OSError as e:
+        raise RuntimeError(f"本地仓库根不可用（{REPOS_ROOT}）：{e}") from e
+
+
+_ensure_repos_root()
+
 
 def _bootstrap_bundled_env() -> None:
     """冻结态首启:若用户数据目录还没有 .env，且 bundle 内预置了 .env.bundle，则复制过去。

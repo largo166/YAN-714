@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
+import FolderPicker from '@/components/FolderPicker'
 
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { GhostButton, Pill } from '../common/PillButton'
 
 /* ═══ 设置浮层(退役前置:紫黑 SettingsDrawer 的核心配置能力海天化) ═══
-   四项:DeepSeek Key/仓库路径/工作目录/收件箱——全走既有端点,密钥只写不回显。 */
+   四项:DeepSeek Key/知识仓库/工作目录/收件箱——全走既有端点,密钥只写不回显。
+   三路径语义(别串台):
+   - 知识仓库 = repository_root_path(受管资料库根,整理入库落 {仓库}/{项目名}/)
+   - 工作目录 = workspace_path(一键清理垃圾作用的设计工作目录)
+   - 收件箱   = inbox_root_path(60s 自动扫描入库的目录)
+   三者各选各的文件夹,不可混填。选文件夹走 FolderPicker(dev);exe 走 pywebview 原生桥。 */
+
+type PickTarget = 'repo' | 'ws' | 'inbox'
 
 interface SettingsState {
   keySet: boolean
@@ -21,6 +29,7 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
   const [draft, setDraft] = useState({ key: '', repo: '', ws: '', inbox: '' })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [picker, setPicker] = useState<PickTarget | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -121,14 +130,17 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
             <div className={row}>
               <span className={label}>知识仓库</span>
               <input className={input} placeholder="资料复制入库的根目录,如 C:\\仓库" value={draft.repo} onChange={(e) => setDraft((d) => ({ ...d, repo: e.target.value }))} />
+              <GhostButton className="flex-none px-3 py-[5px]" onClick={() => setPicker('repo')}>选择</GhostButton>
             </div>
             <div className={row}>
               <span className={label}>工作目录</span>
-              <input className={input} placeholder="一键清理作用的设计工作目录" value={draft.ws} onChange={(e) => setDraft((d) => ({ ...d, ws: e.target.value }))} />
+              <input className={input} placeholder="一键清理垃圾作用的设计工作目录" value={draft.ws} onChange={(e) => setDraft((d) => ({ ...d, ws: e.target.value }))} />
+              <GhostButton className="flex-none px-3 py-[5px]" onClick={() => setPicker('ws')}>选择</GhostButton>
             </div>
             <div className={row}>
               <span className={label}>收件箱</span>
               <input className={input} placeholder="60s 自动扫描入库的目录(留空=停用)" value={draft.inbox} onChange={(e) => setDraft((d) => ({ ...d, inbox: e.target.value }))} />
+              <GhostButton className="flex-none px-3 py-[5px]" onClick={() => setPicker('inbox')}>选择</GhostButton>
             </div>
             <div className="flex items-center gap-3 pt-1">
               <GhostButton pri onClick={() => void save()}>{busy ? '保存中…' : '保存'}</GhostButton>
@@ -139,6 +151,23 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
         )}
         {err && !st && <div className="py-2 font-skcjk text-[12px] font-light text-sk-risk">{err}</div>}
       </GlassCard>
+
+      {/* 三路径选文件夹(dev 降级;exe 走 pywebview 原生桥)。选中回填对应字段,不混填。 */}
+      <FolderPicker
+        open={picker != null}
+        foldersOnly
+        initialPath={picker === 'repo' ? draft.repo : picker === 'ws' ? draft.ws : draft.inbox}
+        onPick={(p) => {
+          setDraft((d) => ({
+            ...d,
+            repo: picker === 'repo' ? p : d.repo,
+            ws: picker === 'ws' ? p : d.ws,
+            inbox: picker === 'inbox' ? p : d.inbox,
+          }))
+          setPicker(null)
+        }}
+        onClose={() => setPicker(null)}
+      />
     </div>
   )
 }
