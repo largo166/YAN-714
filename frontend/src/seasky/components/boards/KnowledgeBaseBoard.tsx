@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { boardImages } from '../../data/boardImages'
-import { useKnowledgeLive } from '../../hooks/useKnowledgeLive'
+import type { KnowledgeLive } from '../../hooks/useKnowledgeLive'
 import { DataSourceStrip } from '../data/DataSourceStrip'
 import { CleanupWizard } from '../data/CleanupWizard'
 import { KnowledgeSearch } from '../data/KnowledgeSearch'
@@ -10,10 +10,10 @@ import { GhostButton, Label, Pill } from '../common/PillButton'
 import { MRow } from '../common/StatBlock'
 
 /* ═══ b1 数据基地:大字纪念碑(构图冻结)——巨号=真 stats.documents;
-   类型带/最近入库/收件箱/检索全接真;清理入口与「最近入库」同级同规格,流程收进浮层 ═══ */
+   类型带/最近入库/收件箱/检索全接真;清理入口与「最近入库」同级同规格,流程收进浮层 ═══
+   数据源:live 由 AppShell 汇聚层(useBoardLive)传入,不再自调 hook——状态栏与本板单一数据源(hotfix1)。 */
 
-export function KnowledgeBaseBoard({ active }: { active: boolean }) {
-  const live = useKnowledgeLive(active)
+export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean; live: KnowledgeLive }) {
   const [recentOpen, setRecentOpen] = useState(false)
   const [cleanupOpen, setCleanupOpen] = useState(false)
   const img = boardImages.data
@@ -82,7 +82,7 @@ export function KnowledgeBaseBoard({ active }: { active: boolean }) {
               note={`Recent ${live.recent.length}`}
               className="bottom-[calc(100%+10px)] left-0 min-w-[430px]"
             >
-              {live.recent.length === 0 && <div className="py-1 font-skcjk text-[12px] font-light text-sk-muted">暂无入库记录。</div>}
+              {live.recent.length === 0 && <div className="py-1 font-skcjk text-[12px] font-light text-sk-muted">暂无入库记录。点「一键清理」接入资料后,最近入库会出现在这里。</div>}
               {live.recent.map((r) => (
                 <MRow key={r.id} compact lead={<Pill>{r.type}</Pill>} text={r.title} who={r.created_at.slice(5, 10)} />
               ))}

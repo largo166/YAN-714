@@ -52,11 +52,11 @@ export function TopNavCapsules({
 }
 
 /** 底部状态栏 */
-export function StatusBar({ left }: { left: string }) {
+export function StatusBar({ left, pulse = false }: { left: string; pulse?: boolean }) {
   const label = 'font-sans text-[10.5px] font-medium uppercase tracking-[0.3em] [text-indent:0.3em] text-sk-muted2'
   return (
     <div className="absolute bottom-0 left-0 z-skchrome flex h-[30px] w-full items-center justify-between bg-black px-6">
-      <span className={label}>{left}</span>
+      <span className={cn(label, pulse && 'sk-pulse')}>{left}</span>
       <span className={label}>FTS5 Ready · 本地运行 · Cockpit Unlocked</span>
     </div>
   )

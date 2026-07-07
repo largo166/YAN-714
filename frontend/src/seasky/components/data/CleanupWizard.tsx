@@ -1,20 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { CleanupPreview, WorkspaceScan } from '@/lib/api'
+import { api, type StagingResult } from '@/lib/api'
+import FolderPicker from '@/components/FolderPicker'
 
 import { knowledgeService as ks } from '../../services'
 import { CardHead } from '../common/GlassCard'
 import { GhostButton, Label, Pill } from '../common/PillButton'
 
-/* ═══ b1 · 一键清理+入库 三步向导(海天全高抽屉,ADR/工单 2026-07-06) ═══
-   ①仓库 ②选取(只读) ③执行(唯一写动作,轻闸)。b1 本体零改动,关抽屉像素级一致。
-   契约(见 docs/现状契约-b1清理入库.md):
-   - apply 走 rel_paths 子集(部分执行)+ shutil.move 永不删除(红线安全);
-   - 建仓库降级=选已有目录(后端无 mkdir 端点,不新建管线);
-   - 自动入库降级=清理落 workspace_path 不进 inbox 管线→'待入库N篇'+一键入库(既有 upload+index)。 */
+/* ═══ b1 · 一键清理+入库 三步向导(海天全高抽屉) ═══
+   ①仓库(repository_root_path 受管资料库根) ②选取(选桌面文件/文件夹→staging收料单)
+   ③执行(五段入库流水线:落盘→解析→入库索引→归档抽图, SSE 逐文件逐段进度)。
+
+   dev 态说明(检查点① · 无新列版):
+   - 选文件夹走 FolderPicker(自绘 list-dir)降级;原生对话框+多选文件待 exe 阶段接 pywebview 桥。
+   - 去重=同名同大小(_already_imported);content_hash 精确去重等 0023 迁移。
+   - 进度存后端内存;"关闭重开续跑"需 0023 的 ingest_jobs 表——本版重开会重跑(去重兜底不产生重复入库)。 */
 
 type WizStep = 1 | 2 | 3
-type Group = 'archive' | 'ignore'
 
 function fmtSize(n: number) {
   if (n >= 1 << 30) return (n / (1 << 30)).toFixed(1) + ' GB'
@@ -23,41 +25,50 @@ function fmtSize(n: number) {
   return n + ' B'
 }
 
-/* preview 候选按 reason 归入建议动作组——纯前端归类,不改后端语义(后端只标可清候选) */
-function groupOf(reason: string): Group {
-  return /tmp|temp|cache|缓存|临时|\.log|日志/i.test(reason) ? 'ignore' : 'archive'
+/* SSE 进度事件(与后端 app/ingest 的事件形态对应) */
+interface IngestEvent {
+  kind: string
+  i?: number
+  name?: string
+  stage?: string
+  chunks?: number
+  truncated_at_page?: number
+  total_pages?: number
+  parse_status?: string
+  reason?: string
+  imported?: number
+  indexed?: number
+  assets?: number
+  skipped?: number
+  failed?: number
+  total?: number
 }
-
-const GROUP_LABEL: Record<Group, string> = { archive: '副本 · 备份 · 旧文件', ignore: '临时 · 缓存 · 日志' }
 
 export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState<WizStep>(1)
-  const [wsPath, setWsPath] = useState<string | null>(null)
-  const [wsAccessible, setWsAccessible] = useState(false)
+  const [repoPath, setRepoPath] = useState<string | null>(null)
   const [indexedCount, setIndexedCount] = useState<number | null>(null)
-  const [pathDraft, setPathDraft] = useState('')
   const [cfgErr, setCfgErr] = useState('')
-  const [scan, setScan] = useState<WorkspaceScan | null>(null)
-  const [preview, setPreview] = useState<CleanupPreview | null>(null)
-  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [picker, setPicker] = useState<null | 'repo' | 'select'>(null)
+  const [staging, setStaging] = useState<StagingResult | null>(null)
+  const [pickedPaths, setPickedPaths] = useState<string[]>([])
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
-  const [confirming, setConfirming] = useState(false)
-  const [applied, setApplied] = useState<{ moved: number; skipped: number; failed: number; timestamp: string } | null>(null)
-  const [restored, setRestored] = useState<{ restored: number; total: number } | null>(null)
+  /* 执行态 */
+  const [running, setRunning] = useState(false)
+  const [events, setEvents] = useState<IngestEvent[]>([])
+  const [receipt, setReceipt] = useState<IngestEvent | null>(null)
+  const esRef = useRef<EventSource | null>(null)
   const bootedRef = useRef(false)
 
-  /* 读工作目录配置(唯一真源:workspaceStatus,不持私有副本) */
+  /* 读受管资料库根(唯一真源:getSettings.repository_root_path) */
   const boot = useCallback(async () => {
-    setErr(''); setStep(1); setScan(null); setPreview(null); setChecked(new Set())
-    setApplied(null); setRestored(null); setConfirming(false)
+    setErr(''); setStep(1); setStaging(null); setPickedPaths([]); setReceipt(null); setEvents([])
     try {
-      const st = await ks.workspaceStatus()
-      setWsPath(st.workspace_path || null)
-      setWsAccessible(st.accessible)
-      if (st.workspace_path && st.accessible) {
+      const s = await api.getSettings()
+      setRepoPath(s.repository_root_path || null)
+      if (s.repository_root_path) {
         try { const kb = await ks.stats(); setIndexedCount(kb.documents) } catch { setIndexedCount(null) }
-        void enterSelect() /* 已配置→自动落第二步 */
       }
     } catch (e) {
       setErr((e as Error).message)
@@ -66,80 +77,76 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
 
   useEffect(() => {
     if (open && !bootedRef.current) { bootedRef.current = true; void boot() }
-    if (!open) bootedRef.current = false
+    if (!open) {
+      bootedRef.current = false
+      esRef.current?.close()
+      esRef.current = null
+    }
   }, [open, boot])
 
-  /* 第一步→第二步:scan(只读)+ preview(只读),默认全勾 */
-  const enterSelect = useCallback(async () => {
-    setBusy('scan'); setErr('')
+  /* 关闭时清理 SSE */
+  useEffect(() => () => { esRef.current?.close() }, [])
+
+  /* 选仓库根(FolderPicker 降级;exe 走原生桥) → 写 repository_root_path */
+  const onPickRepo = async (abs: string) => {
+    setPicker(null); setBusy('cfg'); setCfgErr('')
     try {
-      const sc = await ks.workspaceScan()
-      setScan(sc)
-      if (!sc.accessible) { setErr(sc.error || '工作目录不可访问'); setBusy(''); return }
-      const p = await ks.cleanupPreview()
-      setPreview(p)
-      setChecked(new Set((p.candidates ?? []).map((c) => c.path))) /* 默认全选 */
+      await api.listDir(abs) /* 存在性探测 */
+      await api.updateSettings({ repository_root_path: abs })
+      setRepoPath(abs)
+      try { const kb = await ks.stats(); setIndexedCount(kb.documents) } catch { setIndexedCount(null) }
+    } catch (e) {
+      setCfgErr(`该路径无法作为仓库根:${(e as Error).message}`)
+    } finally { setBusy('') }
+  }
+
+  /* 选取资料(文件夹) → staging 收料单 */
+  const onPickSelect = async (abs: string) => {
+    setPicker(null); setBusy('staging'); setErr('')
+    try {
+      const paths = [abs]
+      const sg = await api.staging(paths)
+      setStaging(sg)
+      setPickedPaths(paths)
       setStep(2)
     } catch (e) { setErr((e as Error).message) } finally { setBusy('') }
-  }, [])
+  }
 
-  /* 保存已选目录为工作目录(复用全局端点;前端先探存在性弥补后端零校验) */
-  const setWorkspace = async () => {
-    const p = pathDraft.trim()
-    if (!p) return
-    setBusy('cfg'); setCfgErr('')
+  /* 执行:启动 ingest job + 订阅 SSE 逐文件逐段进度 */
+  const doIngest = async () => {
+    if (pickedPaths.length === 0) return
+    setBusy('ingest'); setErr(''); setEvents([]); setReceipt(null); setRunning(true); setStep(3)
     try {
-      await ks.listDir(p) /* 存在性探测:不存在会抛,弥补 workspace/config 零校验 */
-      await ks.workspaceConfig(p)
-      setWsPath(p); setWsAccessible(true)
-      try { const kb = await ks.stats(); setIndexedCount(kb.documents) } catch { setIndexedCount(null) }
-      void enterSelect()
+      const { job_id } = await api.ingestStart(pickedPaths)
+      const es = new EventSource(`/api/ingest/${job_id}/stream`)
+      esRef.current = es
+      /* 正常完成标志:后端发完 eof 会主动关连接,而 EventSource 规范把「服务端关连接」也当断线触发 onerror。
+         无此标志时 onerror 会把「正常跑完的关闭」误报成红字(job 其实已成功)。收到 eof/gone/done 即置真。 */
+      let finished = false
+      es.onmessage = (m) => {
+        const ev = JSON.parse(m.data) as IngestEvent & { phase?: string }
+        if (ev.kind === 'eof' || ev.kind === 'gone') {
+          finished = true
+          es.close(); esRef.current = null; setRunning(false); setBusy('')
+          return
+        }
+        if (ev.kind === 'done') {
+          finished = true; setReceipt(ev)
+          /* hotfix1(2026-07-07):入库真完成 → 通知首页重拉真实统计(不依赖用户点「去数据基地看」)。
+             根治「抽屉入库 8、首页仍 0」——首页 useKnowledgeLive 监听此事件 ver++ 重拉。 */
+          window.dispatchEvent(new CustomEvent('romai:knowledge-updated'))
+        }
+        setEvents((prev) => [...prev, ev])
+      }
+      es.onerror = () => {
+        es.close(); esRef.current = null; setRunning(false); setBusy('')
+        /* 已正常完成(收到 eof/done)的关闭:静默,不误报。仅真·中途断线才提示。 */
+        if (!finished) setErr('进度流中断(job 可能已完成,请查看数据基地最近入库)')
+      }
     } catch (e) {
-      setCfgErr(`该路径无法使用:${(e as Error).message}(请选择已存在的文件夹;新建请在资源管理器完成)`)
-    } finally { setBusy('') }
-  }
-
-  const changeWorkspace = () => {
-    /* 回改第一步→清空第二步勾选并明示 */
-    setStep(1); setScan(null); setPreview(null); setChecked(new Set()); setPathDraft(wsPath ?? '')
-  }
-
-  const groups = useMemo(() => {
-    const m: Record<Group, CleanupPreview['candidates']> = { archive: [], ignore: [] }
-    for (const c of preview?.candidates ?? []) (m[groupOf(c.reason)] ||= []).push(c)
-    return m
-  }, [preview])
-
-  const selectedList = useMemo(() => (preview?.candidates ?? []).filter((c) => checked.has(c.path)), [preview, checked])
-  const selectedSize = selectedList.reduce((n, c) => n + (c.size ?? 0), 0)
-
-  const toggle = (path: string) => setChecked((s) => { const n = new Set(s); n.has(path) ? n.delete(path) : n.add(path); return n })
-  const toggleGroup = (g: Group, on: boolean) =>
-    setChecked((s) => { const n = new Set(s); for (const c of groups[g] ?? []) on ? n.add(c.path) : n.delete(c.path); return n })
-
-  /* 第三步执行:apply 传勾选子集(rel_paths),轻闸二次确认;结果三态诚实 */
-  const doApply = async () => {
-    if (selectedList.length === 0) return
-    setBusy('apply'); setErr('')
-    try {
-      const r = await ks.cleanupApply(selectedList.map((c) => c.path))
-      const moved = r.moved ?? 0
-      setApplied({ moved, skipped: selectedList.length - moved, failed: 0, timestamp: r.manifest?.timestamp ?? '' })
-      setConfirming(false)
-    } catch (e) {
-      /* move 中途抛错=部分落盘(契约脆弱点),如实报失败,不伪装全成功 */
-      setApplied({ moved: 0, skipped: 0, failed: selectedList.length, timestamp: '' })
-      setErr(`清理中断:${(e as Error).message}(部分文件可能已移入隔离区但未记录,需在 _ROMAI_CLEANUP_QUARANTINE 人工查看)`)
-    } finally { setBusy('') }
-  }
-
-  const doRestore = async () => {
-    if (!applied?.timestamp) return
-    setBusy('restore'); setErr('')
-    try {
-      const r = await ks.cleanupRestore(applied.timestamp)
-      setRestored({ restored: r.restored ?? 0, total: r.total ?? 0 })
-    } catch (e) { setErr((e as Error).message) } finally { setBusy('') }
+      setRunning(false); setBusy('')
+      setErr(`启动入库失败:${(e as Error).message}`)
+    }
   }
 
   if (!open) return null
@@ -147,12 +154,22 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
   const stepDot = (n: WizStep, label: string) => {
     const active = step === n
     const done = step > n
+    /* 回退语义(P0·入库主链路数据可信度红线):退回到「仓库」步 = 放弃本次选取,
+       清 staging/pickedPaths/回执/事件——杜绝「以为选了/其实是上次的、以为入了/其实没入」。
+       3→2 回看不清(仍是同一批选取,只是复核收料单)。 */
+    const goBack = (target: WizStep) => {
+      if (target >= step || running) return
+      if (target === 1) {
+        setStaging(null); setPickedPaths([]); setReceipt(null); setEvents([]); setErr('')
+      }
+      setStep(target)
+    }
     return (
       <button
         key={n}
         className="flex items-center gap-2"
         disabled={n >= step}
-        onClick={() => { if (n < step) { if (n === 1) changeWorkspace(); else setStep(n) } }}
+        onClick={() => goBack(n)}
       >
         <span className={`grid h-5 w-5 place-items-center rounded-full border text-[11px] ${active ? 'border-sk-primary text-sk-primary' : done ? 'border-sk-ok text-sk-ok' : 'border-sk-hair text-sk-muted2'}`}>
           {done ? '✓' : n}
@@ -162,8 +179,14 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
     )
   }
 
+  /* 进度派生:逐文件最新阶段 + 计数 */
+  const fileEvents = events.filter((e) => e.kind === 'file' || e.kind === 'stage')
+  const lastByFile = new Map<number, IngestEvent>()
+  for (const e of fileEvents) if (e.i != null) lastByFile.set(e.i, e)
+  const doneFiles = events.filter((e) => e.kind === 'file' && (e.stage === '完成' || e.stage?.includes('跳过') || e.stage === '失败'))
+
   return (
-    <div className="absolute inset-0 z-skoverlay flex justify-end bg-[rgba(6,8,10,.5)] backdrop-blur-[4px]" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="absolute inset-0 z-skoverlay flex justify-end bg-[rgba(6,8,10,.5)] backdrop-blur-[4px]" onClick={(e) => { if (e.target === e.currentTarget && !running) onClose() }}>
       <div className="sk-scroll flex h-full w-[min(560px,94vw)] flex-col overflow-y-auto border-l-[0.5px] border-sk-border bg-[rgba(10,12,14,.97)] shadow-skpop">
         {/* 顶部:标题 + 步骤条 */}
         <div className="flex-none border-b-[0.5px] border-sk-hairsoft px-6 pb-3 pt-5">
@@ -178,125 +201,115 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
         </div>
 
         <div className="flex-1 px-6 py-5">
-          {/* ── 第一步:仓库 ── */}
+          {/* ── 第一步:仓库(受管资料库根 repository_root_path) ── */}
           {step === 1 && (
             <div className="flex flex-col gap-4">
-              {wsPath && wsAccessible ? (
+              {repoPath ? (
                 <div className="rounded-skcard border-[0.5px] border-sk-border bg-sk-card p-4">
-                  <div className="flex items-center gap-2"><Pill tone="ok">已配置</Pill><span className="font-skcjk text-[12px] text-sk-muted2">当前工作目录</span></div>
-                  <div className="mt-2 break-all font-skmono text-[12.5px] text-sk-fg">{wsPath}</div>
+                  <div className="flex items-center gap-2"><Pill tone="ok">已配置</Pill><span className="font-skcjk text-[12px] text-sk-muted2">受管资料库根</span></div>
+                  <div className="mt-2 break-all font-skmono text-[12.5px] text-sk-fg">{repoPath}</div>
                   {indexedCount != null && <div className="mt-1 font-skcjk text-[11.5px] text-sk-muted">知识库已索引 {indexedCount} 篇</div>}
-                  <div className="mt-3"><GhostButton onClick={changeWorkspace}>更换仓库 →</GhostButton></div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <GhostButton onClick={() => setPicker('repo')}>更换仓库 →</GhostButton>
+                    <GhostButton pri onClick={() => setPicker('select')}>下一步:选取资料 →</GhostButton>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <Label>选择工作目录(清理与入库作用于此)</Label>
+                  <Label>选择受管资料库根(资料复制入库的根目录)</Label>
                   <div className="font-skcjk text-[11.5px] font-light leading-[1.8] text-sk-muted">
-                    请选择一个<b className="text-sk-fg">已存在</b>的文件夹作为工作目录;需要新建请先在资源管理器创建好再选。
+                    选一个<b className="text-sk-fg">已存在</b>的文件夹作为资料库根;整理入库的文件会复制到 <span className="font-skmono">{'{仓库}/{项目名}/'}</span> 下。
                   </div>
-                  <input
-                    className="w-full rounded-[9px] border-[0.5px] border-sk-hair bg-transparent px-3 py-2 font-skmono text-[12.5px] text-sk-fg outline-none placeholder:text-sk-muted2 focus:border-[rgba(127,179,207,.45)]"
-                    placeholder="例如 D:\\设计仓库\\星河国际"
-                    value={pathDraft}
-                    onChange={(e) => setPathDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void setWorkspace() }}
-                  />
+                  <div><GhostButton pri disabled={busy === 'cfg'} onClick={() => setPicker('repo')}>{busy === 'cfg' ? '校验中…' : '选择文件夹 →'}</GhostButton></div>
                   {cfgErr && <div className="font-skcjk text-[11.5px] font-light text-sk-risk">{cfgErr}</div>}
-                  <div><GhostButton pri disabled={busy === 'cfg'} onClick={() => void setWorkspace()}>{busy === 'cfg' ? '校验中…' : '设为工作目录 →'}</GhostButton></div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── 第二步:选取(只读) ── */}
+          {/* ── 第二步:选取(桌面文件/文件夹 → staging 收料单) ── */}
           {step === 2 && (
             <div className="flex flex-col gap-4">
-              {busy === 'scan' && <div className="py-6 text-center font-skcjk text-[12.5px] text-sk-muted2">正在扫描工作目录…</div>}
-              {scan && (
+              {busy === 'staging' && <div className="py-6 text-center font-skcjk text-[12.5px] text-sk-muted2">正在扫描所选资料…</div>}
+              {staging && (
                 <>
                   <div className="flex flex-wrap gap-x-6 gap-y-2">
-                    {([['文件', scan.total_files], ['文件夹', scan.total_dirs], ['总大小', fmtSize(scan.total_size)], ['可自动清理', scan.auto_cleanable?.length ?? 0]] as const).map(([k, v]) => (
+                    {([['文件', staging.total_files], ['可入库', staging.supported_files], ['已在库', staging.already_indexed], ['不支持', staging.skipped_unsupported]] as const).map(([k, v]) => (
                       <span key={k} className="font-skcjk text-[12px] text-sk-muted"><b className="mr-1.5 font-sans text-[17px] font-medium text-sk-fg [font-variant-numeric:tabular-nums]">{v}</b>{k}</span>
                     ))}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">{Object.entries(scan.type_stats || {}).slice(0, 8).map(([t, n]) => <Pill key={t}>{t} {n}</Pill>)}</div>
+                  <div className="flex flex-wrap gap-1.5">{Object.entries(staging.type_stats || {}).slice(0, 10).map(([t, n]) => <Pill key={t}>{t} {n}</Pill>)}</div>
+                  {staging.error && <div className="font-skcjk text-[11.5px] text-sk-warn">{staging.error}</div>}
 
-                  {(preview?.count ?? 0) === 0 ? (
-                    <div className="py-3 font-skcjk text-[13px] text-sk-ok">目录很干净,没有可自动清理的项。</div>
-                  ) : (
-                    (['ignore', 'archive'] as Group[]).filter((g) => (groups[g]?.length ?? 0) > 0).map((g) => {
-                      const list = groups[g]!
-                      const allOn = list.every((c) => checked.has(c.path))
-                      return (
-                        <div key={g} className="rounded-skcard border-[0.5px] border-sk-border">
-                          <div className="flex items-center justify-between border-b-[0.5px] border-sk-hairsoft px-3 py-2">
-                            <span className="font-skcjk text-[12.5px] text-sk-fg">{GROUP_LABEL[g]} <span className="text-sk-muted2">{list.length}</span></span>
-                            <button className="font-skcjk text-[11px] text-sk-primary" onClick={() => toggleGroup(g, !allOn)}>{allOn ? '取消全选' : '全选'}</button>
+                  {staging.groups.map((g) => (
+                    <div key={g.source_dir} className="rounded-skcard border-[0.5px] border-sk-border">
+                      <div className="flex items-center justify-between border-b-[0.5px] border-sk-hairsoft px-3 py-2">
+                        <span className="min-w-0 flex-1 truncate font-skcjk text-[12.5px] text-sk-fg">{g.project_hint} <span className="text-sk-muted2">· {g.files.length} 文件</span></span>
+                        {g.project_id > 0 && <Pill tone="ok">已建项目</Pill>}
+                      </div>
+                      <div className="max-h-[220px] overflow-y-auto sk-scroll px-1 py-1">
+                        {g.files.slice(0, 40).map((f) => (
+                          <div key={f.abs_path} className={`flex items-center gap-2.5 px-2 py-1.5 ${f.already_indexed ? 'opacity-40' : ''}`}>
+                            <span className="min-w-0 flex-1 truncate font-skcjk text-[11.5px] text-sk-muted">{f.name}</span>
+                            {f.already_indexed && <span className="flex-none font-skcjk text-[10px] text-sk-muted2">已在库</span>}
+                            {!f.supported && <span className="flex-none font-skcjk text-[10px] text-sk-warn">不支持</span>}
+                            <span className="flex-none font-skcjk text-[10.5px] text-sk-muted2">{fmtSize(f.size)}</span>
                           </div>
-                          <div className="max-h-[180px] overflow-y-auto sk-scroll px-1 py-1">
-                            {list.slice(0, 8).map((c) => (
-                              <label key={c.path} className="flex cursor-pointer items-center gap-2.5 px-2 py-1.5">
-                                <input type="checkbox" className="accent-sk-primary" checked={checked.has(c.path)} onChange={() => toggle(c.path)} />
-                                <span className="min-w-0 flex-1 truncate font-skcjk text-[11.5px] text-sk-muted">{c.path}</span>
-                                <span className="flex-none font-skcjk text-[10.5px] text-sk-muted2">{fmtSize(c.size)}</span>
-                              </label>
-                            ))}
-                            {list.length > 8 && <div className="px-2 py-1 font-skcjk text-[10.5px] text-sk-muted2">…另 {list.length - 8} 项同规则(执行时一并处理已勾选项)</div>}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
+                        ))}
+                        {g.files.length > 40 && <div className="px-2 py-1 font-skcjk text-[10.5px] text-sk-muted2">…另 {g.files.length - 40} 项(执行时一并处理)</div>}
+                      </div>
+                    </div>
+                  ))}
+                  <div><GhostButton onClick={() => setPicker('select')}>重新选取</GhostButton></div>
                 </>
               )}
             </div>
           )}
 
-          {/* ── 第三步:执行(唯一写动作) ── */}
+          {/* ── 第三步:执行(五段入库流水线 + SSE 进度) ── */}
           {step === 3 && (
             <div className="flex flex-col gap-4">
-              {!applied ? (
+              {!running && !receipt && (
                 <>
                   <div className="rounded-skcard border-[0.5px] border-sk-border bg-sk-card p-4">
-                    <div className="font-skcjk text-[13px] text-sk-fg">将清理 <b className="text-sk-primary">{selectedList.length}</b> 项 · 合计 {fmtSize(selectedSize)}</div>
-                    <div className="mt-1 break-all font-skmono text-[11px] text-sk-muted2">目标仓库:{wsPath}</div>
-                    <div className="mt-2 font-skcjk text-[12px] font-medium text-sk-ok">✓ 只移入隔离区 · 永不删除(随时可撤销)</div>
+                    <div className="font-skcjk text-[13px] text-sk-fg">将入库 <b className="text-sk-primary">{staging?.supported_files ?? 0}</b> 个可解析文件</div>
+                    <div className="mt-1 break-all font-skmono text-[11px] text-sk-muted2">目标仓库:{repoPath}</div>
+                    <div className="mt-2 font-skcjk text-[12px] font-medium text-sk-ok">五段:识别 → 抽取 → 切块 → 索引 → 归档</div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {!confirming ? (
-                      <GhostButton pri disabled={selectedList.length === 0} onClick={() => setConfirming(true)}>清理 {selectedList.length} 项</GhostButton>
-                    ) : (
-                      <>
-                        <GhostButton pri disabled={busy === 'apply'} onClick={() => void doApply()}>{busy === 'apply' ? '移入中…' : `确认清理 ${selectedList.length} 项`}</GhostButton>
-                        <GhostButton disabled={busy === 'apply'} onClick={() => setConfirming(false)}>取消</GhostButton>
-                      </>
-                    )}
-                  </div>
+                  <div><GhostButton pri disabled={!staging?.supported_files} onClick={() => void doIngest()}>开始入库</GhostButton></div>
                 </>
-              ) : (
+              )}
+
+              {(running || receipt) && (
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap gap-x-6 gap-y-1">
-                    <span className="font-skcjk text-[12px] text-sk-muted"><b className="mr-1 font-sans text-[17px] font-medium text-sk-ok">{applied.moved}</b>已移入</span>
-                    {applied.skipped > 0 && <span className="font-skcjk text-[12px] text-sk-muted"><b className="mr-1 font-sans text-[17px] font-medium text-sk-warn">{applied.skipped}</b>跳过</span>}
-                    {applied.failed > 0 && <span className="font-skcjk text-[12px] text-sk-muted"><b className="mr-1 font-sans text-[17px] font-medium text-sk-risk">{applied.failed}</b>失败</span>}
+                    {([['已入库', receipt?.imported ?? 0, 'ok'], ['已索引', receipt?.indexed ?? 0, 'ok'], ['抽图', receipt?.assets ?? 0, 'default'], ['跳过', receipt?.skipped ?? 0, 'warn'], ['失败', receipt?.failed ?? 0, 'risk']] as const).map(([k, v]) => (
+                      <span key={k} className="font-skcjk text-[12px] text-sk-muted"><b className={`mr-1 font-sans text-[17px] font-medium ${v ? 'text-sk-fg' : 'text-sk-muted2'}`}>{v}</b>{k}</span>
+                    ))}
                   </div>
-                  {/* 自动入库降级(契约):清理落 workspace_path 不进 inbox 管线,且入库须浏览器选文件/收件箱扫描——
-                      wizard 内无法一键真入库,如实深链到数据基地入库入口,不做假一键 */}
-                  {applied.moved > 0 && (
-                    <div className="rounded-skcard border-[0.5px] border-sk-border bg-sk-card p-3">
-                      <div className="font-skcjk text-[12.5px] text-sk-muted">清理完成。留在工作目录的资料<b className="text-sk-fg">待入库</b>——清理与入库是两条独立管线,入库请在数据基地完成(收件箱扫描 / 上传索引)。</div>
-                      <div className="mt-2"><GhostButton onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('romai:seasky:recent-refresh')) }}>去数据基地入库 →</GhostButton></div>
+                  {running && <div className="font-skcjk text-[12px] text-sk-primary">正在入库… 已处理 {doneFiles.length} 个</div>}
+                  {receipt && <div className="font-skcjk text-[12.5px] font-medium text-sk-ok">✓ 入库完成</div>}
+
+                  {/* 逐文件进度/回执(带 chunk 数 + 截断诚实标注) */}
+                  <div className="max-h-[300px] overflow-y-auto sk-scroll rounded-skcard border-[0.5px] border-sk-border">
+                    {[...lastByFile.values()].slice(-60).map((e, idx) => (
+                      <div key={idx} className="flex items-center gap-2 border-b-[0.5px] border-sk-hairsoft px-3 py-1.5 last:border-0">
+                        <span className="min-w-0 flex-1 truncate font-skcjk text-[11px] text-sk-muted">{e.name}</span>
+                        {e.stage === '完成' && e.chunks != null && (
+                          <span className="flex-none font-skcjk text-[10px] text-sk-muted2">
+                            {e.chunks} 块{e.truncated_at_page ? ` · 截断@${e.truncated_at_page}/${e.total_pages}页` : ''}
+                          </span>
+                        )}
+                        <span className={`flex-none font-skcjk text-[10.5px] ${e.stage === '失败' ? 'text-sk-risk' : e.stage === '完成' ? 'text-sk-ok' : e.stage?.includes('跳过') ? 'text-sk-muted2' : 'text-sk-primary'}`}>{e.stage}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {receipt && (
+                    <div className="flex items-center gap-3">
+                      <button className="font-skcjk text-[11.5px] text-sk-primary" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('romai:seasky:recent-refresh')) }}>去数据基地看最近入库 →</button>
                     </div>
                   )}
-                  <div className="flex items-center gap-3">
-                    {restored ? (
-                      <div className="font-skcjk text-[12.5px] text-sk-primary">已撤销恢复 {restored.restored}/{restored.total} 项回原位。</div>
-                    ) : applied.moved > 0 ? (
-                      <GhostButton disabled={busy === 'restore'} onClick={() => void doRestore()}>{busy === 'restore' ? '恢复中…' : '↩ 一键撤销'}</GhostButton>
-                    ) : null}
-                    <button className="font-skcjk text-[11.5px] text-sk-primary" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('romai:seasky:recent-refresh')) }}>查看最近入库 →</button>
-                  </div>
-                  <div className="font-skcjk text-[10.5px] font-light text-sk-muted2">撤销仅本次会话有效;隔离区文件长期保留在 _ROMAI_CLEANUP_QUARANTINE/</div>
                 </div>
               )}
             </div>
@@ -305,16 +318,31 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
           {err && <div className="mt-3 font-skcjk text-[12px] font-light text-sk-risk">{err}</div>}
         </div>
 
-        {/* 底部:计数条 + 步进(第二步常驻) */}
-        {step === 2 && (
+        {/* 底部:第二步的"下一步执行" */}
+        {step === 2 && staging && (
           <div className="flex-none border-t-[0.5px] border-sk-hairsoft px-6 py-3">
             <div className="flex items-center justify-between">
-              <span className="font-skcjk text-[12px] text-sk-muted">已选 <b className="text-sk-fg">{selectedList.length}</b> 项 · 共 {fmtSize(selectedSize)}</span>
-              <GhostButton pri disabled={selectedList.length === 0} onClick={() => setStep(3)}>下一步:执行 →</GhostButton>
+              <span className="font-skcjk text-[12px] text-sk-muted">可入库 <b className="text-sk-fg">{staging.supported_files}</b> 个 · 已在库 {staging.already_indexed} 个</span>
+              <GhostButton pri disabled={!staging.supported_files} onClick={() => setStep(3)}>下一步:执行 →</GhostButton>
             </div>
           </div>
         )}
       </div>
+
+      {/* 目录选择器(dev 降级;exe 走 pywebview 原生桥) */}
+      <FolderPicker
+        open={picker === 'repo'}
+        foldersOnly
+        initialPath={repoPath ?? ''}
+        onPick={(p) => void onPickRepo(p)}
+        onClose={() => setPicker(null)}
+      />
+      <FolderPicker
+        open={picker === 'select'}
+        initialPath={repoPath ?? ''}
+        onPick={(p) => void onPickSelect(p)}
+        onClose={() => setPicker(null)}
+      />
     </div>
   )
 }

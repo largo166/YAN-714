@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { boardImages } from '../../data/boardImages'
-import { useHubLive } from '../../hooks/useHubLive'
+import type { HubLive } from '../../hooks/useHubLive'
 import { hubService as hs } from '../../services'
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { Dot, GhostButton, Label, Pill } from '../common/PillButton'
@@ -9,9 +9,9 @@ import { StatBlock } from '../common/StatBlock'
 
 /* ═══ b3 协作平台:横幅+三列(构图冻结)——成员/甲方画像/智能体/通知全接真 ═══ */
 
-export function HubBoard({ active }: { active: boolean }) {
+export function HubBoard({ active: _active, live }: { active: boolean; live: HubLive }) {
   const img = boardImages.hub
-  const live = useHubLive(active)
+  /* live 由 AppShell 汇聚层(useBoardLive)传入,不再自调 useHubLive——单一数据源(hotfix1) */
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState({ name: '', role: '' })
   const [addErr, setAddErr] = useState('')

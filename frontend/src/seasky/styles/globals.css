@@ -32,6 +32,10 @@ input, textarea { font-family: inherit; }
   80% { transform: translateX(3px); }
 }
 @keyframes sk-typing { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+/* sk-pulse(非母版·三态加载语言):纯透明度呼吸,无位移——守晕动症红线;状态栏"加载中…"用 */
+@keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.sk-pulse { animation: sk-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .sk-pulse { animation: none; opacity: 0.7; } }
 @keyframes sk-grain {
   0% { transform: translate(0, 0); }
   25% { transform: translate(-1.5%, 1%); }

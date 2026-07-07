@@ -5,6 +5,7 @@ import { BOARD_STATUS, LS_KEYS, type BoardIndex } from '../../lib/constants'
 import { energy, horizonY, sweepOnce, trigWave } from '../../lib/seaUniforms'
 import { lsSet } from '../../lib/storage'
 import { useBoardNavigation } from '../../hooks/useBoardNavigation'
+import { useBoardLive } from '../../hooks/useBoardLive'
 import { useCaptureMode } from '../../hooks/useCaptureMode'
 import { useProjectBridge } from '../../services/projectBridge'
 import { AgentCampBoard } from '../boards/AgentCampBoard'
@@ -28,6 +29,7 @@ export function AppShell() {
   const capture = useCaptureMode()
   const nav = useBoardNavigation()
   const proj = useProjectBridge()
+  const boardLive = useBoardLive() /* 汇聚层:状态栏 + b1/b2/b3 单一数据源(hotfix1) */
   const [filmPaused, setFilmPaused] = useState(false)
   const [progress, setProgress] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -96,9 +98,31 @@ export function AppShell() {
     return () => removeEventListener('keydown', onKey)
   }, [phase, nav])
 
-  const statusLeft = board === 0
-    ? (proj.cur ? `${proj.cur.name} · ${proj.cur.status || '进行中'}` : '项目加载中…')
-    : BOARD_STATUS[board]
+  /* 状态栏左槽:全板真实计数(单一数据源 useBoardLive)——保留原表达方式,数字接真值。
+     加载显"…"、空库显真 0、失败显"—"(板内另有可见错误提示)。铁律:无一条静态假数字。 */
+  const projLoading = board === 0 && !proj.cur && proj.loading
+  /* 计数格式化:loading→"…" / err→"—" / 就绪→真数(0 也是真话) */
+  const fmtCount = (loading: boolean, hasErr: boolean, n: number): string =>
+    loading ? '…' : hasErr ? '—' : String(n)
+  const kb = boardLive.knowledge
+  const sk = boardLive.skills
+  const hb = boardLive.hub
+  const statusLeft =
+    board === 0
+      ? (proj.cur ? `${proj.cur.name} · ${proj.cur.status || '进行中'}` : proj.err ? `项目加载失败 · ${proj.err}` : proj.loading ? '项目加载中…' : '暂无项目 · 到数据基地接入资料')
+      : board === 1
+      ? `数据基地 · ${fmtCount(kb.loading, !!kb.err, kb.stats?.documents ?? 0)} 篇受管`
+      : board === 2
+      ? `共创营地 · ${fmtCount(sk.loading, !!sk.err, sk.skills.length)} 项技能在编`
+      : board === 3
+      ? `协作平台 · ${fmtCount(hb.loading, hb.errs.length > 0, hb.members.length)} 名成员`
+      : BOARD_STATUS[4] /* b4 管理驾驶舱:非数字标签 */
+  /* 状态栏 pulse:项目加载 或 当前板计数仍在加载时,给"…"一点呼吸提示 */
+  const statusPulse =
+    projLoading ||
+    (board === 1 && kb.loading) ||
+    (board === 2 && sk.loading) ||
+    (board === 3 && hb.loading)
 
   const enterFromBoards = useCallback((i: BoardIndex) => nav.enterApp(i), [nav])
 
@@ -143,17 +167,19 @@ export function AppShell() {
             <ProjectCenterBoard proj={proj} active={phase === 'app' && board === 0} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 1} skipAnim={capture}>
-            <KnowledgeBaseBoard active={phase === 'app' && board === 1} />
+            <KnowledgeBaseBoard active={phase === 'app' && board === 1} live={boardLive.knowledge} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 2} skipAnim={capture}>
             <AgentCampBoard
               projectId={proj.cur?.id ?? null}
               projectName={proj.cur?.name ?? ''}
+              active={phase === 'app' && board === 2}
+              live={boardLive.skills}
               onGoBoard={(i) => nav.switchBoard(i as BoardIndex)}
             />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 3} skipAnim={capture}>
-            <HubBoard active={phase === 'app' && board === 3} />
+            <HubBoard active={phase === 'app' && board === 3} live={boardLive.hub} />
           </BoardFrame>
           <BoardFrame active={phase === 'app' && board === 4} skipAnim={capture}>
             <CockpitBoard
@@ -163,9 +189,13 @@ export function AppShell() {
               projectNames={proj.projects.map((p) => p.name)}
             />
           </BoardFrame>
-          <StatusBar left={statusLeft} />
+          <StatusBar left={statusLeft} pulse={statusPulse} />
           <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         </div>
+
+        {/* 下拉/浮层 Portal 根:在 stage 内(继承流体缩放 scale)、boards 之上,收纳 DropMenu 展开层——
+            使其脱离标题 data-in 入场动画残留 transform 造成的层叠上下文陷阱,而非靠调大 z-index 比大小 */}
+        <div id="sk-overlay" className="pointer-events-none absolute inset-0 z-[45]" />
 
         <CineLayer hideBars={phase === 'app'} />
       </div>

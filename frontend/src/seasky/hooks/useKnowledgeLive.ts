@@ -29,10 +29,13 @@ export function useKnowledgeLive(active: boolean): KnowledgeLive {
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [docs, setDocs] = useState<DocLite[]>([])
   const [inbox, setInbox] = useState<KnowledgeLive['inbox']>(null)
-  const [loaded, setLoaded] = useState(false)
+  /* hotfix1(2026-07-07):去 loaded 一次性闸,改 ver 驱动可刷新。
+     入库完成后前端派 'romai:knowledge-updated' 事件 → ver++ → 首页重拉真实统计,
+     根治「抽屉入库 8、首页仍显示旧 0」(旧 loaded flag 只加载一次永不刷新)。 */
+  const [ver, setVer] = useState(0)
 
   useEffect(() => {
-    if (!active || loaded) return
+    if (!active) return
     let alive = true
     ;(async () => {
       setLoading(true)
@@ -42,7 +45,6 @@ export function useKnowledgeLive(active: boolean): KnowledgeLive {
         setStats(st)
         setDocs(dl.items.map((d) => ({ id: d.id, title: d.title, type: d.type || '其他', created_at: d.created_at })))
         setErr(null)
-        setLoaded(true)
       } catch (e) {
         if (alive) setErr((e as Error).message)
       } finally {
@@ -52,11 +54,18 @@ export function useKnowledgeLive(active: boolean): KnowledgeLive {
     return () => {
       alive = false
     }
-  }, [active, loaded])
+  }, [active, ver])
 
-  /* 收件箱状态独立 effect:失败不拖垮主数据,StrictMode 双挂载下也能补拉 */
+  /* 入库/知识库变更事件 → 触发重拉(仅活跃时;不活跃时下次进板的 active 变化会自然重拉) */
   useEffect(() => {
-    if (!active || inbox) return
+    const bump = () => setVer((v) => v + 1)
+    window.addEventListener('romai:knowledge-updated', bump)
+    return () => window.removeEventListener('romai:knowledge-updated', bump)
+  }, [])
+
+  /* 收件箱状态:随 ver 同刷(入库后待处理数可能变),失败不拖垮主数据 */
+  useEffect(() => {
+    if (!active) return
     let alive = true
     ks.inboxStatus()
       .then((ib) => {
@@ -68,7 +77,7 @@ export function useKnowledgeLive(active: boolean): KnowledgeLive {
     return () => {
       alive = false
     }
-  }, [active, inbox])
+  }, [active, ver])
 
   const typeStats = useMemo(() => {
     const m = new Map<string, number>()

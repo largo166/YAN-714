@@ -4,7 +4,7 @@ import RichText from '@/components/RichText'
 import type { Skill, SkillRun } from '@/types/schemas'
 
 import { useLocalStorage } from '../../hooks/useLocalStorage'
-import { useSkillsLive } from '../../hooks/useSkillsLive'
+import type { SkillsLive } from '../../hooks/useSkillsLive'
 import { LS_KEYS, MODELS } from '../../lib/constants'
 import { cn } from '../../lib/cn'
 import { campService as cs } from '../../services'
@@ -55,10 +55,14 @@ export function AgentCampBoard({
   projectId,
   projectName,
   onGoBoard,
+  active: _active,
+  live,
 }: {
   projectId: number | null
   projectName: string
   onGoBoard: (i: number) => void
+  active: boolean
+  live: SkillsLive
 }) {
   const [tabRaw, setTab] = useLocalStorage(LS_KEYS.campTab, 'ask')
   const tab = tabRaw === 'agents' ? 'agents' : 'ask'
@@ -72,7 +76,7 @@ export function AgentCampBoard({
   const scrollRef = useRef<HTMLDivElement>(null)
   const convoTaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const live = useSkillsLive(true)
+  /* live 由 AppShell 汇聚层(useBoardLive)传入,不再自调 useSkillsLive——单一数据源(hotfix1) */
 
   const toBottom = () => {
     requestAnimationFrame(() => {
