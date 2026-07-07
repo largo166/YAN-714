@@ -9,16 +9,23 @@ interface PopoverProps {
   onClose: () => void
   title: string
   note?: string
-  /** 锚点定位类(调用方给 top/bottom/left/right) */
+  /** 面板宽度/最大高/滚动等样式类(定位不再靠 top/bottom 类,由锚点实测坐标决定) */
   className?: string
+  /** below=锚点下方弹(默认);above=锚点上方弹 */
+  placement?: 'below' | 'above'
   children: ReactNode
 }
 
 /**
- * 锚点浮层(母版 .pop):挂在触发元素旁,点外面关闭。
- * 首屏收纳原则(P0-4)的载体——长列表进浮层不占首屏。
+ * 锚点浮层(母版 .pop):挂在触发元素旁,点外面关闭。首屏收纳原则(P0-4)的载体。
+ * hotfix3:Portal 到舞台浮层根 #sk-overlay + 按锚点 getBoundingClientRect 实测坐标定位
+ * (除以流体舞台 scale),脱离卡片入场动画残留 transform 造成的层叠上下文——
+ * 根治"浮层压在下方 KPI 数字/卡片上、文字重叠读不了"(与 DropMenu 同源修法)。
  */
-export function Popover({ open, onClose, title, note, className, children }: PopoverProps) {
+export function Popover({ open, onClose, title, note, className, placement = 'below', children }: PopoverProps) {
+  const markerRef = useRef<HTMLSpanElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number; width: number; transform?: string } | null>(null)
+
   useEffect(() => {
     if (!open) return
     const close = () => onClose()
@@ -26,25 +33,64 @@ export function Popover({ open, onClose, title, note, className, children }: Pop
     return () => document.removeEventListener('click', close)
   }, [open, onClose])
 
-  if (!open) return null
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return }
+    const anchor = markerRef.current?.parentElement
+    const overlay = document.getElementById('sk-overlay')
+    if (!anchor || !overlay) return
+    const compute = () => {
+      const o = overlay.getBoundingClientRect()
+      const k = o.width / overlay.offsetWidth || 1 /* 抵消流体舞台 scale */
+      const a = anchor.getBoundingClientRect()
+      const L = (a.left - o.left) / k
+      const T = (a.top - o.top) / k
+      const B = (a.bottom - o.top) / k
+      const W = a.width / k
+      setPos(
+        placement === 'above'
+          ? { left: L, top: T - 10, width: W, transform: 'translateY(-100%)' } /* 锚点上方 */
+          : { left: L, top: B + 10, width: W } /* 锚点下方 */,
+      )
+    }
+    compute()
+    addEventListener('resize', compute)
+    addEventListener('scroll', compute, true)
+    return () => {
+      removeEventListener('resize', compute)
+      removeEventListener('scroll', compute, true)
+    }
+  }, [open, placement])
+
+  /* 就地隐形锚点:测量触发元素位置(面板 Portal 出去后无法自测) */
+  const marker = <span ref={markerRef} aria-hidden className="pointer-events-none absolute h-0 w-0" />
+  const overlay = open ? document.getElementById('sk-overlay') : null
+  if (!open || !pos || !overlay) return marker
+
   return (
-    <div
-      className={cn(
-        'absolute z-skpop min-w-[300px] rounded-[14px] border-[0.5px] border-sk-border bg-sk-heavy p-3 px-4 shadow-skpop backdrop-blur-[16px]',
-        className,
+    <>
+      {marker}
+      {createPortal(
+        <div
+          className={cn(
+            'pointer-events-auto absolute z-skpop min-w-[300px] rounded-[14px] border-[0.5px] border-sk-border bg-sk-heavy p-3 px-4 shadow-skpop backdrop-blur-[16px]',
+            className,
+          )}
+          style={{ left: pos.left, top: pos.top, width: pos.width, transform: pos.transform }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-1.5 flex items-baseline gap-2.5">
+            <CardHead title={title} slim />
+            {note && (
+              <span className="ml-auto">
+                <HeadNote>{note}</HeadNote>
+              </span>
+            )}
+          </div>
+          {children}
+        </div>,
+        overlay,
       )}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="mb-1.5 flex items-baseline gap-2.5">
-        <CardHead title={title} slim />
-        {note && (
-          <span className="ml-auto">
-            <HeadNote>{note}</HeadNote>
-          </span>
-        )}
-      </div>
-      {children}
-    </div>
+    </>
   )
 }
 

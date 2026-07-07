@@ -60,7 +60,7 @@ export function KnowledgeSearch() {
         onClose={() => setOpen(false)}
         title={busy ? '检索中…' : `检索「${q.trim()}」`}
         note={hits ? `FTS5 · 命中 ${hits.length}` : undefined}
-        className="left-0 right-[-2px] top-[calc(100%+10px)] max-h-[300px] overflow-y-auto sk-scroll"
+        className="max-h-[300px] overflow-y-auto sk-scroll"
       >
         {busy && <div className="py-2 font-skcjk text-[12.5px] font-light text-sk-muted2">正在全文检索…</div>}
         {err && <div className="py-2 font-skcjk text-[12.5px] font-light text-sk-risk">检索失败:{err}</div>}

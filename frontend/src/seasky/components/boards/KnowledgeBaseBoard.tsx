@@ -80,7 +80,8 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
               onClose={() => setRecentOpen(false)}
               title="最近入库"
               note={`Recent ${live.recent.length}`}
-              className="bottom-[calc(100%+10px)] left-0 min-w-[430px]"
+              placement="above"
+              className="min-w-[430px]"
             >
               {live.recent.length === 0 && <div className="py-1 font-skcjk text-[12px] font-light text-sk-muted">暂无入库记录。点「一键清理」接入资料后,最近入库会出现在这里。</div>}
               {live.recent.map((r) => (

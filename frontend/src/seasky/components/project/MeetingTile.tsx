@@ -149,7 +149,7 @@ export function MeetingChainCard({ projectId, meetings, minutes, todos }: Meetin
         onClose={() => setListOpen(false)}
         title="会议与纪要"
         note="真实记录"
-        className="left-0 right-0 top-[calc(100%+8px)] max-h-[240px] overflow-y-auto sk-scroll"
+        className="max-h-[240px] overflow-y-auto sk-scroll"
       >
         {listErr && <div className="py-1 font-skcjk text-[12px] font-light text-sk-risk">{listErr}</div>}
         {list && list.length === 0 && (

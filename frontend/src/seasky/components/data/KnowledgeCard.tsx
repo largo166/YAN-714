@@ -23,7 +23,8 @@ export function RecentIntakeCard() {
         onClose={() => setOpen(false)}
         title="最近入库"
         note="Recent 5"
-        className="bottom-[calc(100%+10px)] left-0 min-w-[430px]"
+        placement="above"
+        className="min-w-[430px]"
       >
         {RECENT_INTAKE.map((r) => (
           <MRow key={r.txt} compact lead={<Pill>{r.pill}</Pill>} text={r.txt} who={r.who} />
