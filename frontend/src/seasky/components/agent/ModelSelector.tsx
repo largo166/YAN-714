@@ -27,7 +27,8 @@ export function ModelSelector({ model, onSelect }: { model: string; onSelect: (m
       <span className="text-[10px] text-sk-muted2">▾</span>
       <DropMenu
         open={open}
-        className="bottom-[calc(100%+10px)] left-auto right-0 top-auto"
+        placement="top-right"
+        gap={10}
         items={MODELS.map((m) => ({
           label: m,
           cur: m === model,

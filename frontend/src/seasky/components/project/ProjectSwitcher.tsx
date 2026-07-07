@@ -104,7 +104,9 @@ export function ProjectSwitcher({ proj }: { proj: ProjectBridge }) {
       {saveErr && <span className="text-[11px] font-light tracking-[0.04em] text-sk-risk">{saveErr}</span>}
       <DropMenu
         open={open}
-        className="left-0 top-[calc(100%+16px)] min-w-[310px]"
+        placement="bottom-left"
+        gap={16}
+        className="min-w-[310px]"
         items={proj.projects.map((p) => ({
           label: p.name,
           st: p.status || '',
