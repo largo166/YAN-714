@@ -301,7 +301,7 @@ function CockpitInner({
               {live.broadcasts.slice(0, 2).map((b) => (
                 <MRow key={b.id} compact noBorder lead={<Dot tone="ok" />} text={b.text} who={b.created_at.slice(5, 10)} />
               ))}
-              {live.broadcasts.length === 0 && <div className="font-skcjk text-[11.5px] font-light text-sk-muted2">暂无历史通知。</div>}
+              {live.broadcasts.length === 0 && <div className="font-skcjk text-[11.5px] font-light text-sk-muted2">暂无历史通知。在上方输入框发送第一条,通知会归档到这里。</div>}
             </div>
           </div>
         </GlassCard>
