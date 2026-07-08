@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from typing import Optional
 
-from .. import analysis, models, retrieval, safe_json, schemas
+from .. import analysis, doc_type_rules, models, retrieval, safe_json, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/cross-project", tags=["cross-project"])
@@ -111,6 +111,7 @@ def precipitate(payload: schemas.PrecipitateIn, db: Session = Depends(get_db)) -
         content_text=content,
         file_type="cross_project",
         type=payload.cross_type,
+        design_doc_type=doc_type_rules.migrate_legacy_type(payload.cross_type),  # P1-1:沉淀成果同填语义轴(2026-07-09 A1)
         description=((cog.summary_md if include_summary else lines[0]) or lines[0])[:500],
         resource=resource,
         tags=schemas.CROSS_PROJECT_LABELS[payload.cross_type],

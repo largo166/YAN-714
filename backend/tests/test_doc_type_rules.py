@@ -94,6 +94,18 @@ def test_legacy_map_seven_to_sixteen():
     assert R.migrate_legacy_type("野值") == "其他"
 
 
+def test_legacy_map_english_internal_types():
+    """A1(2026-07-09 已批裁决):回流/沉淀英文内部类型六键,归属逐条锁——
+    spatial_strategy/massing_operation/representation→方法;typology→案例;
+    case_study→案例;design_method→方法。"""
+    assert R.migrate_legacy_type("case_study") == "案例"
+    assert R.migrate_legacy_type("typology") == "案例"
+    assert R.migrate_legacy_type("design_method") == "方法"
+    assert R.migrate_legacy_type("spatial_strategy") == "方法"
+    assert R.migrate_legacy_type("massing_operation") == "方法"
+    assert R.migrate_legacy_type("representation") == "方法"
+
+
 def test_sixteen_types_complete():
     assert len(R.DESIGN_DOC_TYPES) == 16
     assert set(R.LEGACY_TYPE_MAP.values()) <= set(R.DESIGN_DOC_TYPES)
@@ -154,3 +166,159 @@ def test_legacy_rows_read_fallback(client):
     s = client.post("/api/knowledge/search", json={"query": "任务书遗留", "top_k": 10}).json()
     mine = [h for h in s["hits"] if h["document_id"] == did]
     assert mine and mine[0]["design_doc_type"] == "甲方资料"  # 旧'任务书'→映射
+
+
+# ═══ A1/A2(2026-07-09 已批):回流/沉淀构造点带语义轴 + 过滤双轴 ═══
+
+def _cleanup(db, *, doc_ids=(), analysis_pid=None, cog_pid=None, pids=()):
+    from app import models
+    for d in doc_ids:
+        db.query(models.KnowledgeDocument).filter_by(id=d).delete()
+    if analysis_pid:
+        db.query(models.ProjectAnalysis).filter_by(project_id=analysis_pid).delete()
+    if cog_pid:
+        db.query(models.ProjectCognition).filter_by(project_id=cog_pid).delete()
+    for p in pids:
+        db.query(models.Project).filter_by(id=p).delete()
+    db.commit()
+
+
+def test_reflow_analysis_carries_design_type(client):
+    """研判回流产出的知识文档带 design_doc_type=方法(design_method 映射)。"""
+    from app.database import SessionLocal
+    from app import models, safe_json
+
+    pid = client.post("/api/projects", json={"name": "A1回流类型验证"}).json()["id"]
+    db = SessionLocal()
+    try:
+        a = models.ProjectAnalysis(
+            project_id=pid, task="difficulty", status="ok",
+            content="难点:紧凑用地平衡展示区与货值。",
+            sources_json=safe_json.dumps_safe([]),
+        )
+        db.add(a)
+        db.commit()
+        db.refresh(a)
+        aid = a.id
+    finally:
+        db.close()
+    doc_id = None
+    try:
+        r = client.post(f"/api/reflow/analysis/{aid}").json()
+        assert r["status"] == "ok"
+        doc_id = r["document_id"]
+        doc = client.get(f"/api/knowledge/documents/{doc_id}").json()
+        assert doc["type"] == "design_method"          # 旧轴保持
+        assert doc["design_doc_type"] == "方法"         # 新轴按已批映射
+    finally:
+        db = SessionLocal()
+        _cleanup(db, doc_ids=[doc_id] if doc_id else [], analysis_pid=pid, pids=[pid])
+        db.close()
+
+
+def test_reflow_minute_carries_design_type(client):
+    """纪要对外版回流带 design_doc_type=案例(case_study 映射,旧轴归档位不动)。"""
+    from app.database import SessionLocal
+    from app import models, safe_json
+
+    pid = client.post("/api/projects", json={"name": "A1纪要类型验证"}).json()["id"]
+    db = SessionLocal()
+    try:
+        m = models.Meeting(project_id=pid, title="对接会", status="created")
+        db.add(m)
+        db.commit()
+        db.refresh(m)
+        minute = models.MeetingMinute(
+            meeting_id=m.id, gen_status="ok",
+            summary_json=safe_json.dumps_safe([{"text": "确认方向"}]),
+            demand_external_json=safe_json.dumps_safe([{"text": "甲方要求提升品质"}]),
+            demand_internal_json=safe_json.dumps_safe([]),
+            decisions_json=safe_json.dumps_safe([{"text": "下周出比选"}]),
+            review_status="confirmed",
+        )
+        db.add(minute)
+        db.commit()
+        db.refresh(minute)
+        mid = minute.id
+    finally:
+        db.close()
+    doc_id = None
+    try:
+        r = client.post(f"/api/reflow/minute/{mid}").json()
+        assert r["status"] == "ok"
+        doc_id = r["document_id"]
+        doc = client.get(f"/api/knowledge/documents/{doc_id}").json()
+        assert doc["type"] == "case_study"
+        assert doc["design_doc_type"] == "案例"
+    finally:
+        db = SessionLocal()
+        from app import models as M
+        if doc_id:
+            db.query(M.KnowledgeDocument).filter_by(id=doc_id).delete()
+        db.query(M.MeetingMinute).filter_by(id=mid).delete()
+        db.query(M.Meeting).filter_by(project_id=pid).delete()
+        db.query(M.Project).filter_by(id=pid).delete()
+        db.commit()
+        db.close()
+
+
+def test_precipitate_carries_design_type(client):
+    """跨项目沉淀产出带 design_doc_type(spatial_strategy→方法)。"""
+    from app.database import SessionLocal
+    from app import models, safe_json
+
+    pid = client.post("/api/projects", json={"name": "A1沉淀类型验证"}).json()["id"]
+    db = SessionLocal()
+    try:
+        cog = models.ProjectCognition(
+            project_id=pid, module="positioning", module_label="项目定位",
+            fields_json=safe_json.dumps_safe([{
+                "key": "strategy", "label": "空间策略",
+                "value": "退台式布局呼应山景", "status": "confirmed",
+            }]),
+            status="confirmed", module_status="confirmed", version=1,
+        )
+        db.add(cog)
+        db.commit()
+        db.refresh(cog)
+        cog_id = cog.id
+    finally:
+        db.close()
+    doc_id = None
+    try:
+        r = client.post("/api/cross-project/precipitate",
+                        json={"project_id": pid, "cog_id": cog_id, "cross_type": "spatial_strategy"}).json()
+        assert r["status"] == "ok"
+        doc_id = r["item"]["document_id"]
+        doc = client.get(f"/api/knowledge/documents/{doc_id}").json()
+        assert doc["type"] == "spatial_strategy"
+        assert doc["design_doc_type"] == "方法"
+    finally:
+        db = SessionLocal()
+        _cleanup(db, doc_ids=[doc_id] if doc_id else [], cog_pid=pid, pids=[pid])
+        db.close()
+
+
+def test_search_filter_dual_axis(client):
+    """A2 过滤双轴:传旧七类值照常命中(零破坏);传新16类值按语义轴命中。"""
+    p = client.post("/api/projects", json={"name": "A2过滤验证"}).json()
+    f = client.post(
+        f"/api/projects/{p['id']}/files",
+        files={"file": ("襄阳技术规定节选A2.txt", "第一条 本规定适用。第二条 本规范。退界要求。".encode("utf-8"), "text/plain")},
+    ).json()
+    r = client.post(f"/api/projects/{p['id']}/files/{f['id']}/index")
+    did = r.json()["document_id"]
+    doc = client.get(f"/api/knowledge/documents/{did}").json()
+    assert doc["design_doc_type"] == "规范" and doc["type"] == "其他"  # 旧七类无'规范'→其他
+    # 新轴值过滤:命中
+    s_new = client.post("/api/knowledge/search",
+                        json={"query": "技术规定 退界", "top_k": 10, "doc_type": "规范"}).json()
+    assert any(h["document_id"] == did for h in s_new["hits"])
+    # 旧轴值过滤:该文档旧轴=其他,'规范'旧值不存在于七类——用旧值'其他'照常命中(旧行为)
+    s_old = client.post("/api/knowledge/search",
+                        json={"query": "技术规定 退界", "top_k": 10, "doc_type": "其他"}).json()
+    assert any(h["document_id"] == did for h in s_old["hits"])
+    # 不相干值:不命中
+    s_none = client.post("/api/knowledge/search",
+                         json={"query": "技术规定 退界", "top_k": 10, "doc_type": "效果图"}).json()
+    assert not any(h["document_id"] == did for h in s_none["hits"])

@@ -51,6 +51,8 @@ DESIGN_DOC_TYPES = (
 )
 
 # 旧七类(knowledge_meta.VALID_TYPES) → 新16类 默认映射(双轨兼容,写死)
+# 2026-07-09 扩:回流/跨项目沉淀产出的英文内部类型(schemas.CROSS_PROJECT_LABELS 及
+# reflow 的 design_method/case_study)——归属为负责人当日裁决,不是推断。
 LEGACY_TYPE_MAP: dict[str, str] = {
     "任务书": "甲方资料",
     "会议纪要": "会议",
@@ -59,6 +61,12 @@ LEGACY_TYPE_MAP: dict[str, str] = {
     "案例": "案例",
     "方法": "方法",
     "其他": "其他",
+    "case_study": "案例",
+    "typology": "案例",
+    "design_method": "方法",
+    "spatial_strategy": "方法",
+    "massing_operation": "方法",
+    "representation": "方法",
 }
 
 # ── 规则表:每类一组信号词。strong 命中即高置信;weak 需与格式轴佐证或多词共现。 ──

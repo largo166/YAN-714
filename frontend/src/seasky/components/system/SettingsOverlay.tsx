@@ -142,8 +142,9 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
       if (st.status === 'fulfilled') setStats(st.value)
       if (docs.status === 'fulfilled') {
         const m = new Map<string, number>()
-        for (const d of docs.value.items as { type?: string }[]) {
-          const t = d.type || '其他'
+        /* A3(2026-07-09 已批):分布条切建筑语义轴 16 类;存量空值(0023 迁移已回填,仅极老行)兜底旧轴 */
+        for (const d of docs.value.items as { type?: string; design_doc_type?: string }[]) {
+          const t = d.design_doc_type || d.type || '其他'
           m.set(t, (m.get(t) ?? 0) + 1)
         }
         setTypeStats([...m.entries()].sort((a, b) => b[1] - a[1]))

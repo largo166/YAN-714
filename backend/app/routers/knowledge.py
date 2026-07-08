@@ -272,9 +272,10 @@ def search_documents(payload: schemas.KnowledgeSearchIn, db: Session = Depends(g
                             h.locate_status = "文件缺失"
                     except OSError:
                         h.locate_status = "未知"
-        # doc_type 过滤:命中层内存过滤(top_k≤50 零成本),不动 FTS 查询——纯加法,None=不过滤
+        # doc_type 过滤:命中层内存过滤(top_k≤50 零成本),不动 FTS 查询——纯加法,None=不过滤。
+        # A2(2026-07-09 已批):双轴兼容——传旧七类值照常命中(旧行为零破坏),传新16类值按语义轴命中。
         if payload.doc_type:
-            out = [h for h in out if h.doc_type == payload.doc_type]
+            out = [h for h in out if payload.doc_type in (h.doc_type, h.design_doc_type)]
     return schemas.KnowledgeSearchOut(query=payload.query, engine=engine, hits=out)
 
 

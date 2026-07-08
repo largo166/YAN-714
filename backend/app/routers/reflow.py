@@ -14,7 +14,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import analysis, models, retrieval, safe_json, schemas
+from .. import analysis, doc_type_rules, models, retrieval, safe_json, schemas
 from ..database import get_db
 
 router = APIRouter(prefix="/api/reflow", tags=["reflow"])
@@ -62,6 +62,7 @@ def reflow_analysis(analysis_id: int, db: Session = Depends(get_db)) -> schemas.
     doc = models.KnowledgeDocument(
         title=title, content_text=content, file_type="reflow_analysis",
         type="design_method",  # 研判结论归入"设计方法"类知识(可被检索复用)
+        design_doc_type=doc_type_rules.migrate_legacy_type("design_method"),  # P1-1:回流成果同填语义轴(2026-07-09 A1)
         description=row.content.strip()[:500], resource=resource, tags=f"研判 {task_cn}",
     )
     # 原子化：doc 与 reflowed_doc_id 反向引用在【同一次 commit】落库,避免崩溃留孤儿文档。
@@ -138,6 +139,7 @@ def reflow_minute_to_kb(minute_id: int, db: Session = Depends(get_db)) -> schema
     doc = models.KnowledgeDocument(
         title=title, content_text=f"【会议纪要·对外版】{pname}·{mtitle}：\n{content}",
         file_type="reflow_minute", type="case_study",  # 纪要归入案例库
+        design_doc_type=doc_type_rules.migrate_legacy_type("case_study"),  # P1-1:按已批映射 case_study→案例(2026-07-09 A1)
         description=content.strip()[:500], resource=resource, tags=f"会议纪要 {pname}",
     )
     # 原子化：doc 与反向引用同一次 commit
