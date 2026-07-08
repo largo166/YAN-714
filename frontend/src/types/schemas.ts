@@ -310,6 +310,13 @@ export const KnowledgeHitSchema = z.object({
   matched_text: z.string(),
   engine: z.string(),
   locator: z.string().default(''), // 出处定位：第N页 / 第N张幻灯片
+  // ── P0 检索第一生产力(2026-07-08):展示字段(default 兼容旧响应,纯加法) ──
+  file_type: z.string().default(''),
+  doc_type: z.string().default(''),
+  updated_at: z.string().default(''),
+  project_id: z.number().default(0),
+  project_name: z.string().default(''),
+  project_file_id: z.number().default(0),
 })
 export type KnowledgeHit = z.infer<typeof KnowledgeHitSchema>
 

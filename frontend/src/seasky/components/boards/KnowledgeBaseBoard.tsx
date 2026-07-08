@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 
+import { api } from '@/lib/api'
+
 import { boardImages } from '../../data/boardImages'
 import type { KnowledgeLive } from '../../hooks/useKnowledgeLive'
 import { DataSourceStrip } from '../data/DataSourceStrip'
@@ -31,6 +33,31 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
     : '—'
   const cjk = live.stats ? live.stats.cjk_chunks.toLocaleString() : '—'
 
+  /* P0 健康 pill(轻量,读现有 /api/knowledge/health,不建新表不做评分):
+     绿=后端可达+库文件全在位;黄=有孤儿/零星丢失;红=仓库根脱节/不可达。挂载+入库事件时重拉。 */
+  const [health, setHealth] = useState<{ tone: 'ok' | 'warn' | 'risk'; text: string } | null>(null)
+  useEffect(() => {
+    let alive = true
+    const pull = async () => {
+      try {
+        const h = await api.knowledgeHealth()
+        if (!alive) return
+        if (h.root_detached.length > 0) setHealth({ tone: 'risk', text: `仓库根脱节 ${h.root_detached.length}` })
+        else if (h.counts.missing > 0) setHealth({ tone: 'risk', text: `文件丢失 ${h.counts.missing}` })
+        else if (h.counts.orphan > 0) setHealth({ tone: 'warn', text: `孤儿 ${h.counts.orphan}` })
+        else setHealth({ tone: 'ok', text: '库健康' })
+      } catch {
+        if (alive) setHealth({ tone: 'risk', text: '后端不可达' })
+      }
+    }
+    void pull()
+    window.addEventListener('romai:knowledge-updated', pull)
+    return () => {
+      alive = false
+      window.removeEventListener('romai:knowledge-updated', pull)
+    }
+  }, [])
+
   return (
     <>
       <div className="absolute inset-0 flex flex-col justify-center gap-[26px] px-24 pb-[118px]">
@@ -52,6 +79,13 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
                 <span className="font-skcjk text-[11px] font-light tracking-[0.14em] text-sk-muted2">{k}</span>
               </div>
             ))}
+            {/* P0 健康 pill(轻量真值:后端可达/文件在位/根不脱节;详情在设置页体检) */}
+            {health && (
+              <div className="flex flex-col gap-2">
+                <Pill tone={health.tone === 'ok' ? 'ok' : health.tone === 'warn' ? 'default' : 'risk'}>{health.text}</Pill>
+                <span className="font-skcjk text-[11px] font-light tracking-[0.14em] text-sk-muted2">库健康</span>
+              </div>
+            )}
           </div>
         </div>
 

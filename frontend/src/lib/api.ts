@@ -486,13 +486,24 @@ export const api = {
       }),
     )
   },
-  async searchKnowledge(query: string, topK = 5): Promise<KnowledgeSearchOut> {
+  async searchKnowledge(query: string, topK = 5, projectId?: number, docType?: string): Promise<KnowledgeSearchOut> {
+    /* P0(2026-07-08):projectId/docType 纯加法可选参——@项目名 在前端解析成 project_id,
+       走后端现有 search 通路(禁双源);docType 命中层过滤。旧调用(两参)零感知。 */
     return KnowledgeSearchOutSchema.parse(
       await request('/api/knowledge/search', {
         method: 'POST',
-        body: JSON.stringify({ query, top_k: topK }),
+        body: JSON.stringify({
+          query,
+          top_k: topK,
+          ...(projectId != null ? { project_id: projectId } : {}),
+          ...(docType ? { doc_type: docType } : {}),
+        }),
       }),
     )
+  },
+  /** P0:资源管理器定位文件(打开所在位置)。404=文件缺失(带体检指引话术),由调用方如实呈现。 */
+  async revealProjectFile(projectId: number, fileId: number): Promise<{ ok: boolean; mode: string; path: string }> {
+    return request(`/api/projects/${projectId}/files/${fileId}/reveal`, { method: 'POST' })
   },
   async reindexKnowledge(): Promise<{ reindexed: number; engine: string }> {
     return request('/api/knowledge/reindex', { method: 'POST' })

@@ -21,6 +21,7 @@ import { SeaCanvas } from './SeaCanvas'
 import { CineLayer, SkipIntro, useFluidStage } from './SkipIntro'
 import { StatusBar, TopNavCapsules } from './TopNavCapsules'
 import { SettingsOverlay } from '../system/SettingsOverlay'
+import { GlobalSearch } from '../data/GlobalSearch'
 
 /* ═══ 应用外壳:阶段机 film → gate → boards → app(母版等价) ═══ */
 
@@ -33,6 +34,7 @@ export function AppShell() {
   const [filmPaused, setFilmPaused] = useState(false)
   const [progress, setProgress] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false) /* P0:Ctrl+K 全局检索 */
   const appRef = useRef<HTMLDivElement>(null)
   const enteredRef = useRef(false)
 
@@ -73,7 +75,8 @@ export function AppShell() {
     }
   }, [board, phase, capture])
 
-  /* 键盘路由(母版等价):film=Space暂停/Esc跳过;app=1-5 切板块(输入框守卫) */
+  /* 键盘路由(母版等价):film=Space暂停/Esc跳过;app=1-5 切板块(输入框守卫);
+     P0(2026-07-08):Ctrl/Cmd+K 全局检索(全局意图,输入框聚焦也响应) */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (phase === 'film') {
@@ -88,6 +91,11 @@ export function AppShell() {
         return
       }
       if (phase === 'app') {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+          e.preventDefault()
+          setSearchOpen((o) => !o)
+          return
+        }
         const tag = ((e.target as HTMLElement)?.tagName || '').toLowerCase()
         if (tag === 'input' || tag === 'textarea') return
         const n = '12345'.indexOf(e.key)
@@ -191,6 +199,7 @@ export function AppShell() {
           </BoardFrame>
           <StatusBar left={statusLeft} pulse={statusPulse} />
           <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+          <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} proj={proj} />
         </div>
 
         {/* 下拉/浮层 Portal 根:在 stage 内(继承流体缩放 scale)、boards 之上,收纳 DropMenu 展开层——

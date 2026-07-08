@@ -489,6 +489,13 @@ class KnowledgeHitOut(BaseModel):
     matched_text: str
     engine: str
     locator: str = ""  # 出处定位：第N页 / 第N张幻灯片（无则空）
+    # ── P0 检索第一生产力(2026-07-08):展示字段纯加法,旧调用方零感知 ──
+    file_type: str = ""       # 文件格式(pdf/docx/pptx/png…,来自 KnowledgeDocument.file_type)
+    doc_type: str = ""        # 资料类型(任务书/会议纪要/方案文本/图纸/案例/方法/其他)
+    updated_at: str = ""      # 最近更新(ISO 字符串,供结果卡显示日期)
+    project_id: int = 0       # 归属项目(经 ProjectFile.indexed_doc_id 反查;无关联=0)
+    project_name: str = ""    # 归属项目名(前端结果卡直显,免二次查询)
+    project_file_id: int = 0  # 关联项目文件(reveal 用;无关联=0 → 前端不显示打开按钮)
 
 
 class SendMessageOut(BaseModel):
@@ -568,6 +575,7 @@ class KnowledgeSearchIn(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = 5
     project_id: Optional[int] = None  # 项目级检索范围（E1）；None=全库
+    doc_type: Optional[str] = None  # P0:资料类型过滤(VALID_TYPES 之一);None=不过滤(命中层过滤,纯加法)
 
 
 class KnowledgeSearchOut(BaseModel):

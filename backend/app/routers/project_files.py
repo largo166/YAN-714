@@ -304,6 +304,38 @@ def restore_file(project_id: int, file_id: int, timestamp: str, db: Session = De
     return f
 
 
+@router.post("/{project_id}/files/{file_id}/reveal")
+def reveal_file(project_id: int, file_id: int, db: Session = Depends(get_db)) -> dict:
+    """P0 检索第一生产力(2026-07-08):在资源管理器中定位该文件(打开所在位置)。
+
+    路径唯一口径:storage_probe.resolve_physical(委托 uploads.abs_of)——禁第二份拼接(蓝本铁条)。
+    安全边界:只接受库内记录 id,路径永远来自 DB+storage_probe,无用户可控路径入参。
+    降级链:explorer /select 定位失败 → 打开所在文件夹;文件不存在 → 404 带四态口径话术。
+    """
+    from .. import storage_probe
+
+    f = _file_or_404(db, project_id, file_id)
+    phys = storage_probe.resolve_physical(f.stored_path, f.storage_root)
+    if phys is None or not phys.exists():
+        raise HTTPException(
+            404,
+            "文件不在预期位置。该记录的物理文件可能已丢失或仓库根已变更——"
+            "建议到设置页跑一次「库健康体检」。",
+        )
+    import subprocess
+
+    try:
+        # Windows 资源管理器定位到文件(exe/pywebview 同样可用;失败走降级)
+        subprocess.Popen(["explorer", "/select,", str(phys)])
+        return {"ok": True, "mode": "select", "path": str(phys)}
+    except OSError:
+        try:
+            os.startfile(str(phys.parent))  # 降级:打开所在文件夹
+            return {"ok": True, "mode": "folder", "path": str(phys.parent)}
+        except OSError as e:
+            raise HTTPException(500, f"无法打开文件位置:{e}")
+
+
 @router.post("/{project_id}/files/{file_id}/index", response_model=schemas.IndexFileOut)
 def index_file(project_id: int, file_id: int, db: Session = Depends(get_db)):
     """回流入库：把已解析文件写入 knowledge_documents（人工触发，幂等）。"""

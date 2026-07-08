@@ -203,11 +203,35 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
 def search_documents(payload: schemas.KnowledgeSearchIn, db: Session = Depends(get_db)):
     hits = retrieval.search(db, payload.query, top_k=payload.top_k, project_id=payload.project_id)
     engine = hits[0].engine if hits else ("fts5" if retrieval.fts5_available(db) else "like")
-    return schemas.KnowledgeSearchOut(
-        query=payload.query,
-        engine=engine,
-        hits=[schemas.KnowledgeHitOut(**h.__dict__) for h in hits],
-    )
+    out = [schemas.KnowledgeHitOut(**h.__dict__) for h in hits]
+    # ── P0 检索第一生产力(2026-07-08):命中层富化+过滤(检索心脏 retrieval.search 零改动) ──
+    if out:
+        doc_ids = [h.document_id for h in out]
+        docs = {d.id: d for d in db.query(models.KnowledgeDocument).filter(models.KnowledgeDocument.id.in_(doc_ids)).all()}
+        # 反查项目文件(reveal 用):indexed_doc_id → ProjectFile;一次批量查询
+        pfs = {
+            pf.indexed_doc_id: pf
+            for pf in db.query(models.ProjectFile)
+            .filter(models.ProjectFile.indexed_doc_id.in_(doc_ids), models.ProjectFile.status == "active")
+            .all()
+        }
+        pids = {pf.project_id for pf in pfs.values()}
+        pnames = {p.id: p.name for p in db.query(models.Project).filter(models.Project.id.in_(pids)).all()} if pids else {}
+        for h in out:
+            doc = docs.get(h.document_id)
+            if doc is not None:
+                h.file_type = doc.file_type or ""
+                h.doc_type = doc.type or ""
+                h.updated_at = doc.updated_at.isoformat() if doc.updated_at else ""
+            pf = pfs.get(h.document_id)
+            if pf is not None:
+                h.project_id = pf.project_id
+                h.project_file_id = pf.id
+                h.project_name = pnames.get(pf.project_id, "")
+        # doc_type 过滤:命中层内存过滤(top_k≤50 零成本),不动 FTS 查询——纯加法,None=不过滤
+        if payload.doc_type:
+            out = [h for h in out if h.doc_type == payload.doc_type]
+    return schemas.KnowledgeSearchOut(query=payload.query, engine=engine, hits=out)
 
 
 @router.post("/reindex")
