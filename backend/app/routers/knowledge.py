@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .. import knowledge_meta, llm, models, retrieval, safe_json, schemas, storage_probe
+from .. import doc_type_rules, knowledge_meta, llm, models, retrieval, safe_json, schemas, storage_probe
 from ..database import get_db
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
@@ -118,6 +118,8 @@ def create_document(payload: schemas.KnowledgeDocCreate, db: Session = Depends(g
     doc = models.KnowledgeDocument(**payload.model_dump())
     if not doc.type:  # 手动录入未指定时规则推断类型（零 LLM）
         doc.type = knowledge_meta.infer_type(doc.title, doc.file_type, doc.tags, doc.content_text[:200])
+    if not doc.design_doc_type:  # P1-1 双轨:建筑语义轴同步推断
+        doc.design_doc_type = doc_type_rules.infer_design_type(doc.title, content_head=doc.content_text[:400]).dtype
     db.add(doc)
     db.commit()
     db.refresh(doc)
@@ -248,6 +250,8 @@ def search_documents(payload: schemas.KnowledgeSearchIn, db: Session = Depends(g
             if doc is not None:
                 h.file_type = doc.file_type or ""
                 h.doc_type = doc.type or ""
+                # P1-1 双轨读:新列有值用新列;存量空值按旧类映射(不改库,读时兜底)
+                h.design_doc_type = doc.design_doc_type or doc_type_rules.migrate_legacy_type(doc.type)
                 h.updated_at = doc.updated_at.isoformat() if doc.updated_at else ""
             pf = pfs.get(h.document_id)
             if pf is not None:

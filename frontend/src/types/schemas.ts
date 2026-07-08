@@ -318,6 +318,7 @@ export const KnowledgeHitSchema = z.object({
   project_name: z.string().default(''),
   project_file_id: z.number().default(0),
   // ── P0+ 资产卡(已批):可定位态/文件夹/绝对路径(复制用) ──
+  design_doc_type: z.string().default(''), // P1-1 建筑语义轴 16 类(分组主口径)
   locate_status: z.string().default(''),
   folder_hint: z.string().default(''),
   abs_path: z.string().default(''),

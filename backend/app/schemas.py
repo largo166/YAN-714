@@ -491,7 +491,8 @@ class KnowledgeHitOut(BaseModel):
     locator: str = ""  # 出处定位：第N页 / 第N张幻灯片（无则空）
     # ── P0 检索第一生产力(2026-07-08):展示字段纯加法,旧调用方零感知 ──
     file_type: str = ""       # 文件格式(pdf/docx/pptx/png…,来自 KnowledgeDocument.file_type)
-    doc_type: str = ""        # 资料类型(任务书/会议纪要/方案文本/图纸/案例/方法/其他)
+    doc_type: str = ""        # 资料类型·旧七类(任务书/会议纪要/方案文本/图纸/案例/方法/其他,双轨保留)
+    design_doc_type: str = ""  # P1-1 建筑语义轴 16 类(检索分组主口径;旧文档由迁移映射回填)
     updated_at: str = ""      # 最近更新(ISO 字符串,供结果卡显示日期)
     project_id: int = 0       # 归属项目(经 ProjectFile.indexed_doc_id 反查;无关联=0)
     project_name: str = ""    # 归属项目名(前端结果卡直显,免二次查询)
@@ -537,6 +538,8 @@ class KnowledgeDocOut(BaseModel):
     type: str = ""
     description: str = ""
     resource: str = ""
+    design_doc_type: str = ""          # P1-1 双轨:建筑语义轴 16 类
+    design_type_confirmed: bool = False
     created_at: datetime
     updated_at: datetime
 

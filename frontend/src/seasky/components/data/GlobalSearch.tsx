@@ -29,7 +29,12 @@ export function matchProjects(term: string, projects: { id: number; name: string
   return projects.filter((p) => p.name.toLowerCase().includes(t))
 }
 
-const TYPE_ORDER = ['任务书', '会议纪要', '方案文本', '图纸', '案例', '方法', '其他'] as const
+/* P1-1 资料类型 v2:检索分组按建筑语义轴 16 类(design_doc_type);
+   旧文档双轨兜底(后端读时已按旧七类映射回填,前端无需再映射)。 */
+const TYPE_ORDER = [
+  '文本', '演示', '表格', '效果图', '图纸', '模型', '会议', '汇报',
+  '案例', '方法', '规范', '合同', '成本', '甲方资料', '现场资料', '其他',
+] as const
 
 const STAGE_CN: Record<string, string> = {
   brief: '前期', massing: '强排', concept: '概念', scheme: '方案', develop: '深化',
@@ -150,7 +155,8 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
     if (!hits) return []
     const g = new Map<string, KnowledgeHit[]>()
     for (const h of hits) {
-      const t = (TYPE_ORDER as readonly string[]).includes(h.doc_type) ? h.doc_type : '其他'
+      const key = h.design_doc_type || h.doc_type /* 双轨:新轴优先 */
+      const t = (TYPE_ORDER as readonly string[]).includes(key) ? key : '其他'
       if (!g.has(t)) g.set(t, [])
       g.get(t)!.push(h)
     }
@@ -257,7 +263,7 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
                     <div className="truncate font-skcjk text-[13px] font-normal text-sk-fg">{h.title}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-skcjk text-[10.5px] font-light text-sk-muted2">
                       {h.project_name && <span className="text-sk-primary">{h.project_name}</span>}
-                      {h.doc_type && <span>{h.doc_type}</span>}
+                      {(h.design_doc_type || h.doc_type) && <span>{h.design_doc_type || h.doc_type}</span>}
                       {h.file_type && <span>{h.file_type}</span>}
                       {h.folder_hint && <span className="font-skmono text-[10px]">{h.folder_hint}</span>}
                       {h.updated_at && <span>{h.updated_at.slice(0, 10)}</span>}

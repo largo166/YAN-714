@@ -189,6 +189,9 @@ class KnowledgeDocument(Base):
     type: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 规则推断枚举
     description: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 一句话摘要（AI 按需生成）
     resource: Mapped[str] = mapped_column(String(500), default="", nullable=False)  # 真实出处
+    # ── P1-1 资料类型 v2(2026-07-08,双轨):建筑语义轴 16 类。旧 type 七类保留不删(兼容映射见 doc_type_rules) ──
+    design_doc_type: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # 16 类枚举;空=未推断
+    design_type_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # 人工确认过(低置信默认 False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow, nullable=False

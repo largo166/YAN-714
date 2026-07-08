@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import knowledge_meta, models, parsing, retrieval, schemas, uploads, image_assets, safe_json
+from .. import doc_type_rules, knowledge_meta, models, parsing, retrieval, schemas, uploads, image_assets, safe_json
 from ..database import get_db
 from ..safe_paths import sanitize_filename
 
@@ -119,9 +119,13 @@ def _already_imported(db: Session, project_id: int, filename: str, size: int) ->
 
 
 def _doc_from_file(db: Session, f: models.ProjectFile, tags: str) -> models.KnowledgeDocument:
-    """从项目文件构造知识文档，规则填充 type/resource（零 LLM，description 留空待 AI 生成）。"""
+    """从项目文件构造知识文档，规则填充 type/resource（零 LLM，description 留空待 AI 生成）。
+    P1-1(2026-07-08):双轨——旧七类 infer_type 照旧;新增建筑语义轴 design_doc_type(16类,doc_type_rules)。"""
     proj = db.get(models.Project, f.project_id)
     resource = f"{proj.name} / {f.stored_path}" if proj else f.stored_path
+    verdict = doc_type_rules.infer_design_type(
+        f.filename, dir_hint=f.stored_path, content_head=f.content_text[:400]
+    )
     return models.KnowledgeDocument(
         title=f.filename,
         source_path=f.stored_path,
@@ -129,6 +133,8 @@ def _doc_from_file(db: Session, f: models.ProjectFile, tags: str) -> models.Know
         file_type=f.file_type or "text",
         tags=tags,
         type=knowledge_meta.infer_type(f.filename, f.file_type, tags, f.content_text[:200]),
+        design_doc_type=verdict.dtype,
+        design_type_confirmed=False,  # 规则推断均待人工确认;低置信兜底'其他'(宁可未归类不错归类)
         resource=resource,
     )
 
