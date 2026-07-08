@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROM-AI · 海天 OS</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Noto+Sans+SC:wght@100;200;300;400;500&family=IBM+Plex+Mono:wght@300;400&display=swap');
+
+/* ═══════════════════════════════════════════════════════════
+   ROM-AI 海天设计语言 · token 桥
+   (与 shadcn 语义变量同构——落真实 App 时直接替换 tailwind.css)
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --background:#0a0c0e;
+  --foreground:#f2f1ee;
+  --muted:#a1a5aa;
+  --muted-2:rgba(161,165,170,.55);
+  --primary:#7fb3cf;            /* 海天主色 */
+  --primary-deep:#4f7f9e;
+  --primary-glow:rgba(127,179,207,.16);
+  --hair:rgba(242,241,238,.12);
+  --hair-soft:rgba(242,241,238,.06);
+  --card:rgba(10,12,14,.5);     /* 玻璃地层 */
+  --border:rgba(242,241,238,.09);
+  /* 语义色:去饱和入海系(不再紫黑/正红) */
+  --ok:#7ec9a5;
+  --warn:#c9b27f;
+  --risk:#cf7f7f;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#000;overflow:hidden}
+body{font-family:'Space Grotesk','Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;color:var(--foreground);-webkit-font-smoothing:antialiased;font-weight:400}
+
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+#stage{position:relative;width:1280px;height:720px;background:var(--background);overflow:hidden;transform-origin:center center}
+
+#dither{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.9}
+#scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 85% 80% at 42% 50%, rgba(10,12,14,.6), rgba(10,12,14,.24) 55%, rgba(10,12,14,0))}
+
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;visibility:hidden;z-index:5}
+.mask{overflow:hidden}
+.mask>span{display:block;transform:translateY(112%)}
+
+.accent-text{font-weight:500;background:linear-gradient(to right,#8fc0da,var(--primary-deep));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.label{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:10.5px;letter-spacing:.3em;text-indent:.3em;text-transform:uppercase;color:var(--muted-2)}
+
+/* ═══ 开机影片(原样保留自 蓝晒版v11-海天) ═══ */
+#s0 .line{font-family:'Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;font-weight:300;text-align:center;letter-spacing:.14em;text-indent:.14em;color:var(--foreground);line-height:1.7}
+#s0 .l1{font-size:40px}
+#s0 .l2{font-size:40px;margin-top:4px}
+#s0 .sub{margin-top:44px;opacity:0}
+#s0 .sub-rule{width:0;height:2px;background:var(--primary);margin:24px auto 0}
+
+.bracket{position:absolute;width:18px;height:18px;border-color:rgba(242,241,238,.28);border-style:solid;opacity:0}
+.b-tl{top:60px;left:60px;border-width:1px 0 0 1px}
+.b-tr{top:60px;right:60px;border-width:1px 1px 0 0}
+.b-bl{bottom:60px;left:60px;border-width:0 0 1px 1px}
+.b-br{bottom:60px;right:60px;border-width:0 1px 1px 0}
+.meta{position:absolute;width:100%;display:flex;justify-content:space-between;padding:0 92px;opacity:0}
+.meta-top{top:66px}
+.meta-btm{bottom:66px}
+.meta .live{color:var(--primary)}
+#cmd{display:flex;flex-direction:column;align-items:center;gap:22px;opacity:0;z-index:5;transform:translateY(-6px)}
+#cmd .field{display:flex;align-items:baseline;gap:2px;font-family:'Space Grotesk',monospace;font-weight:500;font-size:36px;letter-spacing:.1em;min-height:48px}
+#cmd .ch{display:inline-block;overflow:hidden;height:46px}
+#cmd .ch>i{display:block;font-style:normal;transform:translateY(105%);color:var(--foreground)}
+.cursor{display:inline-block;width:3px;height:34px;background:var(--primary);animation:blink 1.05s steps(1) infinite;vertical-align:-4px;margin-left:10px}
+@keyframes blink{50%{opacity:0}}
+#cmd .rule{width:400px;height:2px;background:var(--hair-soft);position:relative}
+#cmd .rule i{position:absolute;left:0;top:0;height:100%;width:0;background:var(--primary);display:block}
+#cmd-hint{margin-top:28px;opacity:0}
+
+#s2 .boot{font-family:'IBM Plex Mono',monospace;font-weight:300;font-size:12px;line-height:2.9;letter-spacing:.14em;color:var(--muted-2);text-align:left}
+#s2 .boot div{opacity:0;transform:translateX(-10px)}
+#s2 .boot .ok{color:var(--primary)}
+#s2 .sys-title{position:absolute;text-align:center;opacity:0}
+#s2 .sys-title h1{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:80px;letter-spacing:.04em;text-indent:.04em;line-height:1;color:var(--foreground)}
+#s2 .sys-title .rule{width:64px;height:2px;background:var(--primary);margin:30px auto}
+#s2 .sys-title p{opacity:0}
+
+#s3 .q{font-family:'Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;font-weight:300;font-size:40px;letter-spacing:.14em;text-indent:.14em;text-align:center;line-height:1.7;color:var(--foreground)}
+#s3 .strata{margin-top:72px;display:flex;align-items:stretch;gap:40px;opacity:0}
+#s3 .stratum{position:relative;display:flex;flex-direction:column;gap:12px;width:290px;padding:26px 28px;
+  background:var(--card);border:.5px solid var(--border);border-radius:16px;backdrop-filter:blur(12px)}
+#s3 .stratum::before{content:'';position:absolute;top:0;left:8%;width:84%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(242,241,238,.22),transparent)}
+#s3 .stratum .name{font-family:'Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;font-weight:400;font-size:20px;letter-spacing:.1em}
+#s3 .stratum .en{opacity:0}
+#s3 .stratum.gen .name{color:var(--muted)}
+#s3 .stratum.mem{border-color:rgba(127,179,207,.35);box-shadow:var(--primary-glow) 0 0 30px 0}
+#s3 .stratum.mem .name{color:var(--primary)}
+
+#s4 .cols{display:flex;align-items:stretch}
+#s4 .sep{width:1px;background:var(--hair-soft);align-self:stretch;transform:scaleY(0);transform-origin:top}
+#s4 .pillar{display:flex;flex-direction:column;align-items:center;gap:26px;padding:0 70px}
+#s4 .glyph{font-family:'Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;font-weight:100;font-size:88px;line-height:1;color:var(--foreground);opacity:0}
+#s4 .en{opacity:0}
+#s4 .zh{font-family:'Noto Sans SC',sans-serif;font-weight:500;font-size:13px;letter-spacing:.24em;text-indent:.24em;color:var(--muted);opacity:0}
+#s4 .frame-title{position:absolute;top:102px;opacity:0}
+
+#s5 .cards{display:flex;gap:44px}
+#s5 .card{position:relative;width:330px;padding:30px 30px 34px;display:flex;flex-direction:column;gap:16px;opacity:0;
+  background:var(--card);border:.5px solid var(--border);border-radius:16px;backdrop-filter:blur(12px)}
+#s5 .card::before{content:'';position:absolute;top:0;left:8%;width:84%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(242,241,238,.22),transparent)}
+#s5 .chip{width:44px;height:44px;border-radius:10px;border:.5px solid rgba(242,241,238,.12);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;color:var(--primary)}
+#s5 .t{font-family:'Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;font-weight:400;font-size:20px;letter-spacing:.08em;color:var(--foreground);margin-top:12px}
+#s5 .d{font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:13.5px;letter-spacing:.02em;color:var(--muted);line-height:2.05}
+
+#s6 .close-line{font-family:'Noto Sans SC','PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif;font-weight:300;font-size:40px;letter-spacing:.14em;text-indent:.14em;text-align:center;line-height:1.7;color:var(--foreground)}
+#s6 .brand{position:absolute;text-align:center;opacity:0}
+#s6 .brand h1{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:80px;letter-spacing:.04em;text-indent:.04em;line-height:1;color:var(--foreground)}
+#s6 .brand .rule{width:64px;height:2px;background:var(--primary);margin:32px auto;transform:scaleX(0)}
+#s6 .brand p{opacity:0}
+
+/* ═══ 驾驶舱口令(gate)——沿用取景器场景语言 ═══ */
+#gate .g-title{display:flex;flex-direction:column;align-items:center;gap:22px;transform:translateY(-6px)}
+#gate .field{display:flex;align-items:baseline;font-family:'Space Grotesk',monospace;font-weight:500;font-size:36px;letter-spacing:.32em;min-height:48px;color:var(--foreground)}
+#gate .rule{width:400px;height:2px;background:var(--hair-soft);position:relative}
+#gate .rule i{position:absolute;left:0;top:0;height:100%;width:0;background:var(--primary);display:block;transition:width .18s ease}
+#gate .rule.err i{background:var(--risk)}
+#gate-hint{margin-top:28px}
+#gate .g-eyebrow{margin-bottom:34px}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+#gate .shaking{animation:shake .38s ease}
+
+/* ═══ 五大板块展开(pillars) ═══ */
+#boards .frame-title{position:absolute;top:96px;opacity:0}
+#boards .rows{display:flex;gap:22px}
+#boards .bp{position:relative;width:206px;padding:30px 24px 26px;display:flex;flex-direction:column;gap:14px;opacity:0;cursor:pointer;
+  background:var(--card);border:.5px solid var(--border);border-radius:16px;backdrop-filter:blur(12px);
+  transition:border-color .25s ease, box-shadow .25s ease, transform .25s ease}
+#boards .bp::before{content:'';position:absolute;top:0;left:8%;width:84%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(242,241,238,.22),transparent)}
+#boards .bp:hover{border-color:rgba(127,179,207,.4);box-shadow:var(--primary-glow) 0 0 30px 0;transform:translateY(-4px)}
+#boards .bp .no{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:12px;color:var(--primary);letter-spacing:.12em}
+#boards .bp .zh{font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:19px;letter-spacing:.1em;color:var(--foreground)}
+#boards .bp .role{font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:12px;letter-spacing:.06em;color:var(--muted);line-height:1.9}
+#boards-hint{position:absolute;bottom:96px;opacity:0}
+
+/* ═══════════════════════════════════════════════════════════
+   壳(App Shell)——信箱镜头框变成产品骨架
+   ═══════════════════════════════════════════════════════════ */
+#app{position:absolute;inset:0;z-index:8;display:none}
+#app.on{display:block}
+#app-nav{position:absolute;top:0;left:0;width:100%;height:46px;background:#000;z-index:20;
+  display:flex;align-items:center;padding:0 24px;gap:26px}
+#app-nav .wordmark{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;letter-spacing:.06em;color:var(--foreground)}
+#app-nav .wordmark span{color:var(--primary)}
+#app-nav .tabs{display:flex;gap:4px;margin:0 auto}
+#app-nav .tab{position:relative;font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:12.5px;letter-spacing:.14em;text-indent:.14em;
+  color:var(--muted-2);background:none;border:0;padding:0 16px;height:46px;cursor:pointer;transition:color .2s ease}
+#app-nav .tab:hover{color:var(--muted)}
+#app-nav .tab.on{color:var(--foreground)}
+#app-nav .tab.on::after{content:'';position:absolute;bottom:0;left:26%;width:48%;height:2px;background:var(--primary)}
+#app-nav .sys{display:flex;align-items:center;gap:8px}
+#app-nav .sys .dot{width:5px;height:5px;border-radius:50%;background:var(--primary);box-shadow:0 0 8px var(--primary)}
+#app-status{position:absolute;bottom:0;left:0;width:100%;height:30px;background:#000;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+
+.board{position:absolute;top:46px;bottom:30px;left:0;width:100%;display:none}
+.board.on{display:block}
+
+/* HERO 带:数字坐在海平线上(签名) */
+.hero{position:relative;height:232px;padding:34px 64px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.hero .h-left{max-width:520px}
+.hero .h-eyebrow{margin-bottom:16px}
+.hero .h-title{font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:31px;letter-spacing:.14em;text-indent:.14em;color:var(--foreground);line-height:1.4}
+.hero .h-title .accent-text{font-weight:400}
+.hero .h-sub{margin-top:12px;font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:12.5px;letter-spacing:.08em;color:var(--muted)}
+.hero .h-stats{display:flex;align-items:flex-end;gap:52px;padding-top:34px}
+.hstat{text-align:right}
+.hstat .v{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:46px;line-height:1;letter-spacing:-.01em;color:var(--foreground);font-variant-numeric:tabular-nums}
+.hstat .v small{font-size:18px;color:var(--muted);font-weight:400;margin-left:2px}
+.hstat .v.pri{color:var(--primary)}
+.hstat .v.risk{color:var(--risk)}
+.hstat .v.warn{color:var(--warn)}
+.hstat .k{margin-top:10px}
+/* 海平线:贯穿 HERO 底部的一线微光 */
+.horizon{position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent 2%,rgba(127,179,207,.55) 30%,rgba(127,179,207,.55) 70%,transparent 98%);
+  box-shadow:0 0 18px rgba(127,179,207,.35)}
+
+/* 内容区:海面之下,深水层 */
+.deck{position:absolute;top:232px;bottom:0;left:0;width:100%;background:rgba(10,12,14,.92);padding:20px 64px 18px;
+  display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:14px;flex:1;min-height:0}
+.gcard{position:relative;flex:1;background:var(--card);border:.5px solid var(--border);border-radius:16px;
+  backdrop-filter:blur(12px);padding:18px 22px;display:flex;flex-direction:column;gap:12px;min-width:0;overflow:hidden}
+.gcard::before{content:'';position:absolute;top:0;left:8%;width:84%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(242,241,238,.22),transparent)}
+.gcard .g-head{display:flex;align-items:baseline;gap:12px}
+.gcard .g-title{font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:15px;letter-spacing:.1em;color:var(--foreground)}
+.gcard .g-en{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted-2)}
+.gcard .g-body{font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:12.5px;letter-spacing:.03em;color:var(--muted);line-height:2.05}
+
+/* 链路 tile(会议链路/判断解析) */
+.chain{display:flex;align-items:center;gap:10px;flex:1}
+.ctile{flex:1;border:.5px solid var(--hair-soft);border-radius:12px;padding:13px 15px;display:flex;flex-direction:column;gap:7px;
+  transition:border-color .2s ease;cursor:default}
+.ctile:hover{border-color:rgba(127,179,207,.35)}
+.ctile .n{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:21px;color:var(--foreground);font-variant-numeric:tabular-nums}
+.ctile .n em{font-style:normal;font-size:12px;color:var(--muted);font-weight:400;margin-left:3px}
+.ctile .t{font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:13px;letter-spacing:.08em;color:var(--foreground)}
+.ctile .s{font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:10.5px;letter-spacing:.04em;color:var(--muted-2)}
+.arrow{color:var(--muted-2);font-size:12px;flex:none}
+
+/* 里程碑/风险行 */
+.mrow{display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:.5px solid var(--hair-soft);font-weight:300;font-size:12.5px;letter-spacing:.03em;color:var(--muted);line-height:1.8}
+.mrow:last-child{border-bottom:0}
+.mrow .txt{flex:1;color:#c9ccd0}
+.mrow .who{flex:none;font-size:11px;color:var(--muted-2)}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;flex:none;align-self:center}
+.dot.risk{background:var(--risk);box-shadow:0 0 8px rgba(207,127,127,.5)}
+.dot.warn{background:var(--warn)}
+.dot.ok{background:var(--ok)}
+
+/* pill/徽章 */
+.pill{display:inline-flex;align-items:center;gap:6px;border:.5px solid var(--hair);border-radius:9999px;
+  padding:3px 11px;font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:10.5px;letter-spacing:.1em;color:var(--muted)}
+.pill.pri{color:var(--primary);border-color:rgba(127,179,207,.35)}
+.pill.ok{color:var(--ok);border-color:rgba(126,201,165,.3)}
+.pill.warn{color:var(--warn);border-color:rgba(201,178,127,.3)}
+.pill.risk{color:var(--risk);border-color:rgba(207,127,127,.32)}
+
+/* 检索/composer 输入(呼应开机命令行) */
+.cmdline{display:flex;align-items:center;gap:14px;border-bottom:2px solid var(--hair-soft);padding:6px 2px 10px;position:relative}
+.cmdline input{flex:1;background:none;border:0;outline:none;color:var(--foreground);
+  font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:15px;letter-spacing:.06em}
+.cmdline input::placeholder{color:var(--muted-2)}
+.cmdline .go{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:10px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--primary);background:none;border:.5px solid rgba(127,179,207,.4);border-radius:9999px;padding:7px 18px;cursor:pointer;
+  transition:background .2s ease,color .2s ease}
+.cmdline .go:hover{background:var(--primary);color:#0a0c0e}
+.cmdline::after{content:'';position:absolute;left:0;bottom:-2px;height:2px;width:0;background:var(--primary);transition:width .45s cubic-bezier(.4,0,.2,1)}
+.cmdline:focus-within::after{width:100%}
+
+/* 类型统计 tile(数据基地) */
+.ttiles{display:flex;gap:10px;flex-wrap:wrap}
+.ttile{border:.5px solid var(--hair-soft);border-radius:12px;padding:10px 16px;min-width:86px;cursor:default;transition:border-color .2s ease}
+.ttile:hover{border-color:rgba(127,179,207,.35)}
+.ttile .n{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:20px;color:var(--foreground);font-variant-numeric:tabular-nums}
+.ttile .t{margin-top:3px;font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:11px;letter-spacing:.1em;color:var(--muted-2)}
+
+/* 技能 chips(营地) */
+.skills{display:flex;gap:8px;flex-wrap:wrap}
+.skill{border:.5px solid var(--hair-soft);border-radius:9999px;padding:6px 15px;cursor:pointer;background:none;
+  font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:12px;letter-spacing:.1em;color:var(--muted);
+  transition:all .2s ease}
+.skill:hover{color:var(--primary);border-color:rgba(127,179,207,.4)}
+
+/* 成员卡(协作) */
+.member{display:flex;align-items:center;gap:13px;padding:9px 0;border-bottom:.5px solid var(--hair-soft)}
+.member:last-child{border-bottom:0}
+.avatar{width:34px;height:34px;border-radius:10px;border:.5px solid rgba(127,179,207,.4);color:var(--primary);
+  display:flex;align-items:center;justify-content:center;font-family:'Noto Sans SC',sans-serif;font-size:13px;font-weight:400;flex:none}
+.member .mi{flex:1;min-width:0}
+.member .mn{font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:13.5px;letter-spacing:.06em;color:var(--foreground)}
+.member .mr{font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:11px;letter-spacing:.05em;color:var(--muted-2);margin-top:2px}
+
+/* 甜甜圈(驾驶舱)——海系五阶 */
+.donut-wrap{display:flex;align-items:center;gap:26px;flex:1}
+.donut{width:118px;height:118px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:conic-gradient(#7fb3cf 0% 33%,#4f7f9e 33% 51%,#a8cfe0 51% 69%,#5f93ad 69% 84%,#d7e5ec 84% 100%)}
+.donut .hole{width:78px;height:78px;border-radius:50%;background:#0d1013;display:grid;place-items:center;text-align:center}
+.donut .hole .n{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:22px;line-height:1;color:var(--foreground)}
+.donut .hole .k{font-size:9px;margin-top:4px;color:var(--muted-2);letter-spacing:.2em}
+.legend{display:grid;gap:8px;flex:1}
+.lrow{display:flex;align-items:center;gap:9px;font-family:'Noto Sans SC',sans-serif;font-weight:300;font-size:12px;letter-spacing:.06em;color:var(--muted)}
+.lrow .sw{width:9px;height:9px;border-radius:2.5px;flex:none}
+.lrow .lv{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-weight:500;color:#c9ccd0}
+
+/* ghost 按钮 */
+.ghost{font-family:'Noto Sans SC',sans-serif;font-weight:400;font-size:11.5px;letter-spacing:.14em;color:var(--muted);
+  background:none;border:.5px solid var(--hair);border-radius:9999px;padding:8px 20px;cursor:pointer;
+  transition:all .2s ease}
+.ghost:hover{color:var(--primary);border-color:rgba(127,179,207,.4)}
+.ghost.pri{color:var(--primary);border-color:rgba(127,179,207,.4)}
+.ghost.pri:hover{background:var(--primary);color:#0a0c0e}
+
+/* ═══ 电影化层 ═══ */
+#cine-t,#cine-b{position:absolute;left:0;width:100%;height:46px;background:#000;z-index:66;pointer-events:none}
+#cine-t{top:0}#cine-b{bottom:0}
+#ui-vign{position:absolute;inset:0;z-index:63;pointer-events:none;
+  background:radial-gradient(ellipse 78% 74% at 50% 48%, transparent 50%, rgba(3,5,7,.42))}
+#ui-grain{position:absolute;inset:-50%;width:200%;height:200%;z-index:64;opacity:.05;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  animation:uigrain 1.3s steps(4) infinite}
+@keyframes uigrain{0%{transform:translate(0,0)}25%{transform:translate(-1.5%,1%)}50%{transform:translate(1%,-1.5%)}75%{transform:translate(-1%,1.5%)}100%{transform:translate(1.5%,-1%)}}
+.scene{will-change:transform}
+#bar{position:absolute;bottom:0;left:0;width:100%;height:2px;background:rgba(242,241,238,.05);z-index:70}
+#bar i{display:block;height:100%;width:0;background:var(--primary)}
+#hint{position:absolute;bottom:14px;right:22px;z-index:70;font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:.3em;color:rgba(242,241,238,.2)}
+
+@media (prefers-reduced-motion:reduce){#dither,#ui-grain{display:none}}
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+  <canvas id="dither" width="1280" height="720"></canvas>
+  <div id="scrim"></div>
+
+  <!-- ═══ 开机影片 s0-s6(原样) ═══ -->
+  <section class="scene" id="s0">
+    <div class="mask"><span class="line l1">当 AI 时代到来</span></div>
+    <div class="mask"><span class="line l2">我们如何<span class="accent-text">选择</span></span></div>
+    <div class="sub label">When the AI era arrives</div>
+    <div class="sub-rule"></div>
+  </section>
+
+  <section class="scene" id="s1">
+    <div class="bracket b-tl"></div><div class="bracket b-tr"></div>
+    <div class="bracket b-bl"></div><div class="bracket b-br"></div>
+    <div class="meta meta-top"><span class="label">Cockpit</span><span class="label live">● Memory Layer</span></div>
+    <div class="meta meta-btm"><span class="label">ROM-AI</span><span class="label">Standby</span></div>
+    <div id="cmd">
+      <div class="field" id="field"><span class="cursor"></span></div>
+      <div class="rule"><i></i></div>
+      <div id="cmd-hint" class="label">Enter to Begin</div>
+    </div>
+  </section>
+
+  <section class="scene" id="s2">
+    <div class="boot">
+      <div>loading memory layer ................ <span class="ok">OK</span></div>
+      <div>project cognition · 16 fields ....... <span class="ok">OK</span></div>
+      <div>cognition writeback protocol ........ <span class="ok">OK</span></div>
+      <div>context supply protocol ............. <span class="ok">OK</span></div>
+      <div>容 · 模 · 评 · 档 ................... <span class="ok">READY</span></div>
+    </div>
+    <div class="sys-title">
+      <h1>ROM-<span class="accent-text">AI</span></h1>
+      <div class="rule"></div>
+      <p class="label">Architect's Cognitive Core　建筑师的认知中枢</p>
+    </div>
+  </section>
+
+  <section class="scene" id="s3">
+    <div class="mask"><span class="q">AI 能在一夜之间生成一千个方案</span></div>
+    <div class="mask" style="margin-top:4px"><span class="q">却记不住你<span class="accent-text">昨天的判断</span></span></div>
+    <div class="strata">
+      <div class="stratum gen"><div class="name">生成层</div><div class="en label">Generation　拥挤　无记忆</div></div>
+      <div class="stratum mem"><div class="name">记忆层</div><div class="en label">Memory　ROM-AI 所在之处</div></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s4">
+    <div class="frame-title label">Operating System for Design Judgment　一套设计判断的操作系统</div>
+    <div class="cols">
+      <div class="pillar"><div class="glyph">容</div><div class="en label">Intake</div><div class="zh">项目入仓</div></div>
+      <div class="sep"></div>
+      <div class="pillar"><div class="glyph">模</div><div class="en label">Generate</div><div class="zh">方案生成</div></div>
+      <div class="sep"></div>
+      <div class="pillar"><div class="glyph">评</div><div class="en label">Evaluate</div><div class="zh">多维评审</div></div>
+      <div class="sep"></div>
+      <div class="pillar"><div class="glyph">档</div><div class="en label">Archive</div><div class="zh">判断归档</div></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s5">
+    <div class="cards">
+      <div class="card"><div class="chip">01</div><div class="t">项目认知模型</div><div class="d">十六域结构化认知　让系统真正看懂一个项目　而非只是存下文件</div></div>
+      <div class="card"><div class="chip">02</div><div class="t">认知回写</div><div class="d">每一次评审与决策自动沉淀回项目认知　判断不再随汇报结束而蒸发</div></div>
+      <div class="card"><div class="chip">03</div><div class="t">语境供给</div><div class="d">让任何生成式 AI 带着完整的项目记忆开始工作　而不是每次从零开始</div></div>
+    </div>
+  </section>
+
+  <section class="scene" id="s6">
+    <div class="mask"><span class="close-line">让每一次判断</span></div>
+    <div class="mask" style="margin-top:4px"><span class="close-line">成为<span class="accent-text">下一次的起点</span></span></div>
+    <div class="brand">
+      <h1>ROM-<span class="accent-text">AI</span></h1>
+      <div class="rule"></div>
+      <p class="label">Architecture OS　建筑师的记忆层</p>
+    </div>
+  </section>
+
+  <!-- ═══ 驾驶舱口令 ═══ -->
+  <section class="scene" id="gate">
+    <div class="bracket b-tl"></div><div class="bracket b-tr"></div>
+    <div class="bracket b-bl"></div><div class="bracket b-br"></div>
+    <div class="meta meta-top" style="opacity:1"><span class="label">Cockpit</span><span class="label live">● Memory Layer</span></div>
+    <div class="meta meta-btm" style="opacity:1"><span class="label">ROM-AI</span><span class="label" id="gate-state">Locked</span></div>
+    <div class="g-title">
+      <div class="label g-eyebrow">Cockpit Access　驾驶舱口令</div>
+      <div class="field"><span id="gate-dots"></span><span class="cursor"></span></div>
+      <div class="rule" id="gate-rule"><i></i></div>
+      <div id="gate-hint" class="label">输入口令 · Enter 解锁</div>
+    </div>
+  </section>
+
+  <!-- ═══ 五大板块展开 ═══ -->
+  <section class="scene" id="boards">
+    <div class="frame-title label">Five Boards　五大板块</div>
+    <div class="rows">
+      <div class="bp" data-board="0"><div class="no">01</div><div class="zh">项目中心</div><div class="role">负责人工作台<br>判断从这里开始</div></div>
+      <div class="bp" data-board="1"><div class="no">02</div><div class="zh">数据基地</div><div class="role">记忆底座<br>材料成为可引用的记忆</div></div>
+      <div class="bp" data-board="2"><div class="no">03</div><div class="zh">共创营地</div><div class="role">思考中控<br>与设计委员会推演</div></div>
+      <div class="bp" data-board="3"><div class="no">04</div><div class="zh">协作平台</div><div class="role">团队协同<br>谁在做什么一眼可见</div></div>
+      <div class="bp" data-board="4"><div class="no">05</div><div class="zh">管理驾驶舱</div><div class="role">只读大盘<br>跨项目聚合不打扰执行</div></div>
+    </div>
+    <div id="boards-hint" class="label">点击进入 · Enter 直达项目中心</div>
+  </section>
+
+  <!-- ═══════════ App 壳 ═══════════ -->
+  <div id="app">
+    <nav id="app-nav">
+      <span class="wordmark">ROM-<span>AI</span></span>
+      <div class="tabs">
+        <button class="tab on" data-b="0">项目中心</button>
+        <button class="tab" data-b="1">数据基地</button>
+        <button class="tab" data-b="2">共创营地</button>
+        <button class="tab" data-b="3">协作平台</button>
+        <button class="tab" data-b="4">管理驾驶舱</button>
+      </div>
+      <span class="sys"><span class="dot"></span><span class="label" style="letter-spacing:.2em">Memory Layer</span></span>
+    </nav>
+
+    <!-- ── 01 项目中心 ── -->
+    <section class="board on" id="b0">
+      <div class="hero">
+        <div class="h-left">
+          <div class="label h-eyebrow">Project Center　负责人工作台</div>
+          <div class="h-title mask"><span>星河国际项目<span class="accent-text">　进行中</span></span></div>
+          <div class="h-sub">生成并确认会议纪要后，下一节点会出现在这里 · 判断从这里开始</div>
+        </div>
+        <div class="h-stats">
+          <div class="hstat"><div class="v pri">62<small>%</small></div><div class="k label">阶段进度</div></div>
+          <div class="hstat"><div class="v">291</div><div class="k label">文件</div></div>
+          <div class="hstat"><div class="v">4</div><div class="k label">会议纪要</div></div>
+          <div class="hstat"><div class="v risk">2</div><div class="k label">本周聚焦</div></div>
+        </div>
+        <div class="horizon"></div>
+      </div>
+      <div class="deck">
+        <div class="row" style="flex:1.15">
+          <div class="gcard" style="flex:1.5">
+            <div class="g-head"><span class="g-title">会议链路</span><span class="g-en">Meeting Chain</span><span class="g-en" style="margin-left:auto">开会 → 纪要回流 → 待办追踪</span></div>
+            <div class="chain">
+              <div class="ctile"><div class="n">1<em>场</em></div><div class="t">腾讯会议</div><div class="s">一键创建真实会议</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile"><div class="n">4<em>条</em></div><div class="t">会议纪要</div><div class="s">纪要生成 · 回流看板</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile"><div class="n">3<em>待办</em></div><div class="t">任务看板</div><div class="s">1 项过期 · 需推进</div></div>
+            </div>
+          </div>
+          <div class="gcard" style="flex:1.5">
+            <div class="g-head"><span class="g-title">判断解析</span><span class="g-en">Judgment</span><span class="g-en" style="margin-left:auto">AI 解读 → 研判 → 阶段拆解</span></div>
+            <div class="chain">
+              <div class="ctile"><div class="n">16<em>域</em></div><div class="t">项目解读</div><div class="s">任务书 / 场地 / 概念</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile"><div class="n" style="color:var(--risk)">2<em>风险</em></div><div class="t">智能研判</div><div class="s">总览 / 难点 / 诉求 / 计划</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile"><div class="n">100<em>%</em></div><div class="t">阶段拆解</div><div class="s">下一节点在哪</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="gcard" style="flex:1.6">
+            <div class="g-head"><span class="g-title">下一步 · 里程碑</span><span class="g-en">Milestones</span></div>
+            <div>
+              <div class="mrow"><span class="dot risk"></span><span class="txt">今日下班前，向业主方经办人索要电子版 CAD 红线图与控规图则</span><span class="who">设计团队 · 今日</span></div>
+              <div class="mrow"><span class="dot warn"></span><span class="txt">按 2.0 容积率、2:1 面宽进深比、南低北高布局，启动首轮总图强排比选</span><span class="who">设计团队 · 周五例会前</span></div>
+              <div class="mrow"><span class="dot warn"></span><span class="txt">周五例会前完成至少两版强排方案供比选</span><span class="who">设计团队 · 周五例会前</span></div>
+            </div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">风险看板</span><span class="g-en">Risks</span><span class="pill" style="margin-left:auto">项目文件 287</span></div>
+            <div>
+              <div class="mrow"><span class="dot risk"></span><span class="txt">资料缺口：所有材料均为图片文件，未做 OCR，无法获取文本信息</span></div>
+              <div class="mrow"><span class="dot risk"></span><span class="txt">关键约束：无技术参数（用地面积 / 容积率 / 建筑高度）</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 02 数据基地 ── -->
+    <section class="board" id="b1">
+      <div class="hero">
+        <div class="h-left">
+          <div class="label h-eyebrow">Data Base　记忆底座</div>
+          <div class="h-title mask"><span>每一份材料<span class="accent-text">　都成为记忆</span></span></div>
+          <div class="cmdline" style="margin-top:22px;width:430px">
+            <input placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…">
+            <button class="go">Search</button>
+          </div>
+        </div>
+        <div class="h-stats">
+          <div class="hstat"><div class="v pri">100<small>%</small></div><div class="k label">索引完成率</div></div>
+          <div class="hstat"><div class="v">640</div><div class="k label">受管文件</div></div>
+          <div class="hstat"><div class="v">74,629</div><div class="k label">索引块 · CJK</div></div>
+        </div>
+        <div class="horizon"></div>
+      </div>
+      <div class="deck">
+        <div class="row">
+          <div class="gcard" style="flex:1.45">
+            <div class="g-head"><span class="g-title">读取与整理</span><span class="g-en">Intake</span><span class="pill ok" style="margin-left:auto">收件箱 · 运行中 · 待处理 355</span></div>
+            <div class="chain" style="flex:none;margin-top:4px">
+              <div class="ctile" style="flex:none;padding:9px 16px"><div class="t" style="font-size:12px">选择来源</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile" style="flex:none;padding:9px 16px"><div class="t" style="font-size:12px">已选择待整理</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile" style="flex:none;padding:9px 16px"><div class="t" style="font-size:12px">整理中</div></div>
+              <span class="arrow">→</span>
+              <div class="ctile" style="flex:none;padding:9px 16px;border-color:rgba(127,179,207,.4)"><div class="t" style="font-size:12px;color:var(--primary)">已整理</div></div>
+            </div>
+            <div class="g-body">支持 txt · md · pdf · docx · pptx · xlsx · 图片　复制接入并建索引　原始文件不动</div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">最近入库</span><span class="g-en">Recent</span></div>
+            <div>
+              <div class="mrow"><span class="pill">图纸</span><span class="txt">2#3#6#7#报建图0701.pdf</span><span class="who">07-02</span></div>
+              <div class="mrow"><span class="pill">方案文本</span><span class="txt">杭州西站新城单元 YH080901-13 地块项目.pdf</span><span class="who">07-02</span></div>
+              <div class="mrow"><span class="pill">任务书</span><span class="txt">设计要求.txt</span><span class="who">06-29</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="flex:.9">
+          <div class="gcard" style="flex:1.45">
+            <div class="g-head"><span class="g-title">知识库</span><span class="g-en">Library</span><span class="g-en" style="margin-left:auto">640 篇 · 按类型归档</span></div>
+            <div class="ttiles">
+              <div class="ttile"><div class="n">413</div><div class="t">图纸</div></div>
+              <div class="ttile"><div class="n">162</div><div class="t">其他</div></div>
+              <div class="ttile"><div class="n">28</div><div class="t">方案文本</div></div>
+              <div class="ttile"><div class="n">23</div><div class="t">会议纪要</div></div>
+              <div class="ttile"><div class="n">9</div><div class="t">案例</div></div>
+              <div class="ttile"><div class="n">5</div><div class="t">任务书</div></div>
+            </div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">图片资产</span><span class="g-en">Assets</span></div>
+            <div class="g-body">效果图成果 <span style="color:#c9ccd0;font-family:'Space Grotesk';font-weight:500">1,169</span> 张 · 生图素材 4 类<br>AI 生图工坊 · 图生图以素材为参考　真实出图归档</div>
+            <button class="ghost" style="align-self:flex-start;margin-top:auto">进入画廊</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 03 共创营地 ── -->
+    <section class="board" id="b2">
+      <div class="hero">
+        <div class="h-left" style="max-width:640px">
+          <div class="label h-eyebrow">Co-Creation Camp　思考中控</div>
+          <div class="h-title mask"><span>对这个项目<span class="accent-text">　你想推演什么</span></span></div>
+          <div class="cmdline" style="margin-top:22px;width:560px">
+            <input placeholder="像布置设计任务一样描述 · 例：给星河国际做一轮概念激发…">
+            <button class="go">Run</button>
+          </div>
+        </div>
+        <div class="h-stats">
+          <div class="hstat"><div class="v">22</div><div class="k label">在编技能</div></div>
+          <div class="hstat"><div class="v pri">4</div><div class="k label">设计委员会人设</div></div>
+        </div>
+        <div class="horizon"></div>
+      </div>
+      <div class="deck">
+        <div class="row">
+          <div class="gcard" style="flex:1.5">
+            <div class="g-head"><span class="g-title">设计委员会 · 方案评审</span><span class="g-en">MoA Review</span><span class="pill pri" style="margin-left:auto">功能 / 甲方 / 成本 三评图人 + 主审</span></div>
+            <div class="g-body">三位 AI 评图人分别评审本项目认知　再由主审整合出检查清单与跨维度冲突　单模型容易混视角　评图把矛盾显式标出来</div>
+            <button class="ghost pri" style="align-self:flex-start;margin-top:auto">召集设计委员会</button>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">概念工作台</span><span class="g-en">Concept</span></div>
+            <div class="skills">
+              <button class="skill">概念激发</button><button class="skill">体量推敲</button>
+              <button class="skill">方案比选</button><button class="skill">立面生成</button>
+              <button class="skill">竞品对标</button><button class="skill">案例库检索</button>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="flex:.85">
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">文书间</span><span class="g-en">Writing</span></div>
+            <div class="skills">
+              <button class="skill">投标文本</button><button class="skill">汇报提纲</button>
+              <button class="skill">一页纸海报</button><button class="skill">PPT 大纲</button>
+            </div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">出图间</span><span class="g-en">Imaging</span></div>
+            <div class="skills">
+              <button class="skill">AI 生图 · 意向图</button><button class="skill">效果图导演</button>
+              <button class="skill">视角脚本</button><button class="skill">风格参考板</button>
+            </div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">流程间</span><span class="g-en">Flow</span></div>
+            <div class="skills">
+              <button class="skill">节点督办</button><button class="skill">规范审查</button>
+              <button class="skill">任务安排</button><button class="skill">黑话翻译</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 04 协作平台 ── -->
+    <section class="board" id="b3">
+      <div class="hero">
+        <div class="h-left">
+          <div class="label h-eyebrow">Hub　团队协同</div>
+          <div class="h-title mask"><span>谁在做什么<span class="accent-text">　一眼可见</span></span></div>
+          <div class="h-sub" style="display:flex;align-items:center;gap:9px">
+            <span class="dot ok" style="box-shadow:0 0 8px rgba(126,201,165,.5)"></span>今天下午 2 点开会 · 驾驶舱发布的全员通知在此轮播
+          </div>
+        </div>
+        <div class="h-stats">
+          <div class="hstat"><div class="v">4</div><div class="k label">团队成员</div></div>
+          <div class="hstat"><div class="v pri">2</div><div class="k label">智能助手在岗</div></div>
+          <div class="hstat"><div class="v">3</div><div class="k label">甲方画像</div></div>
+        </div>
+        <div class="horizon"></div>
+      </div>
+      <div class="deck">
+        <div class="row">
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">团队成员</span><span class="g-en">Team</span><button class="ghost" style="margin-left:auto;padding:5px 14px">+ 添加成员</button></div>
+            <div>
+              <div class="member"><div class="avatar">杨</div><div class="mi"><div class="mn">杨工</div><div class="mr">主创建筑师 · 强排比选 / 概念深化</div></div><span class="pill warn">负荷适中</span></div>
+              <div class="member"><div class="avatar">李</div><div class="mi"><div class="mn">李工</div><div class="mr">建筑师 · 报建图 / 日照分析</div></div><span class="pill ok">较轻</span></div>
+            </div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">甲方画像库</span><span class="g-en">Clients</span><span class="g-en" style="margin-left:auto">只汇入已确认的认知</span></div>
+            <div class="skills" style="margin-top:2px">
+              <button class="skill">保利（2）</button><button class="skill">华润（1）</button><button class="skill">城投（1）</button>
+            </div>
+            <div class="g-body">同一甲方的项目 / 诉求 / 历史　一处聚合　点开即读其审美偏好与决策习惯</div>
+          </div>
+        </div>
+        <div class="row" style="flex:.8">
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">智能助手</span><span class="g-en">AI Staff</span><span class="g-en" style="margin-left:auto">能力分阶段上岗</span></div>
+            <div style="display:flex;gap:26px">
+              <div class="member" style="border:0;flex:1"><div class="avatar">找</div><div class="mi"><div class="mn">找图小雷达</div><div class="mr">按项目关键词收集意向图与类比线索</div></div><span class="pill ok">可用</span></div>
+              <div class="member" style="border:0;flex:1"><div class="avatar">材</div><div class="mi"><div class="mn">材料小帮手</div><div class="mr">归纳项目资料 · 任务书 · 会议材料</div></div><span class="pill ok">可用</span></div>
+              <div class="member" style="border:0;flex:1"><div class="avatar" style="opacity:.45">审</div><div class="mi"><div class="mn" style="color:var(--muted)">审图老法师 · 翻模小王子</div><div class="mr">即将上岗</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 05 管理驾驶舱 ── -->
+    <section class="board" id="b4">
+      <div class="hero">
+        <div class="h-left">
+          <div class="label h-eyebrow">Cockpit　只读大盘</div>
+          <div class="h-title mask"><span>跨项目聚合<span class="accent-text">　不打扰执行</span></span></div>
+          <div class="h-sub">面向负责人的只读聚合 · 进行中项目 / 交付节点 / 风险与 AI 产能一屏掌握</div>
+        </div>
+        <div class="h-stats">
+          <div class="hstat"><div class="v">8</div><div class="k label">进行中项目</div></div>
+          <div class="hstat"><div class="v warn">0</div><div class="k label">临近交付</div></div>
+          <div class="hstat"><div class="v risk">4</div><div class="k label">高风险项</div></div>
+          <div class="hstat"><div class="v pri">39</div><div class="k label">AI 成果 · 累计</div></div>
+        </div>
+        <div class="horizon"></div>
+      </div>
+      <div class="deck">
+        <div class="row">
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">AI 使用情况</span><span class="g-en">AI Usage</span><span class="g-en" style="margin-left:auto">按能力占比 · 真实计数</span></div>
+            <div class="donut-wrap">
+              <div class="donut"><div class="hole"><div class="n">39</div><div class="k">次成果</div></div></div>
+              <div class="legend">
+                <div class="lrow"><span class="sw" style="background:#7fb3cf"></span>评审<span class="lv">13</span></div>
+                <div class="lrow"><span class="sw" style="background:#4f7f9e"></span>纪要<span class="lv">7</span></div>
+                <div class="lrow"><span class="sw" style="background:#a8cfe0"></span>任务<span class="lv">7</span></div>
+                <div class="lrow"><span class="sw" style="background:#5f93ad"></span>PPT<span class="lv">6</span></div>
+                <div class="lrow"><span class="sw" style="background:#d7e5ec"></span>生图<span class="lv">6</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">成员工作量 · 人工 / AI</span><span class="g-en">Workload</span></div>
+            <div class="g-body">暂无工作量数据　到「协作平台」录入团队成员　纪要待办和任务分派会自动计入负荷</div>
+            <div class="mrow" style="margin-top:auto"><span class="dot warn"></span><span class="txt">飞书项目看板 · 项目评论 —— 即将接入</span></div>
+          </div>
+        </div>
+        <div class="row" style="flex:.7">
+          <div class="gcard">
+            <div class="g-head"><span class="g-title">发全员通知</span><span class="g-en">Broadcast</span><span class="g-en" style="margin-left:auto">出现在所有员工的信息带</span></div>
+            <div class="cmdline">
+              <input placeholder="输入要广播给全员的通知，例：本周五下午 3 点市庄项目阶段评审…">
+              <button class="go">发布</button>
+            </div>
+            <div class="mrow" style="border:0"><span class="dot ok"></span><span class="txt">今天下午 2 点开会</span><span class="who">2026-06-24</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="app-status">
+      <span class="label" id="st-left">星河国际项目 · 进行中</span>
+      <span class="label">FTS5 Ready · 本地运行 · Cockpit Unlocked</span>
+    </div>
+  </div>
+
+  <div id="ui-vign"></div><div id="ui-grain"></div><div id="cine-t"></div><div id="cine-b"></div>
+  <div id="bar"><i></i></div>
+  <div id="hint">SPACE 暂停 · ESC 跳过</div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/CustomEase.min.js"></script>
+<script>
+gsap.registerPlugin(CustomEase);
+CustomEase.create('premium','M0,0 C0.4,0 0.2,1 1,1');
+CustomEase.create('premiumOut','M0,0 C0.6,0 0.8,0.4 1,1');
+const Q=0.6, S=1.2, L=2.2;
+
+/* ════ 叙事参数 ════ */
+const boost={v:0};
+const order={v:0};
+const energy={v:0.35};
+const horizonY={v:0.47};                  /* 海平线高度(GL,自下而上);壳内抬升 */
+const sweep={x:-0.5,amp:0};
+const waveSlots=[{x:0,y:0,t0:-9,a0:0},{x:0,y:0,t0:-9,a0:0}];
+let waveIdx=0;
+function trigWave(x,y,a){
+  waveSlots[waveIdx]={x,y,t0:performance.now()*0.001,a0:a};
+  waveIdx=1-waveIdx;
+}
+
+/* ════ 抖动流体(原样,仅 hy 常量→uniform 供壳内抬升海平线) ════ */
+(function(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv=document.getElementById('dither');
+  const gl=cv.getContext('webgl');
+  if(!gl) return;
+  cv.width=1920;cv.height=1080;
+
+  const vs=`attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
+  const fs=`
+  precision highp float;
+  uniform vec2 u_resolution;
+  uniform float u_time;
+  uniform vec2 u_pointer;
+  uniform float u_boost;
+  uniform float u_order;
+  uniform float u_energy;
+  uniform float u_hy;
+  uniform vec4 u_w1;
+  uniform vec4 u_w2;
+  uniform vec2 u_sweep;
+
+  float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+  float noise(vec2 p){
+    vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+    return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),
+               mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);
+  }
+  float fbm(vec2 p){
+    float v=0.,a=.5;
+    for(int i=0;i<4;i++){v+=a*noise(p);p*=2.03;a*=.5;}
+    return v;
+  }
+  float bayer2(vec2 a){a=floor(a);return fract(a.x/2.+a.y*a.y*.75);}
+  float bayer4(vec2 a){return bayer2(.5*a)*.25+bayer2(a);}
+  float bayer8(vec2 a){return bayer4(.5*a)*.25+bayer2(a);}
+
+  float ring(vec4 w, vec2 st){
+    if(w.w<=0.001) return 0.;
+    vec2 p=vec2(st.x*1.7778,st.y);
+    vec2 c=vec2(w.x*1.7778,w.y);
+    float d=distance(p,c);
+    return exp(-pow((d-w.z)*20.0,2.0))*w.w;
+  }
+
+  void main(){
+    float cell=4.0;
+    vec2 pc=floor(gl_FragCoord.xy/cell);
+    vec2 st=(pc*cell)/u_resolution;
+    vec2 uv=st;
+    uv.x*=u_resolution.x/u_resolution.y;
+
+    float speed=mix(0.060,0.018,u_order)*(0.50+1.15*u_energy);
+    float t=u_time*speed;
+    vec2 drift=u_pointer*0.16*(1.0-u_order*0.5);
+
+    float warpAmp=mix(1.9,0.35,u_order)*(0.45+1.15*u_energy);
+    vec2 q=vec2(fbm(uv*2.2+vec2(t,-t*.7)),fbm(uv*2.2+vec2(-t*.6,t*.9)));
+
+    float fx=mix(2.8,1.1,u_order);
+    float fy=mix(2.8,6.8,u_order);
+    vec2 su=vec2(uv.x*fx+t*mix(0.0,2.4,u_order), uv.y*fy);
+    vec2 r=vec2(fbm(su*0.9+q*warpAmp+vec2(-t*1.3,t*1.1)),
+                fbm(su*0.9+q*warpAmp+vec2(t*1.2,-t*0.8)));
+    float f=fbm(su+q*warpAmp+r*warpAmp*0.85*(1.0-u_order)+drift);
+    f+=(noise(vec2(uv.x*0.9+t*1.6, uv.y*24.0))-0.5)*0.22*u_order;
+    f=pow(max(f,0.0),1.5);
+
+    float vig=smoothstep(1.25,0.18,distance(st,vec2(0.66,0.44)));
+    float gravity=mix(1.0, 0.55+0.9*(1.0-st.y), u_order*0.85);
+    float v=f*vig*gravity;
+    float sw=sin(uv.y*2.6-t*2.4+q.x*2.0)*0.5+0.5;
+    v+=pow(sw,2.2)*f*0.30*(1.0-u_order)*u_energy;
+    v+=smoothstep(0.70,0.95,f)*0.40*(1.0-u_order)*u_energy;
+    float hy=u_hy;
+    float seaMask=smoothstep(hy+0.12,hy-0.05,st.y);
+    v*=mix(0.05,1.0,seaMask);
+    v+=exp(-pow(max(st.y-hy,0.0)/0.085,2.0))*0.10*(0.4+0.6*u_energy);
+    v+=exp(-pow((st.y-hy)*70.0,2.0))*(0.10+0.10*u_energy+0.30*u_boost);
+    v=v*(0.82+0.36*u_energy)*(1.0+u_boost*1.1)+u_boost*0.10;
+
+    v+=exp(-pow((fract(u_time*0.045)*1.5-0.25-st.y)*16.0,2.0))*0.09*u_order;
+    v+=ring(u_w1,st)+ring(u_w2,st);
+    v+=exp(-pow((st.x-u_sweep.x)*9.0,2.0))*u_sweep.y*vig;
+
+    v=clamp(v,0.,1.);
+    float d=bayer8(pc);
+    float qv=clamp(floor(v*8.0+d)/8.0,0.,1.);
+
+    vec3 c0=vec3(0.039,0.047,0.055);
+    vec3 c1=vec3(0.071,0.133,0.196);
+    vec3 c2=vec3(0.141,0.278,0.400);
+    vec3 c3=vec3(0.278,0.478,0.612);
+    vec3 c4=vec3(0.478,0.655,0.769);
+    vec3 c5=vec3(0.843,0.898,0.925);
+    vec3 col;
+    if(qv<0.22)      col=mix(c0,c1,qv/0.22);
+    else if(qv<0.45) col=mix(c1,c2,(qv-0.22)/0.23);
+    else if(qv<0.68) col=mix(c2,c3,(qv-0.45)/0.23);
+    else if(qv<0.90) col=mix(c3,c4,(qv-0.68)/0.22);
+    else             col=mix(c4,c5,(qv-0.90)/0.10);
+    gl_FragColor=vec4(col,1.0);
+  }`;
+
+  function compile(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s;}
+  const prog=gl.createProgram();
+  gl.attachShader(prog,compile(gl.VERTEX_SHADER,vs));
+  gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(prog);gl.useProgram(prog);
+
+  const buf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,'a');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+  const U={};
+  ['u_resolution','u_time','u_pointer','u_boost','u_order','u_energy','u_hy','u_w1','u_w2','u_sweep']
+    .forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+  gl.uniform2f(U.u_resolution,1280,720);
+
+  let ptr={x:0,y:0},cur={x:0,y:0};
+  addEventListener('pointermove',e=>{
+    ptr.x=(e.clientX/innerWidth-0.5);
+    ptr.y=(e.clientY/innerHeight-0.5);
+  });
+  function frame(t){
+    cur.x+=(ptr.x-cur.x)*0.03;cur.y+=(ptr.y-cur.y)*0.03;
+    const now=performance.now()*0.001;
+    gl.uniform1f(U.u_time,t*0.001);
+    gl.uniform2f(U.u_pointer,cur.x,cur.y);
+    gl.uniform1f(U.u_boost,boost.v);
+    gl.uniform1f(U.u_order,order.v);
+    gl.uniform1f(U.u_energy,energy.v);
+    gl.uniform1f(U.u_hy,horizonY.v);
+    waveSlots.forEach((w,i)=>{
+      const e=now-w.t0;
+      const r=e*0.5;
+      const a=w.a0*Math.max(0,1-e/1.1);
+      gl.uniform4f(i===0?U.u_w1:U.u_w2, w.x, w.y, r, a);
+    });
+    gl.uniform2f(U.u_sweep,sweep.x,sweep.amp);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+const Music={start(){},setVoices(){},warm(){},setMid(){},key(){},accent(){},finale(){},end(){},duck(){},toggleMute(){},restart(){},reset(){}};
+
+function fit(){
+  const k=Math.min(innerWidth/1280,innerHeight/720);
+  document.getElementById('stage').style.transform=`scale(${k})`;
+}
+addEventListener('resize',fit);fit();
+
+/* ════ 开机影片时间线(原样;s6 结束→驾驶舱口令) ════ */
+const scenes=['s0','s1','s2','s3','s4','s5','s6'].map(id=>document.getElementById(id));
+const tl=gsap.timeline({
+  paused:true,
+  defaults:{ease:'premium',duration:S},
+  onUpdate:updateBar,
+  onComplete:()=>{enterGate();}
+});
+function show(i){return ()=>{
+  scenes.forEach((s,j)=>s.style.visibility=j===i?'visible':'hidden');
+  gsap.killTweensOf(scenes[i]);
+  gsap.fromTo(scenes[i],{scale:1},{scale:1.04,duration:9.5,ease:'none'});
+}}
+function addSweep(){
+  tl.fromTo(sweep,{x:-0.25,amp:0.16},{x:1.25,amp:0.16,duration:.9,ease:'power2.inOut'},'<')
+    .set(sweep,{amp:0});
+}
+
+tl.addLabel('s0')
+  .call(show(0))
+  .to('#s0 .l1',{y:0,duration:L*0.6,onComplete(){trigWave(0.5,0.58,0.09);}},'+=0.8')
+  .to(energy,{v:1.0,duration:L,ease:'premium'},'<')
+  .to('#s0 .l2',{y:0,duration:L*0.6,onComplete(){trigWave(0.5,0.5,0.09);}},'<0.35')
+  .to(energy,{v:0.72,duration:S,ease:'premium'},'<0.6')
+  .to('#s0 .sub',{opacity:1,duration:S},'<0.4')
+  .to('#s0 .sub-rule',{width:52,duration:S},'<0.2')
+  .to('#s0',{opacity:0,duration:.8,ease:'premiumOut'},'+=1.85');
+addSweep();
+tl.set('#s0',{clearProps:'opacity'});
+
+tl.addLabel('s1')
+  .call(()=>{Music.warm();})
+  .call(show(1))
+  .to(energy,{v:0.5,duration:L,ease:'premium'},'<')
+  .to({v:0},{v:1,duration:L*0.5})
+  .fromTo('#s1 .bracket',{opacity:0,x:(i)=>[5,-5,5,-5][i],y:(i)=>[5,5,-5,-5][i]},
+    {opacity:1,x:0,y:0,duration:Q,stagger:.08},'-=0.85')
+  .to('#s1 .meta',{opacity:1,duration:S*0.7},'-=0.3')
+  .to('#cmd',{opacity:1,duration:S*0.7},'-=0.2')
+  .to('#cmd-hint',{opacity:1,duration:Q},'-=0.25');
+
+const word='ROM-AI';
+const beats=[0.22,0.16,0.20,0.26,0.15,0.19];
+word.split('').forEach((ch,i)=>{
+  tl.call(()=>{
+      const field=document.getElementById('field');
+      const wrap=document.createElement('span');wrap.className='ch';
+      const inner=document.createElement('i');inner.textContent=ch;
+      wrap.appendChild(inner);
+      field.insertBefore(wrap,field.querySelector('.cursor'));
+      gsap.to(inner,{y:0,duration:.4,ease:'premium'});
+      Music.key();
+      trigWave(0.5,0.51,0.13);
+    },null,`+=${beats[i]}`)
+    .to('#cmd .rule i',{width:400*(i+1)/word.length,duration:.14,ease:'none'},'<0.05');
+});
+
+tl.to('#cmd-hint',{opacity:0,duration:.25,ease:'premiumOut'},'+=0.6')
+  .to('#s1',{opacity:0,duration:.5,ease:'premiumOut'},'+=0.25')
+  .call(()=>{Music.accent();},null,'<')
+  .to(boost,{v:1,duration:S*0.7,ease:'power2.in'},'<')
+  .call(show(2))
+  .call(()=>{Music.setVoices({top:true});})
+  .to(boost,{v:0,duration:L,ease:'premium'})
+  .to(order,{v:1,duration:L*1.5,ease:'premium'},'<')
+  .to(energy,{v:0.3,duration:L*1.5,ease:'premium'},'<');
+
+tl.addLabel('s2','-=3');
+tl.to('#s2 .boot div',{opacity:1,x:0,duration:Q*0.6,stagger:.4},'s2+=0.3')
+  .to('#s2 .boot',{opacity:0,duration:Q,ease:'premiumOut'},'+=0.75')
+  .to('#s2 .sys-title',{opacity:1,duration:S})
+  .fromTo('#s2 .sys-title h1',{scale:.94},
+    {scale:1,duration:L*0.75,ease:'premium',onComplete(){trigWave(0.5,0.5,0.1);}},'<')
+  .fromTo('#s2 .sys-title .rule',{scaleX:0},{scaleX:1,duration:S*0.7},'<0.45')
+  .to('#s2 .sys-title p',{opacity:1,duration:S},'<0.35')
+  .to('#s2',{opacity:0,duration:.8,ease:'premiumOut'},'+=1.65');
+addSweep();
+tl.set('#s2',{clearProps:'opacity'});
+
+tl.addLabel('s3')
+  .call(show(3))
+  .to('#s3 .mask:nth-child(1) .q',{y:0,duration:S,onComplete(){trigWave(0.5,0.6,0.09);}})
+  .to(energy,{v:0.8,duration:S,ease:'premium'},'<')
+  .to(order,{v:0.55,duration:S,ease:'premium'},'<')
+  .to('#s3 .mask:nth-child(2) .q',{y:0,duration:S},'<0.35')
+  .fromTo('#s3 .strata',{opacity:0,y:22},
+    {opacity:1,y:0,duration:S*0.85,onComplete(){trigWave(0.5,0.36,0.1);}},'+=0.7')
+  .to(order,{v:1,duration:L*0.8,ease:'premium'},'<')
+  .to(energy,{v:0.3,duration:L*0.8,ease:'premium'},'<')
+  .to('#s3 .stratum .en',{opacity:1,duration:Q,stagger:.13},'<0.35')
+  .fromTo('#s3 .stratum.mem',{boxShadow:'rgba(127,179,207,0) 0 0 0 0'},
+    {boxShadow:'rgba(127,179,207,.16) 0 0 30px 0',duration:S*0.7},'+=0.3')
+  .to('#s3',{opacity:0,duration:.8,ease:'premiumOut'},'+=2');
+addSweep();
+tl.set('#s3',{clearProps:'opacity'});
+
+tl.addLabel('s4')
+  .call(show(4))
+  .to('#s4 .frame-title',{opacity:1,duration:S*0.8})
+  .to('#s4 .sep',{scaleY:1,duration:S*0.85,stagger:.12,ease:'power4.inOut'},'-=0.3')
+  .addLabel('glyphs','-=0.55');
+const glyphX=[0.245,0.415,0.585,0.755];
+document.querySelectorAll('#s4 .glyph').forEach((g,i)=>{
+  tl.fromTo(g,{opacity:0,y:22},
+    {opacity:1,y:0,duration:S*0.8,ease:'premium',
+     onStart(){trigWave(glyphX[i],0.5,0.11);}},
+    'glyphs+='+(i*0.34));
+});
+tl.to('#s4 .en',{opacity:1,duration:Q,stagger:.34},'glyphs+=0.28')
+  .to('#s4 .zh',{opacity:1,duration:Q,stagger:.34},'glyphs+=0.4')
+  .to('#s4',{opacity:0,duration:.8,ease:'premiumOut'},'+=2');
+addSweep();
+tl.set('#s4',{clearProps:'opacity'});
+
+tl.addLabel('s5')
+  .call(()=>{Music.setVoices({mid:false});})
+  .call(show(5))
+  .to(energy,{v:0.22,duration:L,ease:'premium'},'<')
+  .addLabel('cards','+=0.1');
+const cardX=[0.25,0.5,0.75];
+document.querySelectorAll('#s5 .card').forEach((c,i)=>{
+  tl.fromTo(c,{opacity:0,y:26},
+    {opacity:1,y:0,duration:S*0.8,ease:'premium',
+     onStart(){trigWave(cardX[i],0.5,0.09);}},
+    'cards+='+(i*0.3));
+});
+tl.to('#s5',{opacity:0,duration:.8,ease:'premiumOut'},'+=2.3');
+addSweep();
+tl.set('#s5',{clearProps:'opacity'});
+
+tl.addLabel('s6')
+  .call(show(6))
+  .to('#s6 .mask:nth-child(1) .close-line',{y:0,duration:S})
+  .to(energy,{v:0.45,duration:S,ease:'premium'},'<')
+  .to('#s6 .mask:nth-child(2) .close-line',{y:0,duration:S,onComplete(){trigWave(0.5,0.5,0.09);}},'<0.35')
+  .to('#s6 .mask .close-line',{y:'-112%',duration:S*0.7,ease:'premiumOut',stagger:.07},'+=1.8')
+  .to(boost,{v:.35,duration:S,ease:'power2.in'},'<')
+  .to('#s6 .brand',{opacity:1,duration:S},'+=0.1')
+  .call(()=>{Music.finale();},null,'<')
+  .fromTo('#s6 .brand h1',{scale:.94},{scale:1,duration:L*0.8,ease:'premium'},'<')
+  .to(boost,{v:0,duration:L,ease:'premium'},'<')
+  .to(energy,{v:0.12,duration:L*1.3,ease:'premium'},'<')
+  .to('#s6 .brand .rule',{scaleX:1,duration:S*0.8,ease:'power4.inOut'},'<0.5')
+  .to('#s6 .brand p',{opacity:1,duration:S},'<0.35')
+  .to('#s6',{opacity:0,duration:.9,ease:'premiumOut'},'+=1.5');
+
+/* ════ 阶段机:film → gate → boards → shell ════ */
+let phase='film';
+window.__phase=()=>phase;
+/* 原型验证直达钩子(不影响正常流) */
+window.__go={gate(){enterGate();},boards(){phase='boards';tl.pause();scenes.forEach(s=>s.style.visibility='hidden');gateEl.style.visibility='hidden';document.getElementById('bar').style.display='none';enterBoards();},app(i){phase='boards';boardsEl.style.visibility='visible';enterApp(i);},board(i){switchBoard(i,false);}};
+const gateEl=document.getElementById('gate');
+const boardsEl=document.getElementById('boards');
+const appEl=document.getElementById('app');
+let pw='';
+
+function sweepOnce(){
+  gsap.fromTo(sweep,{x:-0.25,amp:0.16},{x:1.25,amp:0.16,duration:.9,ease:'power2.inOut',
+    onComplete(){sweep.amp=0;}});
+}
+
+function enterGate(){
+  if(phase==='gate') return;
+  phase='gate';
+  tl.pause();
+  scenes.forEach(s=>s.style.visibility='hidden');
+  document.getElementById('bar').style.display='none';
+  document.getElementById('hint').textContent='';
+  gsap.to(order,{v:1,duration:1.6,ease:'premium'});
+  gsap.to(energy,{v:0.3,duration:1.6,ease:'premium'});
+  sweepOnce();
+  gateEl.style.visibility='visible';
+  gsap.fromTo(gateEl,{opacity:0},{opacity:1,duration:.8,ease:'premium'});
+  gsap.fromTo('#gate .bracket',{opacity:0,x:(i)=>[5,-5,5,-5][i],y:(i)=>[5,5,-5,-5][i]},
+    {opacity:1,x:0,y:0,duration:Q,stagger:.08,delay:.2});
+  trigWave(0.5,0.5,0.1);
+}
+
+function gateType(ch){
+  if(pw.length>=12) return;
+  pw+=ch;
+  const dots=document.getElementById('gate-dots');
+  const s=document.createElement('span');
+  s.textContent='●';
+  s.style.cssText='display:inline-block;font-size:15px;vertical-align:6px;margin:0 5px;color:var(--foreground);opacity:0;transform:translateY(8px)';
+  dots.appendChild(s);
+  gsap.to(s,{opacity:1,y:0,duration:.3,ease:'premium'});
+  document.querySelector('#gate-rule i').style.width=(pw.length/12*100)+'%';
+  trigWave(0.5,0.51,0.08);
+}
+function gateBack(){
+  if(!pw) return;
+  pw=pw.slice(0,-1);
+  const dots=document.getElementById('gate-dots');
+  if(dots.lastChild) dots.removeChild(dots.lastChild);
+  document.querySelector('#gate-rule i').style.width=(pw.length/12*100)+'%';
+}
+function gateSubmit(){
+  const rule=document.getElementById('gate-rule');
+  if(pw.length<4){
+    rule.classList.add('err');
+    document.querySelector('.g-title').classList.add('shaking');
+    document.getElementById('gate-hint').textContent='口令至少 4 位 · 原型演示可输任意口令';
+    setTimeout(()=>{rule.classList.remove('err');document.querySelector('.g-title').classList.remove('shaking');},500);
+    return;
+  }
+  phase='boards';
+  document.getElementById('gate-state').textContent='Unlocked';
+  document.getElementById('gate-state').style.color='var(--primary)';
+  gsap.to(boost,{v:.7,duration:.5,ease:'power2.in'});
+  gsap.to(boost,{v:0,duration:1.6,ease:'premium',delay:.55});
+  trigWave(0.5,0.5,0.16);
+  gsap.to(gateEl,{opacity:0,duration:.6,ease:'premiumOut',delay:.35,onComplete(){
+    gateEl.style.visibility='hidden';
+    enterBoards();
+  }});
+}
+
+function enterBoards(){
+  sweepOnce();
+  boardsEl.style.visibility='visible';
+  gsap.to('#boards .frame-title',{opacity:1,duration:S*0.7});
+  document.querySelectorAll('#boards .bp').forEach((c,i)=>{
+    gsap.fromTo(c,{opacity:0,y:26},
+      {opacity:1,y:0,duration:S*0.7,ease:'premium',delay:.15+i*0.14,
+       onStart(){trigWave(0.15+i*0.175,0.5,0.08);}});
+  });
+  gsap.to('#boards-hint',{opacity:1,duration:Q,delay:1.1});
+}
+
+const BOARD_STATUS=['星河国际项目 · 进行中','数据基地 · 640 篇受管','共创营地 · 22 项技能在编','协作平台 · 4 名成员','管理驾驶舱 · 只读'];
+function enterApp(bIdx){
+  if(phase==='app') return;
+  phase='app';
+  gsap.to(boardsEl,{opacity:1,duration:.01});
+  gsap.to(boardsEl,{opacity:0,duration:.55,ease:'premiumOut',onComplete(){
+    boardsEl.style.visibility='hidden';
+    sweepOnce();
+    gsap.to(horizonY,{v:0.615,duration:1.4,ease:'premium'});   /* 海平线抬到 HERO 底 */
+    gsap.to(energy,{v:0.18,duration:1.8,ease:'premium'});      /* 深水静场(晕动症红线) */
+    appEl.classList.add('on');
+    gsap.fromTo('#app-nav',{y:-46},{y:0,duration:.7,ease:'premium'});
+    gsap.fromTo('#app-status',{y:30},{y:0,duration:.7,ease:'premium'});
+    switchBoard(bIdx,true);
+  }});
+}
+
+let curBoard=-1;
+function switchBoard(i,first){
+  if(i===curBoard) return;
+  curBoard=i;
+  document.querySelectorAll('#app-nav .tab').forEach((t,j)=>t.classList.toggle('on',j===i));
+  document.querySelectorAll('.board').forEach((b,j)=>b.classList.toggle('on',j===i));
+  document.getElementById('st-left').textContent=BOARD_STATUS[i];
+  if(!first) sweepOnce();
+  trigWave(0.35,0.62,0.07);
+  const b=document.getElementById('b'+i);
+  const mask=b.querySelector('.h-title.mask>span');
+  gsap.fromTo(mask,{y:'112%'},{y:0,duration:.85,ease:'premium'});
+  gsap.fromTo(b.querySelectorAll('.h-eyebrow,.h-sub,.cmdline'),
+    {opacity:0},{opacity:1,duration:.7,ease:'premium',stagger:.08,delay:.15});
+  gsap.fromTo(b.querySelectorAll('.hstat'),
+    {opacity:0,y:14},{opacity:1,y:0,duration:.7,ease:'premium',stagger:.07,delay:.1});
+  gsap.fromTo(b.querySelectorAll('.gcard'),
+    {opacity:0,y:16},{opacity:1,y:0,duration:.6,ease:'premium',stagger:.06,delay:.2});
+}
+
+document.querySelectorAll('#boards .bp').forEach(p=>{
+  p.addEventListener('click',()=>enterApp(+p.dataset.board));
+});
+document.querySelectorAll('#app-nav .tab').forEach(t=>{
+  t.addEventListener('click',()=>switchBoard(+t.dataset.b,false));
+});
+
+/* ── 控制 ── */
+const barFill=document.querySelector('#bar i');
+function updateBar(){barFill.style.width=(tl.progress()*100)+'%';}
+let playing=false;
+function togglePause(){
+  if(phase!=='film') return;
+  if(!playing){tl.play();}else{tl.pause();}
+  playing=!playing;
+}
+addEventListener('keydown',e=>{
+  if(phase==='film'){
+    if(e.code==='Space'){e.preventDefault();togglePause();}
+    if(e.code==='Escape'){enterGate();}
+    return;
+  }
+  if(phase==='gate'){
+    if(e.key==='Enter'){gateSubmit();return;}
+    if(e.key==='Backspace'){gateBack();return;}
+    if(e.key.length===1&&!e.ctrlKey&&!e.metaKey){gateType(e.key);}
+    return;
+  }
+  if(phase==='boards'){
+    if(e.key==='Enter'){enterApp(0);}
+    return;
+  }
+  if(phase==='app'){
+    const n='12345'.indexOf(e.key);
+    if(n>=0) switchBoard(n,false);
+  }
+});
+
+if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+  enterGate();
+}else{
+  tl.play();playing=true;
+}
+</script>
+</body>
+</html>

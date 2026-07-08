@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>项目中心 · 版面 v2 提案</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Space Grotesk','Noto Sans SC',system-ui,sans-serif;color:#f4f1ea;letter-spacing:-.01em;min-height:100vh;padding:28px 30px 60px;overflow-x:hidden;
+    background:radial-gradient(circle at 18% -6%,rgba(124,92,255,.2),transparent 31%),radial-gradient(circle at 86% 4%,rgba(66,165,255,.12),transparent 28%),radial-gradient(circle at 64% 108%,rgba(215,168,110,.1),transparent 32%),linear-gradient(180deg,#030406 0%,#07080c 44%,#030406 100%)}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);opacity:.5}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:linear-gradient(115deg,transparent 0 38%,rgba(255,255,255,.022) 39% 41%,transparent 42% 100%);opacity:.7}
+  .wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto}
+  .mut{color:#8f96a5}.gold{color:#d7a86e}.cyan{color:#36e6d4}.red{color:#ff5e66}.amber{color:#fdab3d}
+  .ck{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032));transition:.16s}
+  .ck::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--ac,linear-gradient(90deg,#7c5cff,#42a5ff));opacity:.9}
+  .ck::after{content:"";position:absolute;right:-30px;top:-30px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle,var(--gl,rgba(124,92,255,.28)),transparent 68%)}
+  .ck>*{position:relative;z-index:1}
+  .ck:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.4);border-color:rgba(124,92,255,.4)}
+  .ck.flat::before{display:none}
+  /* header */
+  .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .hd h1{font-size:26px;font-weight:700;letter-spacing:-.03em;background:linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .pick{font-size:13px;color:#d8d4cc;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.045);border-radius:12px;padding:7px 12px}
+  .chip{font-size:11.5px;color:#d8d4cc;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);border-radius:8px;padding:3px 9px}
+  .chip.on{color:#c8bcff;border-color:rgba(124,92,255,.5);background:rgba(124,92,255,.16)}
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-bottom:14px}
+  .pulse{padding:20px;display:grid;grid-template-columns:168px 1fr;gap:18px;align-items:center}
+  .gauge{width:168px;height:168px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#7c5cff 0% 62%,rgba(255,255,255,.06) 62% 100%);box-shadow:0 0 46px rgba(124,92,255,.26)}
+  .gauge .in{width:126px;height:126px;border-radius:50%;background:#0a0c12;display:grid;place-items:center;text-align:center;border:1px solid rgba(255,255,255,.08)}
+  .gauge .pct{font-size:38px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  .pulse .nm{font-size:18px;font-weight:700}
+  .pulse .nx{font-size:12px;margin-top:6px}
+  .pulse .mini{display:flex;gap:16px;margin-top:16px;flex-wrap:wrap}
+  .pulse .mini b{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .pulse .mini span{display:block;font-size:11px;color:#8f96a5;margin-top:2px}
+  /* focus */
+  .focus{padding:18px}
+  .focus .ti{font-size:14px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .focus .ti em{font-size:11px;font-style:normal;color:#8f96a5;font-weight:400}
+  .frow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07);cursor:pointer}
+  .frow:first-of-type{border-top:0}
+  .frow .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .frow .t{flex:1;font-size:12.5px;color:#d8d4cc}
+  .frow .n{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+  .frow .go{font-size:11px;color:#8f96a5}
+  /* KPI strip */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:14px 0}
+  .kpi{padding:14px 15px}
+  .kpi .l{font-size:11.5px;color:#8f96a5;display:flex;align-items:center;gap:5px}
+  .kpi .v{margin-top:9px;font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  /* group + jump */
+  .grp{display:flex;align-items:center;gap:10px;margin:22px 0 12px}
+  .grp .bar{width:4px;height:16px;border-radius:2px;background:linear-gradient(180deg,#7c5cff,#42a5ff)}
+  .grp h2{font-size:16px;font-weight:700}.grp .h{font-size:11.5px;color:#8f96a5}.grp .ln{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.1),transparent)}
+  .jump{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 6px}
+  .jump a{font-size:12px;color:#d8d4cc;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);border-radius:99px;padding:5px 12px;text-decoration:none}
+  .jump a:hover{border-color:rgba(124,92,255,.5);color:#c8bcff}
+  /* two col */
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+  .sec{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025);margin-bottom:12px;overflow:hidden}
+  .sech{display:flex;align-items:center;gap:9px;padding:13px 15px;font-size:14px;font-weight:600}
+  .sech .cv{color:#7c5cff}.sech .h{margin-left:auto;font-size:11.5px;color:#8f96a5;font-weight:400}
+  .secb{padding:0 15px 15px;font-size:12px;color:#8f96a5;line-height:1.6}
+  aside .ck{padding:16px;margin-bottom:14px}
+  aside .ti{font-size:14px;font-weight:700;color:#fff;margin-bottom:10px}
+  .li{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:#d8d4cc;padding:6px 0}
+  .li .b{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .li .w{margin-left:auto;font-size:11px;color:#8f96a5}
+  .pill{font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 7px;flex-shrink:0}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+  .tg{font-size:11px;color:#d8d4cc;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:2px 8px}.tg b{color:#8f96a5;font-weight:400;margin-right:4px}
+  .note{font-size:11px;color:#5f6674;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;display:inline-block}
+  @media(max-width:980px){.hero{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>项目中心</h1>
+    <span class="pick">▾ 当前项目 · <b>襄阳示范区投标</b></span>
+    <span class="chip">襄阳</span><span class="chip on">投标冲刺</span><span class="chip">甲方 · 城投</span>
+    <span class="note" style="margin-left:auto">数字为示意 · 仅看版面</span>
+  </div>
+
+  <div class="hero">
+    <div class="ck pulse" style="--ac:linear-gradient(90deg,#7c5cff,#42a5ff)">
+      <div class="gauge"><div class="in"><div><div class="pct">62<span style="font-size:15px;color:#8f96a5">%</span></div><div style="font-size:11px;color:#8f96a5;margin-top:4px">阶段进度</div></div></div></div>
+      <div>
+        <div class="nm">投标冲刺</div>
+        <div class="nx gold">下一节点 · 总图定稿收口 · 今天 22:00</div>
+        <div class="mini">
+          <div><b>128</b><span>文件</span></div>
+          <div><b>14</b><span>会议</span></div>
+          <div><b class="cyan">8</b><span>会议纪要</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="ck focus" style="--ac:#ff5e66;--gl:rgba(255,94,102,.26)">
+      <div class="ti">本周聚焦 <em>需要负责人介入的事（实时聚合，可点跳转）</em></div>
+      <div class="frow"><span class="dot" style="background:#ff5e66;box-shadow:0 0 8px #ff5e66"></span><span class="t">高风险 · 总图逾期</span><span class="n red">3</span><span class="go">查看 ›</span></div>
+      <div class="frow"><span class="dot" style="background:#d7a86e;box-shadow:0 0 8px #d7a86e"></span><span class="t">紧急里程碑 · 襄阳总图定稿</span><span class="n gold">2</span><span class="go">里程碑 ›</span></div>
+      <div class="frow"><span class="dot" style="background:#fdab3d;box-shadow:0 0 8px #fdab3d"></span><span class="t">过期 / 卡住任务</span><span class="n amber">1 / 2</span><span class="go">任务看板 ›</span></div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="ck kpi" style="--ac:linear-gradient(90deg,#7c5cff,#42a5ff)"><div class="l">📄 文件</div><div class="v">128</div></div>
+    <div class="ck kpi" style="--ac:#42a5ff;--gl:rgba(66,165,255,.26)"><div class="l">📅 会议</div><div class="v">14</div></div>
+    <div class="ck kpi" style="--ac:#fdab3d;--gl:rgba(215,168,110,.26)"><div class="l">✓ 待办</div><div class="v amber">23</div></div>
+    <div class="ck kpi" style="--ac:#36e6d4;--gl:rgba(54,230,212,.24)"><div class="l">🔊 纪要</div><div class="v cyan">8</div></div>
+    <div class="ck kpi" style="--ac:#ff5e66;--gl:rgba(255,94,102,.26)"><div class="l">⚠ 风险</div><div class="v red">3</div></div>
+    <div class="ck kpi" style="--ac:linear-gradient(90deg,#7c5cff,#36e6d4)"><div class="l">⟳ 资产</div><div class="v">11</div></div>
+  </div>
+
+  <div class="jump"><span class="mut" style="font-size:11.5px;align-self:center;margin-right:2px">快速跳转：</span><a href="#">会议链路</a><a href="#">任务看板</a><a href="#">项目解读</a><a href="#">智能研判</a></div>
+
+  <div class="cols">
+    <main>
+      <div class="grp"><span class="bar"></span><h2>会议链路</h2><span class="h">腾讯 → 纪要 → 任务看板</span><span class="ln"></span></div>
+      <div class="sec"><div class="sech"><span class="cv">▾</span>腾讯会议<span class="h">一键创建真实会议</span></div><div class="secb">（腾讯会议卡 · 子面板原样）</div></div>
+      <div class="sec"><div class="sech"><span class="cv">▾</span>会议纪要<span class="h">创建 / 上传 / 回流</span></div><div class="secb">（会议纪要交付中心 · 子面板原样）</div></div>
+      <div class="sec"><div class="sech"><span class="cv">▾</span>任务看板<span class="h amber">⚠ 3 · 1 过期 · 2 卡住</span></div><div class="secb">（待办 / 进行中 / 已完成 · 子面板原样）</div></div>
+      <div class="grp"><span class="bar"></span><h2>判断解析</h2><span class="h">AI 解读 + 研判</span><span class="ln"></span></div>
+      <div class="sec"><div class="sech"><span class="cv">▾</span>项目解读<span class="h">A1–A8 一键 AI 解读</span></div><div class="secb">（结构化认知 · 子面板原样）</div></div>
+      <div class="sec"><div class="sech"><span class="cv">▾</span>智能研判<span class="h">总览 / 难点 / 诉求 / 计划 / 提纲</span></div><div class="secb">（前期分析 5 项 · 子面板原样）</div></div>
+      <div class="sec"><div class="sech"><span class="cv">▾</span>阶段拆解<span class="h">16 节点状态机</span></div><div class="secb">（阶段进度 · 子面板原样）</div></div>
+    </main>
+    <aside>
+      <div class="ck"><div class="ti">下一步 · 里程碑</div>
+        <div class="li"><span class="b" style="background:#ff5e66;box-shadow:0 0 8px #ff5e66"></span>总图定稿收口<span class="w">王工 · 今天</span></div>
+        <div class="li"><span class="b" style="background:#d7a86e;box-shadow:0 0 8px #d7a86e"></span>三层平面评审<span class="w">陈工 · 6/30</span></div>
+        <div class="li"><span class="b" style="background:#d7a86e;box-shadow:0 0 8px #d7a86e"></span>效果图视角脚本<span class="w">郑工 · 7/2</span></div>
+      </div>
+      <div class="ck"><div class="ti">风险看板 · 可复用资产</div>
+        <div class="li"><span class="pill" style="color:#ff9b9b;border:1px solid rgba(255,94,102,.4);background:rgba(255,94,102,.12)">高</span>投标总图逾期，需今晚收口</div>
+        <div class="li"><span class="pill" style="color:#e2c07a;border:1px solid rgba(215,168,110,.4);background:rgba(215,168,110,.12)">中</span>效果图资产深度不足</div>
+        <div class="tags"><span class="tg"><b>类型学</b>抬板架空</span><span class="tg"><b>竞品</b>悬挑会所</span><span class="tg"><b>口径</b>要高级感</span></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="grp"><span class="bar"></span><h2>资料</h2><span class="h">读取 / 清理归数据基地 · 此处仅本项目入口</span><span class="ln"></span></div>
+  <div class="sec"><div class="sech"><span class="cv" style="color:#5f6674">▸</span>项目文件<span class="h">拖拽 / 选择上传</span></div></div>
+  <div class="sec"><div class="sech"><span class="cv" style="color:#5f6674">▸</span>项目目录 · 读取与安全清理<span class="h">默认折叠</span></div></div>
+</div>
+</body>
+</html>

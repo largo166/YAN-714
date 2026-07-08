@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<!--
+  ⚠ 旧静态 MOCK（已废弃）：本文件是「专家会诊」最早的静态设计稿，里面的数字（78分/¥0.13/75%）是写死的假数据。
+  真实实现已由 React 组件 frontend/src/pages/MoaReviewPanel.tsx 取代（提交 ec7534a 起）。
+  保留仅供历史参考；后续统一清理时可删。请勿当作当前能力或真实数据。
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【旧静态MOCK·已被React取代】ROM-AI 方案评审</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background:#0f1013; color:#e2e0da; }
+
+:root {
+  --bg-deep: #0f1013;
+  --bg-surface: #1a1c22;
+  --bg-card: #20232b;
+  --bg-card-hover: #272a34;
+  --border: #2c2f3a;
+  --border-light: #3a3d4a;
+  --text-primary: #e2e0da;
+  --text-secondary: #8a8790;
+  --text-tertiary: #5a5760;
+  --accent-gold: #c9a96e;
+  --accent-gold-dim: rgba(201,169,110,0.15);
+  --accent-gold-glow: rgba(201,169,110,0.3);
+  --accent-blue: #5a9fd4;
+  --accent-green: #6b9e75;
+  --accent-orange: #c98a4e;
+  --accent-red: #c76b6b;
+  --status-pass: var(--accent-green);
+  --status-fail: var(--accent-red);
+  --status-warning: var(--accent-orange);
+}
+
+.container { max-width:1200px; margin:0 auto; padding:32px; }
+
+/* Header */
+.page-header { margin-bottom:24px; }
+.page-title { font-size:22px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:12px; }
+.badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:500; background:var(--accent-gold-dim); color:var(--accent-gold); }
+.page-subtitle { font-size:13px; color:var(--text-secondary); margin-top:6px; }
+
+/* Top Stats Bar */
+.stats-bar { display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom:24px; }
+
+.stat-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px;
+  transition:all 0.2s;
+}
+.stat-card:hover { border-color:var(--border-light); transform:translateY(-2px); }
+
+.stat-label { font-size:11px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:8px; }
+.stat-value { font-size:32px; font-weight:600; color:var(--text-primary); line-height:1; }
+.stat-value.score-high { color:var(--accent-green); }
+.stat-value.score-medium { color:var(--accent-orange); }
+.stat-value.score-low { color:var(--accent-red); }
+
+.stat-sub { font-size:12px; color:var(--text-secondary); margin-top:8px; }
+
+/* Expert Panel */
+.expert-panel { margin-bottom:24px; }
+.section-title { font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+.expert-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
+
+.expert-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px;
+  position:relative; transition:all 0.2s;
+}
+.expert-card:hover { border-color:var(--accent-gold); }
+.expert-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:12px 12px 0 0; opacity:0.5;
+}
+.expert-card.function::before { background:var(--accent-blue); }
+.expert-card.client::before { background:var(--accent-gold); }
+.expert-card.cost::before { background:var(--accent-green); }
+
+.expert-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.expert-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; }
+.expert-avatar.function { background:rgba(90,159,212,0.2); color:var(--accent-blue); }
+.expert-avatar.client { background:var(--accent-gold-dim); color:var(--accent-gold); }
+.expert-avatar.cost { background:rgba(107,158,117,0.2); color:var(--accent-green); }
+.expert-name { font-size:14px; font-weight:600; color:var(--text-primary); }
+.expert-model { font-size:11px; color:var(--text-tertiary); }
+.expert-meta { font-size:11px; color:var(--text-tertiary); margin-left:auto; }
+
+.expert-issues { margin-top:8px; }
+.issue-item {
+  padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-secondary); line-height:1.5;
+}
+.issue-item:last-child { border-bottom:none; }
+.issue-severity { display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; font-weight:500; margin-right:6px; }
+.issue-severity.high { background:rgba(199,107,107,0.15); color:var(--accent-red); }
+.issue-severity.medium { background:rgba(201,169,110,0.15); color:var(--accent-gold); }
+.issue-severity.low { background:rgba(90,159,212,0.15); color:var(--accent-blue); }
+
+.expert-status { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-tertiary); }
+
+/* Checklist */
+.checklist-panel { margin-bottom:24px; }
+
+.checklist-category { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; margin-bottom:12px; overflow:hidden; }
+.checklist-category:hover { border-color:var(--border-light); }
+
+.category-header {
+  padding:14px 20px; display:flex; align-items:center; gap:12px; cursor:pointer;
+}
+.category-header:hover { background:var(--bg-card-hover); }
+
+.category-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.category-status.pass { background:var(--accent-green); box-shadow:0 0 8px rgba(107,158,117,0.4); }
+.category-status.warning { background:var(--accent-orange); box-shadow:0 0 8px rgba(201,138,78,0.4); }
+.category-status.fail { background:var(--accent-red); box-shadow:0 0 8px rgba(199,107,107,0.4); }
+
+.category-name { font-size:14px; font-weight:600; color:var(--text-primary); flex:1; }
+.category-progress { font-size:12px; color:var(--text-tertiary); }
+.category-progress span { color:var(--text-primary); font-weight:500; }
+
+.category-items { padding:0 20px 16px; }
+.item-row {
+  display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);
+}
+.item-row:last-child { border-bottom:none; }
+
+.item-check { width:20px; height:20px; border-radius:50%; border:2px solid var(--border-light); flex-shrink:0; margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:10px; }
+.item-check.pass { border-color:var(--accent-green); background:rgba(107,158,117,0.1); color:var(--accent-green); }
+.item-check.fail { border-color:var(--accent-red); background:rgba(199,107,107,0.1); color:var(--accent-red); }
+.item-check.warning { border-color:var(--accent-orange); background:rgba(201,138,78,0.1); color:var(--accent-orange); }
+
+.item-content { flex:1; }
+.item-title { font-size:13px; color:var(--text-primary); font-weight:500; }
+.item-note { font-size:12px; color:var(--text-secondary); margin-top:2px; line-height:1.5; }
+.item-meta { font-size:11px; color:var(--text-tertiary); margin-top:4px; display:flex; gap:12px; }
+.item-meta span { display:flex; align-items:center; gap:4px; }
+.item-expert { color:var(--accent-gold); }
+
+.item-action { padding:4px 10px; border-radius:6px; font-size:11px; color:var(--accent-gold); border:1px solid var(--accent-gold-dim); background:transparent; cursor:pointer; transition:all 0.2s; flex-shrink:0; }
+.item-action:hover { background:var(--accent-gold-dim); }
+
+/* Conflict Section */
+.conflict-panel { margin-bottom:24px; }
+.conflict-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px;
+  border-left:3px solid var(--accent-orange);
+}
+.conflict-title { font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.conflict-title::before { content:'⚠️'; font-size:14px; }
+
+.conflict-views { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-bottom:12px; }
+.conflict-view { padding:10px; border-radius:8px; background:var(--bg-surface); font-size:12px; color:var(--text-secondary); line-height:1.5; }
+.conflict-view strong { color:var(--text-primary); display:block; margin-bottom:4px; }
+
+.conflict-resolution { padding:10px; border-radius:8px; background:rgba(201,169,110,0.08); font-size:12px; color:var(--accent-gold); line-height:1.5; }
+.conflict-resolution strong { display:block; margin-bottom:4px; }
+
+/* Actions */
+.action-panel { display:flex; gap:12px; padding:16px; background:var(--bg-surface); border-radius:12px; border:1px solid var(--border); }
+
+.btn { padding:10px 20px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; border:none; transition:all 0.2s; }
+
+.btn-primary { background:linear-gradient(135deg, var(--accent-gold), #a08a55); color:#0f1013; font-weight:600; }
+.btn-primary:hover { box-shadow:0 0 16px var(--accent-gold-glow); transform:translateY(-1px); }
+
+.btn-ghost { background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--bg-card-hover); color:var(--text-primary); }
+
+.btn-success { background:rgba(107,158,117,0.2); color:var(--accent-green); border:1px solid rgba(107,158,117,0.3); }
+.btn-success:hover { background:rgba(107,158,117,0.3); }
+
+.btn-danger { background:rgba(199,107,107,0.2); color:var(--accent-red); border:1px solid rgba(199,107,107,0.3); }
+.btn-danger:hover { background:rgba(199,107,107,0.3); }
+
+/* Cost info */
+.cost-info { font-size:11px; color:var(--text-tertiary); margin-left:auto; display:flex; align-items:center; gap:12px; }
+.cost-info span { display:flex; align-items:center; gap:4px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .expert-grid { grid-template-columns: 1fr; }
+  .conflict-views { grid-template-columns: 1fr; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="page-title">
+      方案评审报告
+      <span class="badge">MoA 审核模式</span>
+      <span class="badge" style="background:rgba(90,159,212,0.15);color:var(--accent-blue);">3位专家</span>
+    </div>
+    <div class="page-subtitle">重庆启元示范区 · 概念设计阶段 · 2026-06-29</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">整体评分</div>
+      <div class="stat-value score-medium">78</div>
+      <div class="stat-sub">满分 100 · 中等风险</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">风险等级</div>
+      <div class="stat-value score-medium" style="font-size:20px;">Medium</div>
+      <div class="stat-sub">3项需关注 · 2项不通过</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">通过率</div>
+      <div class="stat-value score-medium">75%</div>
+      <div class="stat-sub">18项通过 · 6项未通过</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">评审成本</div>
+      <div class="stat-value" style="font-size:20px;">¥0.13</div>
+      <div class="stat-sub">36K tokens · 8.2s</div>
+    </div>
+  </div>
+
+  <!-- Expert Panel -->
+  <div class="expert-panel">
+    <div class="section-title">👥 专家意见摘要</div>
+    <div class="expert-grid">
+      <div class="expert-card function">
+        <div class="expert-header">
+          <div class="expert-avatar function">功</div>
+          <div>
+            <div class="expert-name">功能维度专家</div>
+            <div class="expert-model">deepseek-chat</div>
+          </div>
+          <div class="expert-meta">1,847ms · ¥0.011</div>
+        </div>
+        <div class="expert-issues">
+          <div class="issue-item"><span class="issue-severity high">高</span>疏散距离超标，核心筒至最远点 38m，规范要求 30m</div>
+          <div class="issue-item"><span class="issue-severity medium">中</span>后勤流线与客用流线有交叉，建议分设</div>
+          <div class="issue-item"><span class="issue-severity low">低</span>无障碍坡道坡度略陡，建议放缓至 1:12</div>
+        </div>
+        <div class="expert-status">5项问题 · 2项高严重</div>
+      </div>
+
+      <div class="expert-card client">
+        <div class="expert-header">
+          <div class="expert-avatar client">甲</div>
+          <div>
+            <div class="expert-name">甲方维度专家</div>
+            <div class="expert-model">deepseek-chat</div>
+          </div>
+          <div class="expert-meta">1,623ms · ¥0.011</div>
+        </div>
+        <div class="expert-issues">
+          <div class="issue-item"><span class="issue-severity high">高</span>投资回报测算未回应，甲方明确要求 ROI ≥ 15%</div>
+          <div class="issue-item"><span class="issue-severity medium">中</span>产品溢价逻辑不够清晰，需补充差异化卖点</div>
+          <div class="issue-item"><span class="issue-severity low">低</span>汇报口径偏技术导向，建议增加商业价值页</div>
+        </div>
+        <div class="expert-status">3项问题 · 1项高严重</div>
+      </div>
+
+      <div class="expert-card cost">
+        <div class="expert-header">
+          <div class="expert-avatar cost">造</div>
+          <div>
+            <div class="expert-name">成本维度专家</div>
+            <div class="expert-model">deepseek-chat</div>
+          </div>
+          <div class="expert-meta">1,912ms · ¥0.011</div>
+        </div>
+        <div class="expert-issues">
+          <div class="issue-item"><span class="issue-severity high">高</span>幕墙弧形玻璃单方造价增加 30%，可能超标</div>
+          <div class="issue-item"><span class="issue-severity medium">中</span>机电设备层高度不足，需增加 0.5m</div>
+          <div class="issue-item"><span class="issue-severity low">低</span>结构转换层可优化，减少 15% 钢材用量</div>
+        </div>
+        <div class="expert-status">4项问题 · 2项高严重</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="checklist-panel">
+    <div class="section-title">📋 检查清单（6维度）</div>
+
+    <!-- 功能匹配 -->
+    <div class="checklist-category">
+      <div class="category-header" onclick="toggleCategory(this)">
+        <div class="category-status warning"></div>
+        <div class="category-name">功能匹配</div>
+        <div class="category-progress">5/10 <span>通过</span></div>
+      </div>
+      <div class="category-items">
+        <div class="item-row">
+          <div class="item-check warning">!</div>
+          <div class="item-content">
+            <div class="item-title">功能布局合理性</div>
+            <div class="item-note">动静分区合理，但后勤流线与客用流线有交叉。建议将后勤入口调整至建筑北侧。</div>
+            <div class="item-meta"><span class="item-expert">👤 功能维度专家</span><span>严重度: 中等</span></div>
+          </div>
+          <button class="item-action">生成任务</button>
+        </div>
+        <div class="item-row">
+          <div class="item-check fail">✕</div>
+          <div class="item-content">
+            <div class="item-title">空间流线效率</div>
+            <div class="item-note">疏散距离超标：核心筒至最远点 38m，规范要求 30m。需增设疏散楼梯或调整核心筒位置。</div>
+            <div class="item-meta"><span class="item-expert">👤 功能维度专家</span><span>严重度: 高</span></div>
+          </div>
+          <button class="item-action">生成任务</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 多专业协调 -->
+    <div class="checklist-category">
+      <div class="category-header" onclick="toggleCategory(this)">
+        <div class="category-status pass"></div>
+        <div class="category-name">多专业协调</div>
+        <div class="category-progress">7/10 <span>通过</span></div>
+      </div>
+      <div class="category-items">
+        <div class="item-row">
+          <div class="item-check pass">✓</div>
+          <div class="item-content">
+            <div class="item-title">结构体系可行性</div>
+            <div class="item-note">框架-剪力墙结构合理，转换层位置恰当。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据支撑 -->
+    <div class="checklist-category">
+      <div class="category-header" onclick="toggleCategory(this)">
+        <div class="category-status pass"></div>
+        <div class="category-name">数据支撑</div>
+        <div class="category-progress">8/10 <span>通过</span></div>
+      </div>
+      <div class="category-items">
+        <div class="item-row">
+          <div class="item-check pass">✓</div>
+          <div class="item-content">
+            <div class="item-title">日照分析合规</div>
+            <div class="item-note">大寒日日照时数满足规范要求，未对北侧住宅产生遮挡。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日照采光 -->
+    <div class="checklist-category">
+      <div class="category-header" onclick="toggleCategory(this)">
+        <div class="category-status pass"></div>
+        <div class="category-name">日照采光</div>
+        <div class="category-progress">7/10 <span>通过</span></div>
+      </div>
+      <div class="category-items">
+        <div class="item-row">
+          <div class="item-check pass">✓</div>
+          <div class="item-content">
+            <div class="item-title">采光系数满足</div>
+            <div class="item-note">主要功能房间采光系数满足《建筑采光设计标准》GB 50033。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 城市关系 -->
+    <div class="checklist-category">
+      <div class="category-header" onclick="toggleCategory(this)">
+        <div class="category-status warning"></div>
+        <div class="category-name">城市关系</div>
+        <div class="category-progress">6/10 <span>通过</span></div>
+      </div>
+      <div class="category-items">
+        <div class="item-row">
+          <div class="item-check warning">!</div>
+          <div class="item-content">
+            <div class="item-title">街道界面连续性</div>
+            <div class="item-note">底层商业界面与周边街区衔接不够连续，建议增加骑楼或檐廊设计。</div>
+            <div class="item-meta"><span class="item-expert">👤 功能维度专家</span><span>严重度: 中</span></div>
+          </div>
+          <button class="item-action">生成任务</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 造价控制 -->
+    <div class="checklist-category">
+      <div class="category-header" onclick="toggleCategory(this)">
+        <div class="category-status fail"></div>
+        <div class="category-name">造价控制</div>
+        <div class="category-progress">5/10 <span>通过</span></div>
+      </div>
+      <div class="category-items">
+        <div class="item-row">
+          <div class="item-check fail">✕</div>
+          <div class="item-content">
+            <div class="item-title">单方造价控制</div>
+            <div class="item-note">幕墙弧形玻璃单方造价增加 30%，预计超出限额设计 8%。建议改为折线玻璃或优化板块划分。</div>
+            <div class="item-meta"><span class="item-expert">👤 成本维度专家</span><span>严重度: 高</span></div>
+          </div>
+          <button class="item-action">生成任务</button>
+        </div>
+        <div class="item-row">
+          <div class="item-check warning">!</div>
+          <div class="item-content">
+            <div class="item-title">机电设备空间</div>
+            <div class="item-note">设备层净高不足，需增加 0.5m 以满足风管安装要求。</div>
+            <div class="item-meta"><span class="item-expert">👤 成本维度专家</span><span>严重度: 中</span></div>
+          </div>
+          <button class="item-action">生成任务</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conflict -->
+  <div class="conflict-panel">
+    <div class="section-title">⚠️ 冲突意见（需平衡）</div>
+    <div class="conflict-card">
+      <div class="conflict-title">立面弧形玻璃</div>
+      <div class="conflict-views">
+        <div class="conflict-view">
+          <strong>功能维度专家</strong>
+          弧形玻璃提升空间品质，创造独特的室内光影效果，符合高端住宅定位。甲方汇报中已获认可。
+        </div>
+        <div class="conflict-view">
+          <strong>成本维度专家</strong>
+          弧形玻璃幕墙单方造价增加 30%，预计使外立面成本从 1200元/㎡ 增至 1560元/㎡，整体单方造价可能超出限额 8%。
+        </div>
+      </div>
+      <div class="conflict-resolution">
+        <strong>💡 聚合建议</strong>
+        采用折线玻璃替代纯弧形，每块玻璃保持平面但板块间形成折线转折。这样可在保持视觉动感的同时，将幕墙造价控制在限额内（预计增加 12% 而非 30%）。建议尽快与幕墙顾问确认可行性。
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="action-panel">
+    <button class="btn btn-success">✓ 确认评审结果</button>
+    <button class="btn btn-primary">🔄 重新评审</button>
+    <button class="btn btn-ghost">📄 导出报告</button>
+    <button class="btn btn-ghost">📊 查看历史</button>
+    <div class="cost-info">
+      <span>💰 ¥0.13</span>
+      <span>⏱️ 8.2s</span>
+      <span>🔤 36K tokens</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleCategory(header) {
+  const items = header.nextElementSibling;
+  if (items.style.display === 'none') {
+    items.style.display = 'block';
+  } else {
+    items.style.display = 'none';
+  }
+}
+</script>
+
+</body>
+</html>

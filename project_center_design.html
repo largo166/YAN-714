@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROM-AI 项目中心 — 设计稿</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background:#0f1013; color:#e2e0da; overflow:hidden; }
+
+:root {
+  --bg-deep: #0f1013;
+  --bg-surface: #1a1c22;
+  --bg-card: #20232b;
+  --bg-card-hover: #272a34;
+  --bg-elevated: #2a2d38;
+  --border: #2c2f3a;
+  --border-light: #3a3d4a;
+  --text-primary: #e2e0da;
+  --text-secondary: #8a8790;
+  --text-tertiary: #5a5760;
+  --accent-gold: #c9a96e;
+  --accent-gold-dim: rgba(201,169,110,0.15);
+  --accent-gold-glow: rgba(201,169,110,0.3);
+  --accent-blue: #5a9fd4;
+  --accent-green: #6b9e75;
+  --accent-orange: #c98a4e;
+  --accent-red: #c76b6b;
+  --status-active: var(--accent-gold);
+  --status-done: var(--accent-green);
+  --status-risk: var(--accent-red);
+  --status-wait: var(--accent-orange);
+}
+
+/* ===== 左侧 Sidebar ===== */
+.sidebar {
+  position:fixed; left:0; top:0; bottom:0; width:56px;
+  background: var(--bg-deep);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column; align-items:center;
+  padding:16px 0; z-index:100;
+}
+
+.logo-icon {
+  width:28px; height:28px; border-radius:6px;
+  background: linear-gradient(135deg, var(--accent-gold), #8a7652);
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:700; color:#0f1013; margin-bottom:28px;
+}
+
+.nav-item {
+  width:40px; height:40px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  color: var(--text-tertiary); cursor:pointer; margin-bottom:4px;
+  transition: all 0.2s ease; position:relative;
+}
+
+.nav-item:hover { background: var(--bg-card); color: var(--text-primary); }
+
+.nav-item.active { background: var(--accent-gold-dim); color: var(--accent-gold); }
+
+.nav-item.active::before {
+  content:''; position:absolute; left:-8px; top:50%; transform:translateY(-50%);
+  width:3px; height:20px; background: var(--accent-gold); border-radius:0 2px 2px 0;
+}
+
+.nav-icon { font-size:18px; }
+
+.nav-badge {
+  position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%;
+  background: var(--accent-gold); border:2px solid var(--bg-deep);
+}
+
+.user-avatar {
+  width:32px; height:32px; border-radius:50%;
+  background: linear-gradient(135deg, #4a5a6a, #3a4a5a);
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; color: var(--text-secondary); margin-top:auto;
+  border:2px solid var(--border);
+}
+
+/* ===== 主内容区 ===== */
+.main { margin-left:56px; height:100vh; overflow-y:auto; overflow-x:hidden; }
+
+.header {
+  padding:20px 32px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  background: var(--bg-surface);
+  position:sticky; top:0; z-index:10;
+}
+
+.header-left { display:flex; align-items:center; gap:20px; }
+
+.page-title { font-size:22px; font-weight:600; color: var(--text-primary); letter-spacing:0.02em; }
+
+.breadcrumb { font-size:12px; color: var(--text-tertiary); }
+
+.breadcrumb span { color: var(--text-secondary); }
+
+.header-right { display:flex; align-items:center; gap:12px; }
+
+.search-box {
+  width:260px; height:36px; border-radius:8px; border:1px solid var(--border);
+  background: var(--bg-card); padding:0 14px; display:flex; align-items:center; gap:8px;
+  color: var(--text-tertiary); font-size:13px; transition: border 0.2s;
+}
+
+.search-box:hover { border-color: var(--border-light); }
+
+.btn {
+  height:36px; padding:0 18px; border-radius:8px; border:none;
+  font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-gold), #a08a55);
+  color: #0f1013; font-weight:600;
+}
+
+.btn-primary:hover { box-shadow: 0 0 16px var(--accent-gold-glow); transform: translateY(-1px); }
+
+.btn-ghost { background: var(--bg-card); color: var(--text-secondary); border:1px solid var(--border); }
+
+.btn-ghost:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+/* ===== 仪表盘区域 ===== */
+.dashboard { padding:24px 32px; display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; }
+
+.kpi-card {
+  background: var(--bg-card); border-radius:12px; border:1px solid var(--border);
+  padding:20px; transition: all 0.2s ease; position:relative; overflow:hidden;
+}
+
+.kpi-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
+
+.kpi-card::after {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+  opacity:0; transition: opacity 0.3s;
+}
+
+.kpi-card:hover::after { opacity:0.3; }
+
+.kpi-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+
+.kpi-label { font-size:11px; color: var(--text-tertiary); text-transform:uppercase; letter-spacing:0.1em; }
+
+.kpi-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+
+.kpi-icon.gold { background: var(--accent-gold-dim); color: var(--accent-gold); }
+.kpi-icon.blue { background: rgba(90,159,212,0.15); color: var(--accent-blue); }
+.kpi-icon.green { background: rgba(107,158,117,0.15); color: var(--accent-green); }
+.kpi-icon.red { background: rgba(199,107,107,0.15); color: var(--accent-red); }
+
+.kpi-value { font-size:28px; font-weight:600; color: var(--text-primary); line-height:1; }
+
+.kpi-sub { margin-top:8px; font-size:12px; color: var(--text-tertiary); display:flex; align-items:center; gap:6px; }
+
+.kpi-trend { color: var(--accent-green); font-size:11px; }
+
+/* ===== 项目区域 ===== */
+.projects-section { padding:0 32px 24px; }
+
+.section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+
+.section-title { font-size:15px; font-weight:600; color: var(--text-primary); }
+
+.section-tabs { display:flex; gap:4px; }
+
+.tab { padding:6px 14px; border-radius:6px; font-size:12px; color: var(--text-tertiary); cursor:pointer; transition: all 0.2s; border:none; background:transparent; }
+
+.tab:hover { color: var(--text-primary); }
+
+.tab.active { background: var(--accent-gold-dim); color: var(--accent-gold); font-weight:500; }
+
+/* ===== 项目卡片矩阵 ===== */
+.project-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px; }
+
+.project-card {
+  background: var(--bg-card); border-radius:12px; border:1px solid var(--border);
+  padding:20px; transition: all 0.25s ease; position:relative; cursor:pointer;
+}
+
+.project-card:hover { border-color: var(--border-light); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+
+.project-card::before {
+  content:''; position:absolute; top:0; left:20px; right:20px; height:1px;
+  background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+  opacity:0; transition: opacity 0.3s;
+}
+
+.project-card:hover::before { opacity:0.4; }
+
+.card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
+
+.project-name { font-size:15px; font-weight:600; color: var(--text-primary); line-height:1.4; }
+
+.project-meta { font-size:12px; color: var(--text-tertiary); margin-top:4px; }
+
+.status-badge {
+  padding:3px 10px; border-radius:20px; font-size:11px; font-weight:500;
+  display:flex; align-items:center; gap:4px;
+}
+
+.status-badge.active { background: var(--accent-gold-dim); color: var(--accent-gold); }
+
+.status-badge.done { background: rgba(107,158,117,0.15); color: var(--accent-green); }
+
+.status-badge.risk { background: rgba(199,107,107,0.15); color: var(--accent-red); }
+
+.status-dot { width:6px; height:6px; border-radius:50%; }
+
+/* 认知进度条 */
+.cognition-progress { margin-bottom:16px; }
+
+.cognition-label { font-size:11px; color: var(--text-tertiary); margin-bottom:8px; display:flex; justify-content:space-between; }
+
+.cognition-label span { color: var(--accent-gold); }
+
+.progress-bar {
+  height:4px; border-radius:2px; background: var(--bg-elevated); overflow:hidden; display:flex; gap:2px;
+}
+
+.progress-segment { height:100%; border-radius:1px; transition: width 0.5s ease; }
+
+.progress-segment.filled { background: var(--accent-gold); }
+.progress-segment.empty { background: var(--bg-elevated); }
+
+.progress-segment.filled:nth-child(3) { background: var(--accent-blue); }
+.progress-segment.filled:nth-child(5) { background: var(--accent-green); }
+
+/* 卡片中部信息 */
+.card-body { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:16px; }
+
+.card-metric { text-align:center; }
+
+.card-metric-value { font-size:18px; font-weight:600; color: var(--text-primary); }
+
+.card-metric-label { font-size:11px; color: var(--text-tertiary); margin-top:2px; }
+
+/* 最近活动 */
+.card-footer { border-top:1px solid var(--border); padding-top:12px; }
+
+.recent-activity { font-size:12px; color: var(--text-secondary); line-height:1.5; }
+
+.recent-activity strong { color: var(--accent-gold); font-weight:500; }
+
+.recent-activity time { color: var(--text-tertiary); font-size:11px; }
+
+/* 跨项目链接标签 */
+.card-links { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+
+.link-tag {
+  padding:3px 8px; border-radius:4px; font-size:11px; color: var(--text-tertiary);
+  background: var(--bg-elevated); border:1px solid var(--border); cursor:pointer; transition: all 0.2s;
+}
+
+.link-tag:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+
+/* ===== 右侧边栏（最近动态） ===== */
+.right-panel {
+  position:fixed; right:0; top:0; bottom:0; width:280px;
+  background: var(--bg-surface); border-left:1px solid var(--border);
+  padding:20px; overflow-y:auto; z-index:50;
+}
+
+.panel-title { font-size:13px; font-weight:600; color: var(--text-primary); margin-bottom:16px; text-transform:uppercase; letter-spacing:0.08em; }
+
+.activity-item { display:flex; gap:12px; margin-bottom:16px; position:relative; }
+
+.activity-item::before {
+  content:''; position:absolute; left:14px; top:28px; bottom:-16px; width:1px;
+  background: var(--border);
+}
+
+.activity-avatar {
+  width:28px; height:28px; border-radius:50%; flex-shrink:0;
+  background: linear-gradient(135deg, #4a5a6a, #3a4a5a);
+  display:flex; align-items:center; justify-content:center; font-size:10px; color: var(--text-secondary);
+  border:2px solid var(--bg-surface); z-index:1;
+}
+
+.activity-avatar.gold { background: linear-gradient(135deg, var(--accent-gold), #8a7652); color: #0f1013; }
+
+.activity-content { flex:1; }
+
+.activity-text { font-size:12px; color: var(--text-secondary); line-height:1.5; }
+
+.activity-text strong { color: var(--text-primary); font-weight:500; }
+
+.activity-time { font-size:11px; color: var(--text-tertiary); margin-top:2px; }
+
+.activity-highlight { color: var(--accent-gold); }
+
+/* 待办快速入口 */
+.todo-section { margin-top:24px; padding-top:24px; border-top:1px solid var(--border); }
+
+.todo-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+
+.todo-item:last-child { border-bottom:none; }
+
+.todo-check { width:16px; height:16px; border-radius:4px; border:2px solid var(--border-light); flex-shrink:0; cursor:pointer; transition: all 0.2s; }
+
+.todo-check:hover { border-color: var(--accent-gold); }
+
+.todo-text { font-size:12px; color: var(--text-secondary); flex:1; }
+
+.todo-project { font-size:11px; color: var(--text-tertiary); }
+
+.todo-due { font-size:11px; color: var(--accent-red); }
+
+.todo-due.safe { color: var(--accent-green); }
+
+/* 快速操作 */
+.quick-actions { display:flex; gap:8px; margin-top:24px; }
+
+.quick-btn { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); font-size:12px; text-align:center; cursor:pointer; transition: all 0.2s; }
+
+.quick-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); background: var(--bg-card-hover); }
+
+/* ===== 响应式 ===== */
+@media (max-width: 1400px) {
+  .right-panel { display:none; }
+  .dashboard { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .dashboard { grid-template-columns: 1fr; }
+  .project-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== 滚动条美化 ===== */
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* 动画 */
+@keyframes fadeInUp {
+  from { opacity:0; transform:translateY(12px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+.kpi-card { animation: fadeInUp 0.5s ease backwards; }
+
+.kpi-card:nth-child(1) { animation-delay:0.1s; }
+.kpi-card:nth-child(2) { animation-delay:0.2s; }
+.kpi-card:nth-child(3) { animation-delay:0.3s; }
+.kpi-card:nth-child(4) { animation-delay:0.4s; }
+
+.project-card { animation: fadeInUp 0.5s ease backwards; }
+.project-card:nth-child(1) { animation-delay:0.1s; }
+.project-card:nth-child(2) { animation-delay:0.15s; }
+.project-card:nth-child(3) { animation-delay:0.2s; }
+.project-card:nth-child(4) { animation-delay:0.25s; }
+.project-card:nth-child(5) { animation-delay:0.3s; }
+.project-card:nth-child(6) { animation-delay:0.35s; }
+
+</style>
+</head>
+<body>
+
+<!-- 左侧 Sidebar -->
+<nav class="sidebar">
+  <div class="logo-icon">R</div>
+  <div class="nav-item active" title="项目中心">
+    <span class="nav-icon">◆</span>
+  </div>
+  <div class="nav-item" title="数据基地">
+    <span class="nav-icon">◈</span>
+  </div>
+  <div class="nav-item" title="共创营地">
+    <span class="nav-icon">◎</span>
+    <div class="nav-badge"></div>
+  </div>
+  <div class="nav-item" title="协作平台">
+    <span class="nav-icon">◎</span>
+  </div>
+  <div class="nav-item" title="管理驾驶舱">
+    <span class="nav-icon">◉</span>
+  </div>
+  <div class="user-avatar">A</div>
+</nav>
+
+<!-- 主内容区 -->
+<div class="main">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <h1 class="page-title">项目中心</h1>
+      <div class="breadcrumb">proj / <span>项目中心</span></div>
+    </div>
+    <div class="header-right">
+      <div class="search-box">
+        <span>🔍</span> 搜索项目、认知、会议...
+      </div>
+      <button class="btn btn-ghost">⚙ 筛选</button>
+      <button class="btn btn-primary">+ 新建项目</button>
+    </div>
+  </header>
+
+  <!-- Dashboard KPI -->
+  <section class="dashboard">
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">活跃项目</span>
+        <div class="kpi-icon gold">◆</div>
+      </div>
+      <div class="kpi-value">12</div>
+      <div class="kpi-sub">
+        <span class="kpi-trend">↑ 3</span> 较上月
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">本周会议</span>
+        <div class="kpi-icon blue">◎</div>
+      </div>
+      <div class="kpi-value">8</div>
+      <div class="kpi-sub">
+        <span class="kpi-trend">↑ 2</span> 待确认纪要 3
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">待办任务</span>
+        <div class="kpi-icon green">✓</div>
+      </div>
+      <div class="kpi-value">24</div>
+      <div class="kpi-sub">
+        <span style="color:var(--accent-red)">⚠ 5</span> 逾期
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">知识条目</span>
+        <div class="kpi-icon red">◈</div>
+      </div>
+      <div class="kpi-value">67</div>
+      <div class="kpi-sub">
+        <span class="kpi-trend">↑ 12</span> 本月沉淀
+      </div>
+    </div>
+  </section>
+
+  <!-- 项目区域 -->
+  <section class="projects-section">
+    <div class="section-header">
+      <h2 class="section-title">活跃项目</h2>
+      <div class="section-tabs">
+        <button class="tab active">全部</button>
+        <button class="tab">住宅</button>
+        <button class="tab">商业</button>
+        <button class="tab">办公</button>
+        <button class="tab">文化</button>
+      </div>
+    </div>
+
+    <div class="project-grid">
+      <!-- 项目卡片 1 -->
+      <div class="project-card">
+        <div class="card-header">
+          <div>
+            <div class="project-name">重庆启元示范区</div>
+            <div class="project-meta">goa 大象设计 · 住宅 · 12,000㎡</div>
+          </div>
+          <div class="status-badge active">
+            <span class="status-dot" style="background:var(--accent-gold)"></span> 概念设计
+          </div>
+        </div>
+
+        <div class="cognition-progress">
+          <div class="cognition-label">认知进度 <span>5/8</span></div>
+          <div class="progress-bar">
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-metric">
+            <div class="card-metric-value">6</div>
+            <div class="card-metric-label">会议</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">3</div>
+            <div class="card-metric-label">待办</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">8</div>
+            <div class="card-metric-label">认知</div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="recent-activity">
+            <strong>2小时前</strong> 完成方案评审预检，<span class="activity-highlight">3项未通过</span> → 已生成任务
+          </div>
+          <div class="card-links">
+            <span class="link-tag">竞品对标</span>
+            <span class="link-tag">甲方画像</span>
+            <span class="link-tag">知识沉淀</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 项目卡片 2 -->
+      <div class="project-card">
+        <div class="card-header">
+          <div>
+            <div class="project-name">礼贤未来社区</div>
+            <div class="project-meta">gad 杰地设计 · 住宅 · 45,000㎡</div>
+          </div>
+          <div class="status-badge active">
+            <span class="status-dot" style="background:var(--accent-blue)"></span> 方案深化
+          </div>
+        </div>
+
+        <div class="cognition-progress">
+          <div class="cognition-label">认知进度 <span>7/8</span></div>
+          <div class="progress-bar">
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-metric">
+            <div class="card-metric-value">12</div>
+            <div class="card-metric-label">会议</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">5</div>
+            <div class="card-metric-label">待办</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">14</div>
+            <div class="card-metric-label">认知</div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="recent-activity">
+            <strong>昨天</strong> 甲方汇报通过，<span class="activity-highlight">诉求翻译已确认</span>
+          </div>
+          <div class="card-links">
+            <span class="link-tag">规划条件</span>
+            <span class="link-tag">任务闭环</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 项目卡片 3 -->
+      <div class="project-card">
+        <div class="card-header">
+          <div>
+            <div class="project-name">宁波中心大厦</div>
+            <div class="project-meta">gad 杰地设计 · 商业 · 280,000㎡</div>
+          </div>
+          <div class="status-badge done">
+            <span class="status-dot" style="background:var(--accent-green)"></span> 已归档
+          </div>
+        </div>
+
+        <div class="cognition-progress">
+          <div class="cognition-label">认知进度 <span>8/8</span></div>
+          <div class="progress-bar">
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-metric">
+            <div class="card-metric-value">28</div>
+            <div class="card-metric-label">会议</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">0</div>
+            <div class="card-metric-label">待办</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">32</div>
+            <div class="card-metric-label">认知</div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="recent-activity">
+            <strong>3天前</strong> 项目复盘完成，<span class="activity-highlight">12条知识已沉淀</span>
+          </div>
+          <div class="card-links">
+            <span class="link-tag">知识库</span>
+            <span class="link-tag">竞品对标</span>
+            <span class="link-tag">甲方画像</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 项目卡片 4 -->
+      <div class="project-card">
+        <div class="card-header">
+          <div>
+            <div class="project-name">杭州亚运村</div>
+            <div class="project-meta">line+ 建筑 · 住宅/商业 · 180,000㎡</div>
+          </div>
+          <div class="status-badge risk">
+            <span class="status-dot" style="background:var(--accent-red)"></span> 风险
+          </div>
+        </div>
+
+        <div class="cognition-progress">
+          <div class="cognition-label">认知进度 <span>2/8</span></div>
+          <div class="progress-bar">
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-metric">
+            <div class="card-metric-value">2</div>
+            <div class="card-metric-label">会议</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">8</div>
+            <div class="card-metric-label">待办</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">4</div>
+            <div class="card-metric-label">认知</div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="recent-activity">
+            <strong>5天前</strong> 规划条件提取完成，<span class="activity-highlight">⚠ 3项待人工确认</span>
+          </div>
+          <div class="card-links">
+            <span class="link-tag">规划条件</span>
+            <span class="link-tag">任务闭环</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 项目卡片 5 -->
+      <div class="project-card">
+        <div class="card-header">
+          <div>
+            <div class="project-name">直向图书馆</div>
+            <div class="project-meta">直向建筑 · 文化 · 3,500㎡</div>
+          </div>
+          <div class="status-badge active">
+            <span class="status-dot" style="background:var(--accent-green)"></span> 施工图
+          </div>
+        </div>
+
+        <div class="cognition-progress">
+          <div class="cognition-label">认知进度 <span>6/8</span></div>
+          <div class="progress-bar">
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-metric">
+            <div class="card-metric-value">15</div>
+            <div class="card-metric-label">会议</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">2</div>
+            <div class="card-metric-label">待办</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">18</div>
+            <div class="card-metric-label">认知</div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="recent-activity">
+            <strong>1天前</strong> 方案评审预检通过，<span class="activity-highlight">全部18项通过</span>
+          </div>
+          <div class="card-links">
+            <span class="link-tag">评审预检</span>
+            <span class="link-tag">知识沉淀</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 项目卡片 6 -->
+      <div class="project-card">
+        <div class="card-header">
+          <div>
+            <div class="project-name"> MAD 云谷艺术中心</div>
+            <div class="project-meta">MAD 建筑 · 文化 · 28,000㎡</div>
+          </div>
+          <div class="status-badge active">
+            <span class="status-dot" style="background:var(--accent-blue)"></span> 方案设计
+          </div>
+        </div>
+
+        <div class="cognition-progress">
+          <div class="cognition-label">认知进度 <span>4/8</span></div>
+          <div class="progress-bar">
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment filled" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+            <div class="progress-segment empty" style="width:12.5%"></div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-metric">
+            <div class="card-metric-value">4</div>
+            <div class="card-metric-label">会议</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">6</div>
+            <div class="card-metric-label">待办</div>
+          </div>
+          <div class="card-metric">
+            <div class="card-metric-value">10</div>
+            <div class="card-metric-label">认知</div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="recent-activity">
+            <strong>4小时前</strong> 甲方画像已生成，<span class="activity-highlight">决策风格：数据驱动</span>
+          </div>
+          <div class="card-links">
+            <span class="link-tag">甲方画像</span>
+            <span class="link-tag">竞品对标</span>
+            <span class="link-tag">任务闭环</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 右侧边栏 -->
+<aside class="right-panel">
+  <div class="panel-title">最近动态</div>
+
+  <div class="activity-item">
+    <div class="activity-avatar gold">AI</div>
+    <div class="activity-content">
+      <div class="activity-text"><strong>AI 助手</strong> 为 <strong>重庆启元</strong> 生成方案评审预检报告</div>
+      <div class="activity-time">2 小时前</div>
+    </div>
+  </div>
+
+  <div class="activity-item">
+    <div class="activity-avatar">王</div>
+    <div class="activity-content">
+      <div class="activity-text"><strong>王志鹏</strong> 确认了 <strong>礼贤社区</strong> 的诉求翻译</div>
+      <div class="activity-time">3 小时前</div>
+    </div>
+  </div>
+
+  <div class="activity-item">
+    <div class="activity-avatar">严</div>
+    <div class="activity-content">
+      <div class="activity-text"><strong>严硕</strong> 上传了 <strong>宁波中心</strong> 的竞品对标报告</div>
+      <div class="activity-time">5 小时前</div>
+    </div>
+  </div>
+
+  <div class="activity-item">
+    <div class="activity-avatar gold">AI</div>
+    <div class="activity-content">
+      <div class="activity-text"><strong>AI 助手</strong> 从 <strong>宁波中心</strong> 沉淀了 <strong>12 条知识</strong></div>
+      <div class="activity-time">1 天前</div>
+    </div>
+  </div>
+
+  <div class="activity-item">
+    <div class="activity-avatar">李</div>
+    <div class="activity-content">
+      <div class="activity-text"><strong>李想</strong> 在 <strong>杭州亚运村</strong> 添加了 3 个待办</div>
+      <div class="activity-time">2 天前</div>
+    </div>
+  </div>
+
+  <div class="todo-section">
+    <div class="panel-title">我的待办</div>
+
+    <div class="todo-item">
+      <div class="todo-check"></div>
+      <div class="todo-text">确认重庆启元方案评审清单</div>
+      <div class="todo-due">今天</div>
+    </div>
+
+    <div class="todo-item">
+      <div class="todo-check"></div>
+      <div class="todo-text">审核杭州亚运村规划条件</div>
+      <div class="todo-due">今天</div>
+    </div>
+
+    <div class="todo-item">
+      <div class="todo-check"></div>
+      <div class="todo-text">完成 MAD 云谷竞品对标</div>
+      <div class="todo-due safe">明天</div>
+    </div>
+
+    <div class="todo-item">
+      <div class="todo-check"></div>
+      <div class="todo-text">直向图书馆知识沉淀确认</div>
+      <div class="todo-due safe">2天后</div>
+    </div>
+  </div>
+
+  <div class="quick-actions">
+    <div class="quick-btn">📅 日历</div>
+    <div class="quick-btn">📊 报告</div>
+  </div>
+</aside>
+
+</body>
+</html>

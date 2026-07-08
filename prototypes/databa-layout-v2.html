@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据基地 · 版面 v2 提案</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Space Grotesk','Noto Sans SC',system-ui,sans-serif;color:#f4f1ea;letter-spacing:-.01em;min-height:100vh;padding:28px 30px 60px;overflow-x:hidden;
+    background:radial-gradient(circle at 18% -6%,rgba(124,92,255,.2),transparent 31%),radial-gradient(circle at 86% 4%,rgba(66,165,255,.12),transparent 28%),radial-gradient(circle at 64% 108%,rgba(215,168,110,.1),transparent 32%),linear-gradient(180deg,#030406 0%,#07080c 44%,#030406 100%)}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);opacity:.5}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:linear-gradient(115deg,transparent 0 38%,rgba(255,255,255,.022) 39% 41%,transparent 42% 100%);opacity:.7}
+  .wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto}
+  .mut{color:#8f96a5}.gold{color:#d7a86e}.cyan{color:#36e6d4}.green{color:#49d18d}.amber{color:#fdab3d}
+  .ck{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.032));transition:.16s}
+  .ck::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--ac,linear-gradient(90deg,#7c5cff,#42a5ff));opacity:.9}
+  .ck::after{content:"";position:absolute;right:-30px;top:-30px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle,var(--gl,rgba(124,92,255,.28)),transparent 68%)}
+  .ck>*{position:relative;z-index:1}
+  .ck:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.4);border-color:rgba(124,92,255,.4)}
+  h1{font-size:26px;font-weight:700;letter-spacing:-.03em;background:linear-gradient(95deg,#fff,#c8bcff 55%,#80c9ff);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block}
+  .badge{font-size:11px;color:#49d18d;border:1px solid rgba(73,209,141,.4);background:rgba(73,209,141,.12);border-radius:99px;padding:3px 10px;margin-left:10px;vertical-align:middle}
+  .note{font-size:11px;color:#5f6674;border:1px dashed rgba(255,255,255,.1);border-radius:8px;padding:5px 9px;float:right}
+  .grp{display:flex;align-items:center;gap:10px;margin:24px 0 12px}
+  .grp .bar{width:4px;height:16px;border-radius:2px;background:linear-gradient(180deg,#7c5cff,#42a5ff)}
+  .grp h2{font-size:16px;font-weight:700}.grp .h{font-size:11.5px;color:#8f96a5}.grp .ln{flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.1),transparent)}
+  .ghost{font-family:inherit;cursor:pointer;font-size:12px;color:#c8bcff;border:1px solid rgba(124,92,255,.4);background:rgba(124,92,255,.1);border-radius:9px;padding:6px 12px}
+  .btn{font-family:inherit;cursor:pointer;font-size:13px;font-weight:600;border:0;border-radius:11px;padding:9px 15px;color:#fff;background:linear-gradient(135deg,#7c5cff,#42a5ff);box-shadow:0 0 30px rgba(124,92,255,.2)}
+  .btn.g{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);box-shadow:none;color:#d8d4cc}
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-bottom:6px}
+  .pulse{padding:20px;display:grid;grid-template-columns:148px 1fr;gap:18px;align-items:center}
+  .gauge{width:148px;height:148px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#36e6d4 0% 76%,rgba(255,255,255,.06) 76% 100%);box-shadow:0 0 42px rgba(54,230,212,.22)}
+  .gauge .in{width:112px;height:112px;border-radius:50%;background:#0a0c12;display:grid;place-items:center;text-align:center;border:1px solid rgba(255,255,255,.08)}
+  .gauge .pct{font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  .pmini{display:flex;gap:16px;margin:4px 0 12px;flex-wrap:wrap}.pmini b{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}.pmini span{display:block;font-size:11px;color:#8f96a5;margin-top:2px}
+  .eng{font-size:10.5px;color:#d7a86e;border:1px solid rgba(215,168,110,.4);background:rgba(215,168,110,.12);border-radius:7px;padding:2px 8px}
+  .search{padding:18px;display:flex;flex-direction:column}
+  .sbar{display:flex;gap:8px}.sbar input{flex:1;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:9px 12px;color:#f4f1ea;font-size:13px;font-family:inherit}
+  .hit{font-size:12px;padding:8px 0;border-top:1px solid rgba(255,255,255,.07)}.hit b{color:#fff}.hit .loc{color:#36e6d4;font-size:11px;margin-left:4px}.hit .sn{color:#d8d4cc;display:block;margin-top:2px}
+  /* pipeline */
+  .pipe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 12px}
+  .pstep{font-size:12px;color:#8f96a5;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);border-radius:99px;padding:5px 12px}
+  .pstep.on{color:#fff;border-color:rgba(124,92,255,.6);background:rgba(124,92,255,.16);box-shadow:0 0 16px rgba(124,92,255,.3)}
+  .pstep.done{color:#9be6c4;border-color:rgba(73,209,141,.4);background:rgba(73,209,141,.1)}
+  .arr{color:#5f6674}
+  /* two col */
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+  .doc{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}
+  .chip{font-size:10px;color:#c8bcff;border:1px solid rgba(124,92,255,.4);background:rgba(124,92,255,.14);border-radius:6px;padding:1px 7px}
+  .chip.b{color:#8fc7ff;border-color:rgba(66,165,255,.4);background:rgba(66,165,255,.12)}
+  .chip.c{color:#7fdca8;border-color:rgba(73,209,141,.4);background:rgba(73,209,141,.12)}
+  .act{margin-left:auto;font-size:11px;color:#8f96a5}
+  .ti{font-size:14px;font-weight:700;color:#fff;margin-bottom:10px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}.tg{font-size:11px;color:#d8d4cc;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 8px}.tg b{color:#8f96a5;font-weight:400;margin-right:4px}
+  .hrow{display:flex;align-items:center;gap:8px;font-size:12px;color:#d8d4cc;padding:6px 0}.hb{width:8px;height:8px;border-radius:50%}
+  /* gallery */
+  .gal{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .tile{aspect-ratio:4/3;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,rgba(124,92,255,.18),rgba(66,165,255,.1));position:relative;transition:.16s;cursor:pointer}
+  .tile:hover{border-color:rgba(124,92,255,.6);box-shadow:0 0 20px rgba(124,92,255,.25)}
+  .tile span{position:absolute;left:8px;bottom:8px;font-size:10.5px;color:#d8d4cc;background:rgba(10,12,18,.8);border-radius:6px;padding:2px 7px}
+  @media(max-width:980px){.hero{grid-template-columns:1fr}.cols{grid-template-columns:1fr}.gal{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="note">数字示意 · 仅看版面</span>
+  <h1>数据基地</h1><span class="badge">● 本地索引 · 已接入</span>
+
+  <div class="grp" style="margin-top:18px"><span class="bar"></span><h2>库存脉搏 · 检索</h2><span class="h">读进来 → 索引 → 查得到</span><span class="ln"></span></div>
+  <div class="hero">
+    <div class="ck pulse" style="--ac:linear-gradient(90deg,#36e6d4,#42a5ff);--gl:rgba(54,230,212,.22)">
+      <div class="gauge"><div class="in"><div><div class="pct">76<span style="font-size:13px;color:#8f96a5">%</span></div><div style="font-size:10.5px;color:#8f96a5;margin-top:3px">索引完成率</div></div></div></div>
+      <div>
+        <div class="pmini">
+          <div><b>1,284</b><span>受管文件</span></div>
+          <div><b class="cyan">978</b><span>已索引</span></div>
+          <div><b>5,210</b><span>索引块·CJK</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="eng">FTS5 · BM25</span><button class="ghost">⟳ 重建索引</button></div>
+      </div>
+    </div>
+    <div class="ck search" style="--ac:#36e6d4;--gl:rgba(54,230,212,.2)">
+      <div class="ti">全文检索 <span style="font-size:11px;color:#8f96a5;font-weight:400">本地 · 出处精确到页</span></div>
+      <div class="sbar"><input placeholder="搜索已入库资料（关键词 / 编号 / 中文短语）…" value="抬板架空"><button class="btn">🔍 搜索</button></div>
+      <div class="hit"><b>📄 某江悦府·抬板架空会客厅</b><span class="loc">· 第 12 页</span><span class="sn">首层抬高 5.4m 做归家会客厅，释放底层江景视线…</span></div>
+      <div class="hit"><b>📄 襄阳江景地块·指标速查</b><span class="loc">· 第 3 页</span><span class="sn">退江红线 30m，含日照与车位配比要点…</span></div>
+    </div>
+  </div>
+
+  <div class="grp"><span class="bar"></span><h2>① 读取与整理</h2><span class="h">本地来源 → 一键整理入库 · 收件箱自动入库</span><span class="ln"></span></div>
+  <div class="ck" style="padding:18px;--ac:linear-gradient(90deg,#7c5cff,#42a5ff)">
+    <div class="pipe">
+      <span class="pstep done">未选择</span><span class="arr">→</span>
+      <span class="pstep on">已选择 · 24 个可整理</span><span class="arr">→</span>
+      <span class="pstep">整理中 N/total</span><span class="arr">→</span>
+      <span class="pstep">已整理</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn g">📁 选择文件夹</button><button class="btn g">📄 选择文件</button><button class="btn">⚡ 一键整理</button>
+      <span style="margin-left:auto;align-self:center;font-size:11.5px;color:#8f96a5">整理目标：<span class="gold">仓库 D:\ROM-AI\repo</span></span></div>
+    <div class="hrow" style="margin-top:10px;border-top:1px solid rgba(255,255,255,.07);padding-top:10px"><span class="hb" style="background:#49d18d;box-shadow:0 0 8px #49d18d"></span>收件箱已启用 · <span class="mono">C:\Users\…\ROM-AI收件箱</span><span class="act"><span class="amber" style="border:1px solid rgba(253,171,61,.4);background:rgba(253,171,61,.12);border-radius:99px;padding:2px 8px">待处理 2</span> · 立即扫描</span></div>
+  </div>
+
+  <div class="grp"><span class="bar"></span><h2>② 知识库</h2><span class="h">已入库文档 · 可复用资产</span><span class="ln"></span></div>
+  <div class="cols">
+    <div class="ck" style="padding:16px 18px;--ac:#42a5ff;--gl:rgba(66,165,255,.18)">
+      <div class="ti">已入库文档 <span style="font-size:11px;color:#8f96a5;font-weight:400">点条目展开 · SQLite 落库</span></div>
+      <div class="doc"><span style="color:#8f96a5">▸</span><span class="chip">规划条件</span><b>襄阳江景地块·指标速查</b><span style="color:#8f96a5">#江景 #高层</span><span class="act">PDF · AI 元数据 · 删除</span></div>
+      <div class="doc"><span style="color:#8f96a5">▸</span><span class="chip c">竞品案例</span><b>某江悦府·抬板架空</b><span style="color:#8f96a5">#抬板</span><span class="act">DOCX · AI 元数据 · 删除</span></div>
+      <div class="doc"><span style="color:#8f96a5">▸</span><span class="chip b">规范库</span><b>住宅日照间距·浙江标准</b><span class="act">PDF · AI 元数据 · 删除</span></div>
+    </div>
+    <aside style="display:grid;gap:14px">
+      <div class="ck" style="padding:16px"><div class="ti">可复用资产 · 沉淀层</div><div class="tags"><span class="tg"><b>江景</b>2</span><span class="tg"><b>抬板</b>3</span><span class="tg"><b>高层</b>2</span><span class="tg"><b>日照</b>1</span></div></div>
+      <div class="ck" style="padding:16px"><div class="ti">库存健康</div>
+        <div class="hrow"><span class="hb" style="background:#49d18d"></span>索引状态 正常 · FTS5/BM25</div>
+        <div class="hrow"><span class="hb" style="background:#8f96a5"></span>图纸/图片登记元数据，不入全文检索</div></div>
+    </aside>
+  </div>
+
+  <div class="grp"><span class="bar"></span><h2>③ 图片资产</h2><span class="h">效果图画廊 · 图生图（当前项目）</span><span class="ln"></span></div>
+  <div class="ck" style="padding:18px;--ac:linear-gradient(90deg,#7c5cff,#36e6d4)">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:#8f96a5">生图模式 · 图生图（3 张素材作参考）</span><input placeholder="描述要生成的效果图…" style="flex:1;min-width:200px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;color:#f4f1ea;font-size:13px;font-family:inherit"><button class="btn">用素材生图</button></div>
+    <div class="gal">
+      <div class="tile"><span>效果图 · 江景人视</span></div><div class="tile"><span>参考图 · 黄昏</span></div><div class="tile"><span>白模 · 体块</span></div><div class="tile"><span>效果图 · 夜景</span></div>
+    </div>
+  </div>
+
+  <div class="grp"><span class="bar"></span><h2>④ 跨项目复用库</h2><span class="h">B1–B6 · 已沉淀(只读)</span><span class="ln"></span></div>
+  <div class="ck" style="padding:16px 18px;--ac:#d7a86e;--gl:rgba(215,168,110,.18)">
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tg" style="border-color:rgba(124,92,255,.4);color:#c8bcff">全部</span><span class="tg">类型学 8</span><span class="tg">竞品 12</span><span class="tg">口径 6</span></div>
+  </div>
+</div>
+</body>
+</html>

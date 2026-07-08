@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROM-AI · 板块动态背景 + 排版升级小样</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Space Grotesk','Noto Sans SC','Microsoft YaHei',sans-serif;color:#f4f1ea;letter-spacing:-.01em;background:#050507;overflow-x:hidden}
+  .note{max-width:1080px;margin:28px auto 8px;padding:0 24px;color:#8f96a5;font-size:13px;line-height:1.7}
+  .note b{color:#d8d4cc}
+  /* 板块段:full-bleed,内容 1080 居中,4px 节奏 */
+  section.board{position:relative;padding:72px 24px 64px;border-top:1px solid rgba(255,255,255,.06);overflow:hidden}
+  section.board canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.9}
+  .inner{position:relative;z-index:1;max-width:1080px;margin:0 auto}
+  .tag{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(124,92,255,.32);background:rgba(124,92,255,.08);color:#c8bcff;border-radius:999px;padding:6px 14px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:500}
+  /* 展示级标题(FluidMatrix display-lg 纪律:大字级/600/-0.025em) */
+  h1.display{margin:18px 0 10px;font-size:clamp(40px,5vw,64px);font-weight:600;line-height:1.02;letter-spacing:-.025em}
+  h1.display .grad{background:linear-gradient(95deg,#fff 10%,#c8bcff 55%,#80c9ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:#8f96a5;font-size:14px;line-height:1.65;max-width:560px}
+  /* 渐变描边壳(FluidMatrix 招牌技法):外壳渐变细线,内容面内缩 */
+  .shell{margin-top:28px;border-radius:18px;padding:1px;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.02) 55%,rgba(124,92,255,.10));}
+  .shellin{border-radius:17px;background:rgba(5,6,10,.55);backdrop-filter:blur(14px);padding:22px 24px;display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+  .kpi{min-width:120px}
+  .kpi .v{font-size:30px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:12px;color:#8f96a5;margin-top:4px}
+  .kpi .v.c{color:#36e6d4}.kpi .v.a{color:#fdab3d}
+  .btn{margin-left:auto;border:0;border-radius:12px;padding:11px 18px;font:600 13px/1 'Space Grotesk','Noto Sans SC',sans-serif;letter-spacing:.01em;color:#fff;background:linear-gradient(135deg,#7c5cff,#42a5ff);cursor:pointer;transition:filter 150ms ease}
+  .btn:hover{filter:brightness(1.12)}
+  .btn.ghost{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#d8d4cc}
+  .meta{margin-top:14px;color:#5f6674;font-size:11.5px;letter-spacing:.04em}
+  .meta b{color:#8f96a5;font-weight:500}
+  @media (prefers-reduced-motion: reduce){ section.board canvas{display:none} }
+</style>
+</head>
+<body>
+
+<div class="note">
+  <b>小样说明</b> · 每个板块 = 同一紫蓝色调 + 各自专属动态背景(鼠标移入有轻微视差)。排版按 FluidMatrix 纪律升级:
+  展示级大标题(≤64px/600/-0.025em)、渐变描边壳(卡片外圈那道上亮下消的细线)、黑玻璃面、4px 节奏、150ms 克制动效。
+  数字为示意,只看氛围与排版。
+</div>
+
+<!-- ① 项目中心 · 点阵波场 -->
+<section class="board" data-mode="dots">
+  <canvas></canvas>
+  <div class="inner">
+    <span class="tag">Project Center · 判断与推进</span>
+    <h1 class="display">把项目从判断<br><span class="grad">推进到交付</span></h1>
+    <p class="sub">前期判断解析 + 会议链路。首屏直接暴露风险、里程碑与待办,负责人不再靠追问。</p>
+    <div class="shell"><div class="shellin">
+      <div class="kpi"><div class="v">62<span style="font-size:14px;color:#8f96a5">%</span></div><div class="l">阶段进度</div></div>
+      <div class="kpi"><div class="v">128</div><div class="l">文件</div></div>
+      <div class="kpi"><div class="v a">23</div><div class="l">待办</div></div>
+      <div class="kpi"><div class="v c">8</div><div class="l">会议纪要</div></div>
+      <button class="btn">进入工作台</button>
+    </div></div>
+    <div class="meta">动态背景 · <b>点阵波场</b>(FluidMatrix 同款 dot-matrix,紫蓝化,软波浮动+指针漂移)</div>
+  </div>
+</section>
+
+<!-- ② 数据基地 · 数据流 -->
+<section class="board" data-mode="streams">
+  <canvas></canvas>
+  <div class="inner">
+    <span class="tag">Data Base · 记忆底座</span>
+    <h1 class="display">让每份材料<br><span class="grad">都成为可引用的记忆</span></h1>
+    <p class="sub">读进来 → 索引 → 查得到。规划条件、竞品、黑话与图库,沉淀为跨项目可复用的判断。</p>
+    <div class="shell"><div class="shellin">
+      <div class="kpi"><div class="v">1,284</div><div class="l">受管文件</div></div>
+      <div class="kpi"><div class="v c">978</div><div class="l">已索引</div></div>
+      <div class="kpi"><div class="v">5,210</div><div class="l">索引块</div></div>
+      <button class="btn ghost">全文检索</button><button class="btn">一键整理</button>
+    </div></div>
+    <div class="meta">动态背景 · <b>数据流</b>(纵向光丝缓降,如索引在落库)</div>
+  </div>
+</section>
+
+<!-- ③ 共创营地 · 思维粒子 -->
+<section class="board" data-mode="sparks">
+  <canvas></canvas>
+  <div class="inner">
+    <span class="tag">Co-creation Camp · 思考中控</span>
+    <h1 class="display">先杀平庸,再逼出<br><span class="grad">砸中评委的那一条</span></h1>
+    <p class="sub">带着项目记忆想方案:锁张力、逼非共识、设计委员会对抗评图。</p>
+    <div class="shell"><div class="shellin">
+      <div class="kpi"><div class="v">22</div><div class="l">技能</div></div>
+      <div class="kpi"><div class="v c">17</div><div class="l">历史成果</div></div>
+      <div class="kpi"><div class="v">3+1</div><div class="l">设计委员会</div></div>
+      <button class="btn">开始共创</button>
+    </div></div>
+    <div class="meta">动态背景 · <b>思维粒子</b>(漂浮光点偶发连线,如灵感碰撞)</div>
+  </div>
+</section>
+
+<!-- ④ 协作平台 · 轨道连线 -->
+<section class="board" data-mode="orbits">
+  <canvas></canvas>
+  <div class="inner">
+    <span class="tag">Collab · 协同透明</span>
+    <h1 class="display">谁在做什么、卡在哪<br><span class="grad">一眼可见</span></h1>
+    <p class="sub">团队、智能助手、甲方画像一屏协作;任务与结论实时同步。</p>
+    <div class="shell"><div class="shellin">
+      <div class="kpi"><div class="v">8<span style="font-size:14px;color:#8f96a5">/14</span></div><div class="l">在线协作</div></div>
+      <div class="kpi"><div class="v a">5</div><div class="l">待我处理</div></div>
+      <div class="kpi"><div class="v c">12</div><div class="l">今日完成</div></div>
+      <button class="btn ghost">团队负载</button><button class="btn">添加成员</button>
+    </div></div>
+    <div class="meta">动态背景 · <b>轨道连线</b>(节点缓行于轨道,连线渐隐,如协作网络)</div>
+  </div>
+</section>
+
+<!-- ⑤ 管理驾驶舱 · 雷达脉冲 -->
+<section class="board" data-mode="radar">
+  <canvas></canvas>
+  <div class="inner">
+    <span class="tag">Cockpit · 管理视角</span>
+    <h1 class="display">问题在变红之前<br><span class="grad">就被看见</span></h1>
+    <p class="sub">跨项目健康、交付节点、风险与 AI 产能,一屏掌握。</p>
+    <div class="shell"><div class="shellin">
+      <div class="kpi"><div class="v">8</div><div class="l">进行中项目</div></div>
+      <div class="kpi"><div class="v" style="color:#ff5e66">4</div><div class="l">高风险</div></div>
+      <div class="kpi"><div class="v">38</div><div class="l">AI 成果</div></div>
+      <button class="btn">解锁驾驶舱</button>
+    </div></div>
+    <div class="meta">动态背景 · <b>雷达脉冲</b>(同心环缓慢扩散+扫描线,如持续监测)</div>
+  </div>
+</section>
+
+<div class="note" style="margin-bottom:48px">
+  <b>落地口径(若确认)</b>:动态背景做成共享 canvas 组件(每板块传 mode),只在各页 HERO 区渲染(非全页,列表滚动区不动);
+  低透明度、GPU 友好、prefers-reduced-motion 全关;与现有 HUD 网格叠加或替换任选。渐变描边壳升级为 ckcard 的 hero 变体。
+  展示级大标题只用于各板块首屏一处,工作区标题维持 26px 体系。
+</div>
+
+<script>
+// 共享动态背景引擎(小样版:Canvas2D 近似;正式版可升 WebGL 着色器)。同一紫蓝色调,五种形态。
+const PURPLE='124,92,255', BLUE='66,165,255';
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelectorAll('section.board').forEach(sec=>{
+  const cv=sec.querySelector('canvas'); const mode=sec.dataset.mode;
+  const ctx=cv.getContext('2d'); let W,H,dpr=Math.min(devicePixelRatio||1,2);
+  let mx=.5,my=.5; // 指针漂移(subtle)
+  const fit=()=>{ W=sec.clientWidth; H=sec.clientHeight; cv.width=W*dpr; cv.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); };
+  fit(); addEventListener('resize',fit);
+  sec.addEventListener('pointermove',e=>{ const r=sec.getBoundingClientRect(); mx=(e.clientX-r.left)/r.width; my=(e.clientY-r.top)/r.height; });
+  if(reduced) return;
+
+  // 各形态状态
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  let parts=[];
+  if(mode==='streams') parts=Array.from({length:26},()=>({x:Math.random(),y:Math.random(),v:rand(.0004,.0016),len:rand(40,140),w:rand(.6,1.6),hue:Math.random()<.6?PURPLE:BLUE,a:rand(.05,.16)}));
+  if(mode==='sparks')  parts=Array.from({length:46},()=>({x:Math.random(),y:Math.random(),vx:rand(-.00025,.00025),vy:rand(-.0002,.0002),r:rand(.8,2.2),hue:Math.random()<.6?PURPLE:BLUE,a:rand(.18,.5)}));
+  if(mode==='orbits')  parts=Array.from({length:9},(_,i)=>({R:rand(.14,.46),th:Math.random()*6.283,v:rand(.0006,.0018)*(i%2?1:-1),r:rand(1.6,2.6),hue:i%3?PURPLE:BLUE}));
+
+  let t=0;
+  (function draw(){
+    t+=1; ctx.clearRect(0,0,W,H);
+    const ox=(mx-.5)*14, oy=(my-.5)*10; // 视差偏移
+
+    if(mode==='dots'){ // 点阵波场(FluidMatrix 招牌,紫蓝化)
+      const gap=34;
+      for(let y=gap/2;y<H;y+=gap) for(let x=gap/2;x<W;x+=gap){
+        const w1=Math.sin(x*.012+t*.014)+Math.cos(y*.014+t*.011);
+        const w2=Math.sin((x+y)*.006+t*.008);
+        const a=.05+.10*(w1+w2+2)/4 * (1-y/H*.55);
+        const r=1+.9*(w2+1)/2;
+        ctx.fillStyle=`rgba(${(x/W+y/H)%1<.55?PURPLE:BLUE},${a.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(x+ox+Math.sin(y*.02+t*.012)*4, y+oy+w1*3, r, 0, 6.283); ctx.fill();
+      }
+    }
+    if(mode==='streams'){ // 数据流:纵向光丝
+      parts.forEach(p=>{
+        p.y+=p.v; if(p.y>1.15){p.y=-.15;p.x=Math.random();}
+        const x=p.x*W+ox*1.4, y=p.y*H;
+        const g=ctx.createLinearGradient(0,y-p.len,0,y);
+        g.addColorStop(0,`rgba(${p.hue},0)`); g.addColorStop(1,`rgba(${p.hue},${p.a})`);
+        ctx.fillStyle=g; ctx.fillRect(x,y-p.len,p.w,p.len);
+        ctx.fillStyle=`rgba(${p.hue},${(p.a*2.2).toFixed(3)})`; ctx.fillRect(x-.5,y-2,p.w+1,2.5);
+      });
+    }
+    if(mode==='sparks'){ // 思维粒子+偶发连线
+      parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; if(p.x<0||p.x>1)p.vx*=-1; if(p.y<0||p.y>1)p.vy*=-1; });
+      for(let i=0;i<parts.length;i++){ const a=parts[i], ax=a.x*W+ox, ay=a.y*H+oy;
+        for(let j=i+1;j<parts.length;j++){ const b=parts[j]; const bx=b.x*W+ox, by=b.y*H+oy;
+          const d=Math.hypot(ax-bx,ay-by); if(d<110){ ctx.strokeStyle=`rgba(${PURPLE},${(.10*(1-d/110)).toFixed(3)})`; ctx.lineWidth=.7; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke(); } }
+        ctx.fillStyle=`rgba(${a.hue},${(a.a*.8).toFixed(3)})`; ctx.beginPath(); ctx.arc(ax,ay,a.r,0,6.283); ctx.fill(); }
+    }
+    if(mode==='orbits'){ // 轨道连线
+      const cx=W*.78+ox*2, cy=H*.42+oy*2;
+      ctx.strokeStyle=`rgba(255,255,255,.045)`; ctx.lineWidth=1;
+      parts.forEach(p=>{ ctx.beginPath(); ctx.arc(cx,cy,p.R*Math.min(W,H),0,6.283); ctx.stroke(); });
+      const pts=parts.map(p=>{ p.th+=p.v; const R=p.R*Math.min(W,H); return [cx+Math.cos(p.th)*R, cy+Math.sin(p.th)*R, p]; });
+      pts.forEach(([x,y,p],i)=>{ const n=pts[(i+1)%pts.length];
+        ctx.strokeStyle=`rgba(${PURPLE},.08)`; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(n[0],n[1]); ctx.stroke();
+        ctx.fillStyle=`rgba(${p.hue},.55)`; ctx.beginPath(); ctx.arc(x,y,p.r,0,6.283); ctx.fill();
+        ctx.fillStyle=`rgba(${p.hue},.12)`; ctx.beginPath(); ctx.arc(x,y,p.r*3.2,0,6.283); ctx.fill(); });
+    }
+    if(mode==='radar'){ // 雷达脉冲:同心扩散环+扫描线
+      const cx=W*.5+ox*2, cy=H*.55+oy*2, maxR=Math.max(W,H)*.55;
+      for(let k=0;k<3;k++){ const r=((t*.35+k*maxR/3)%maxR);
+        ctx.strokeStyle=`rgba(${PURPLE},${(0.14*(1-r/maxR)).toFixed(3)})`; ctx.lineWidth=1.2;
+        ctx.beginPath(); ctx.arc(cx,cy,r,0,6.283); ctx.stroke(); }
+      const ang=t*.006; const g=ctx.createConicGradient ? ctx.createConicGradient(ang,cx,cy) : null;
+      if(g){ g.addColorStop(0,`rgba(${BLUE},.10)`); g.addColorStop(.08,`rgba(${BLUE},0)`); g.addColorStop(1,`rgba(${BLUE},0)`);
+        ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,maxR,0,6.283); ctx.fill(); }
+      ctx.fillStyle=`rgba(${PURPLE},.5)`; ctx.beginPath(); ctx.arc(cx,cy,2.4,0,6.283); ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  })();
+});
+</script>
+</body>
+</html>
