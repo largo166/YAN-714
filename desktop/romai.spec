@@ -63,6 +63,15 @@ for pkg in ("docx", "pptx", "fitz", "pymupdf"):
     except Exception:
         pass
 
+# ── OCR 进包(2026-07-08 已批):rapidocr 模型(~15.5MB)+onnxruntime ──
+# 收件人开箱即有图片/扫描件 OCR;代价=exe 体积显著变大(模型+onnxruntime DLL)。
+# 注意:打包解释器必须有 rapidocr——统一用 backend/.venv(权威解释器,测试同源)。
+for pkg in ("rapidocr_onnxruntime", "onnxruntime"):
+    try:
+        datas += collect_data_files(pkg)
+    except Exception:
+        pass
+
 # ── 隐藏导入：uvicorn 动态加载的 loop/protocol/lifespan + 后端全部子模块 ──
 hiddenimports = []
 hiddenimports += collect_submodules("uvicorn")
@@ -78,6 +87,7 @@ hiddenimports += [
     "httpx", "h11", "sniffio", "anyio",
     "webview", "clr",
     "fitz", "docx", "pptx",
+    "rapidocr_onnxruntime", "onnxruntime",  # OCR 进包(2026-07-08 已批)
     "app.main", "app.config", "app.database", "app.models",
 ]
 
