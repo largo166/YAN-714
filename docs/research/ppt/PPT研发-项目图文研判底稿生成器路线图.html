@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ROM-AI PPT研发｜项目图文研判底稿生成器路线图</title>
+  <style>
+    :root {
+      --bg: #0b0f18;
+      --panel: rgba(255, 255, 255, .065);
+      --panel-2: rgba(255, 255, 255, .095);
+      --line: rgba(255, 255, 255, .14);
+      --text: #eef2ff;
+      --muted: #aab3c8;
+      --weak: #78839b;
+      --purple: #8b5cff;
+      --blue: #43a5ff;
+      --cyan: #33e6d3;
+      --gold: #e0b76f;
+      --red: #ff6473;
+      --green: #67d391;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .32);
+      --radius: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(139, 92, 255, .26), transparent 30%),
+        radial-gradient(circle at 88% 8%, rgba(51, 230, 211, .16), transparent 34%),
+        linear-gradient(180deg, #0b0f18 0%, #111623 56%, #0b0f18 100%);
+      line-height: 1.65;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 44px 0 72px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 42px;
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background: linear-gradient(135deg, rgba(139, 92, 255, .18), rgba(67, 165, 255, .08) 45%, rgba(255, 255, 255, .045));
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -80px -140px auto;
+      width: 360px;
+      height: 360px;
+      border-radius: 50%;
+      background: rgba(51, 230, 211, .14);
+      filter: blur(16px);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 9px;
+      align-items: center;
+      padding: 7px 12px;
+      color: #dcd6ff;
+      border: 1px solid rgba(139, 92, 255, .42);
+      border-radius: 999px;
+      background: rgba(139, 92, 255, .12);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 20px 0 10px;
+      font-size: clamp(34px, 5vw, 62px);
+      line-height: 1.06;
+      letter-spacing: -.055em;
+    }
+
+    .subtitle {
+      max-width: 920px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .principle {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(0, 0, 0, .18);
+    }
+
+    .principle strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    section { margin-top: 34px; }
+
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 25px;
+      letter-spacing: -.025em;
+    }
+
+    .hint {
+      color: var(--weak);
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .18);
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      letter-spacing: -.02em;
+    }
+
+    .card p { margin: 0; color: var(--muted); }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      padding: 4px 9px;
+      color: #d9deef;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .055);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .purple { color: #d9ceff; border-color: rgba(139, 92, 255, .35); background: rgba(139, 92, 255, .12); }
+    .blue { color: #cce8ff; border-color: rgba(67, 165, 255, .35); background: rgba(67, 165, 255, .1); }
+    .cyan { color: #c9fff8; border-color: rgba(51, 230, 211, .32); background: rgba(51, 230, 211, .09); }
+    .gold { color: #ffe6b8; border-color: rgba(224, 183, 111, .36); background: rgba(224, 183, 111, .1); }
+    .red { color: #ffd0d6; border-color: rgba(255, 100, 115, .36); background: rgba(255, 100, 115, .1); }
+    .green { color: #d7ffe5; border-color: rgba(103, 211, 145, .34); background: rgba(103, 211, 145, .1); }
+
+    .route {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .route .step {
+      position: relative;
+      padding: 18px;
+      min-height: 146px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .055);
+    }
+
+    .route .step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -14px;
+      top: 46%;
+      color: var(--purple);
+      font-weight: 900;
+      z-index: 2;
+    }
+
+    .num {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      font-weight: 900;
+    }
+
+    .step h3 { margin: 0 0 6px; font-size: 16px; }
+    .step p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    th, td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      color: #dfe6ff;
+      background: rgba(255, 255, 255, .065);
+      font-size: 13px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    td { color: var(--muted); }
+    td strong { color: var(--text); }
+
+    .schema {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    pre {
+      height: 100%;
+      margin: 0;
+      padding: 20px;
+      overflow: auto;
+      color: #d9e3ff;
+      border: 1px solid rgba(139, 92, 255, .25);
+      border-radius: var(--radius);
+      background: #080b12;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 14px;
+    }
+
+    .phase {
+      display: grid;
+      grid-template-columns: 170px 1fr 1fr 1fr;
+      gap: 14px;
+      align-items: stretch;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .phase .label {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(139, 92, 255, .12);
+    }
+
+    .phase .label b { font-size: 18px; }
+    .phase .label span { color: var(--muted); font-size: 13px; }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    li + li { margin-top: 6px; }
+
+    .metric {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .05);
+    }
+
+    .metric .dot {
+      flex: 0 0 11px;
+      width: 11px;
+      height: 11px;
+      margin-top: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 18px rgba(51, 230, 211, .7);
+    }
+
+    .metric b { display: block; margin-bottom: 3px; }
+    .metric span { color: var(--muted); font-size: 14px; }
+
+    .slide-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .slide {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .045);
+    }
+
+    .slide b { display: block; margin-bottom: 4px; }
+    .slide span { color: var(--muted); font-size: 13px; }
+
+    .footer {
+      margin-top: 36px;
+      padding: 18px 22px;
+      color: var(--weak);
+      border: 1px dashed var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .035);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .principles, .cols-3, .cols-4, .route, .schema, .slide-list { grid-template-columns: 1fr; }
+      .cols-2 { grid-template-columns: 1fr; }
+      .route .step:not(:last-child)::after { display: none; }
+      .phase { grid-template-columns: 1fr; }
+      .hero { padding: 28px; }
+      .wrap { width: min(100vw - 28px, 1180px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <div class="eyebrow">ROM-AI · PPT研发 · DeckPlan 图文底稿生成能力</div>
+      <h1>项目图文研判底稿生成器 1.0</h1>
+      <p class="subtitle">
+        这条研发线不是“一键生成最终 PPT”，而是让 ROM-AI 读取项目资料，先生成可审查、可追溯、可替图的
+        <strong>DeckPlan 结构化页面计划</strong>，再渲染成可继续深化的图文底稿。
+      </p>
+      <div class="principles">
+        <div class="principle">
+          <strong>AI 放 60%</strong>
+          <span>自动完成结构、判断、图片槽、候选素材和来源记录。</span>
+        </div>
+        <div class="principle">
+          <strong>人工替 40%</strong>
+          <span>设计师负责替图、深化判断、调整版式和主创表达。</span>
+        </div>
+        <div class="principle">
+          <strong>DeckPlan 优先</strong>
+          <span>先做 JSON 编排层，再做 PPTX 渲染，不直接冲最终导出。</span>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <div class="section-title">
+        <h2>一、研发定位</h2>
+        <div class="hint">定义清楚，避免做成通用 AI PPT 玩具</div>
+      </div>
+      <div class="grid cols-3">
+        <div class="card">
+          <span class="tag purple">产品定位</span>
+          <h3>项目启动图文工作台</h3>
+          <p>面向方案前期、投标、概念启动，把零散资料编排成可继续深化的图文底稿。</p>
+        </div>
+        <div class="card">
+          <span class="tag blue">核心对象</span>
+          <h3>DeckPlan</h3>
+          <p>每页包含判断标题、文本要点、图片槽、候选资产、来源证据和备注依据。</p>
+        </div>
+        <div class="card">
+          <span class="tag red">明确不做</span>
+          <h3>不追求全自动终稿</h3>
+          <p>第一版不解决所有图片语义匹配，不做万能模板，不承诺自动排出可汇报终稿。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>二、总技术路线</h2>
+        <div class="hint">复用现有底座，只新增编排层</div>
+      </div>
+      <div class="route">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>资料接入</h3>
+          <p>复用项目文件、解析和抽图链路，形成文字、图片、页码、caption。</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>素材盘点</h3>
+          <p>识别有什么、缺什么、哪些材料不可读，建立图片候选池。</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>DeckPlan 编排</h3>
+          <p>生成结构化 JSON：章节、页面判断、图片槽、候选图、来源证据。</p>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <h3>PPTX 渲染</h3>
+          <p>按 DeckPlan 渲染底稿：有图放图，缺图黑占位，备注写依据。</p>
+        </div>
+        <div class="step">
+          <div class="num">5</div>
+          <h3>人工替图</h3>
+          <p>前端页列表、候选图池、图片槽替换；MVP 后置。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>三、复用与新增边界</h2>
+        <div class="hint">先复用，不重造第二套</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>能力层</th>
+            <th>必须复用</th>
+            <th>新增内容</th>
+            <th>边界说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>资料解析</strong></td>
+            <td><code>parsing.py</code></td>
+            <td>素材盘点时读取解析状态、页码、分块、截断信息</td>
+            <td>不重写 PDF/PPTX/DOCX/XLSX/OCR 解析器</td>
+          </tr>
+          <tr>
+            <td><strong>图片资产</strong></td>
+            <td><code>image_assets.py</code>、<code>FileAsset</code></td>
+            <td>图片语义粗分类、候选打分、图片槽推荐</td>
+            <td>第一版只推荐 2-5 张候选，不追求全自动放准</td>
+          </tr>
+          <tr>
+            <td><strong>文件接口</strong></td>
+            <td><code>project_files.py</code></td>
+            <td>读取项目资料包、资产池、缩略图 URL</td>
+            <td>不新建独立文件管理系统</td>
+          </tr>
+          <tr>
+            <td><strong>研判沉淀</strong></td>
+            <td><code>ProjectAnalysis</code>、<code>SkillResult</code></td>
+            <td>DeckPlan 可先作为技能结果 JSON 或研判结果 JSON 保存</td>
+            <td>MVP 先不建表，待验证后决定是否持久化为独立对象</td>
+          </tr>
+          <tr>
+            <td><strong>PPT 渲染</strong></td>
+            <td><code>exporters.build_pptx()</code></td>
+            <td>支持图片槽、黑占位、页脚来源、备注依据</td>
+            <td>渲染层是第三阶段，不是第一阶段</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>四、DeckPlan Schema 草案</h2>
+        <div class="hint">PPT研发的核心资产，不是 PPTX 文件</div>
+      </div>
+      <div class="schema">
+        <div class="card">
+          <span class="tag cyan">结构原则</span>
+          <h3>页面计划必须可审查、可替换、可追溯</h3>
+          <ul>
+            <li>Deck 级记录项目名、汇报类型、模板、章节。</li>
+            <li>Slide 级标题必须是具体判断，不允许空壳标题。</li>
+            <li>图片槽是一等对象，记录类型、是否必需、候选图和 fallback。</li>
+            <li>来源证据指向 PDF 页码、PPT 页码、FileAsset、文本片段。</li>
+            <li>备注区记录判断依据，供人工复核和深化。</li>
+          </ul>
+        </div>
+        <pre>{
+  "deck_id": "draft-uuid",
+  "project_name": "项目名称",
+  "deck_type": "pre_research | design_strategy",
+  "version": "1.0",
+  "chapters": [
+    {
+      "title": "章节名称",
+      "slides": [
+        {
+          "slide_no": 1,
+          "slide_type": "cover | map_analysis | site_reading | strategy | benchmark | summary",
+          "title": "樊城老城更新与改善型居住的机会",
+          "judgement": "本页核心判断，必须具体",
+          "bullets": ["要点 1", "要点 2", "要点 3"],
+          "image_slots": [
+            {
+              "slot_id": "s01_main_map",
+              "type": "map | aerial | site_photo | plan | benchmark | chart",
+              "required": true,
+              "need": "基地鸟瞰或区位交通图",
+              "candidate_asset_ids": [12, 18, 21],
+              "fallback": "black_placeholder"
+            }
+          ],
+          "sources": [
+            {
+              "kind": "project_file | file_asset | analysis",
+              "source_id": 34,
+              "page": 7,
+              "quote": "来源摘要或证据说明"
+            }
+          ],
+          "speaker_notes": "判断依据、风险、人工复核提示"
+        }
+      ]
+    }
+  ]
+}</pre>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>五、四阶段研发过程</h2>
+        <div class="hint">先大纲规划，后代码落地；P0 检索完成后单独排期</div>
+      </div>
+      <div class="timeline">
+        <div class="phase">
+          <div class="label"><b>阶段 1</b><span>素材盘点</span></div>
+          <div>
+            <strong>目标</strong>
+            <ul>
+              <li>抽文字、抽图、缩略图、页码和 caption。</li>
+              <li>输出“有什么 / 无法读 / 缺什么”。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>技术节点</strong>
+            <ul>
+              <li>复用 <code>parsing.py</code>、<code>image_assets.py</code>。</li>
+              <li>形成素材盘点 JSON，不调用 PPT 渲染。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>成果标准</strong>
+            <ul>
+              <li>能列出项目文字材料、图片资产、不可读文件。</li>
+              <li>每张候选图有来源文件、页码或 caption。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="label"><b>阶段 2</b><span>DeckPlan 编排</span></div>
+          <div>
+            <strong>目标</strong>
+            <ul>
+              <li>生成 8-12 页结构化 JSON。</li>
+              <li>每页带判断、图片槽、候选图和来源证据。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>技术节点</strong>
+            <ul>
+              <li>新增 DeckPlan schema 与生成 prompt。</li>
+              <li>先支持“前期研判 Deck”和“设计策略 Deck”。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>成果标准</strong>
+            <ul>
+              <li>JSON 可被人工审阅和修改。</li>
+              <li>标题没有“项目分析/区位分析”这类空壳词。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="label"><b>阶段 3</b><span>PPTX 渲染</span></div>
+          <div>
+            <strong>目标</strong>
+            <ul>
+              <li>把 DeckPlan 渲染为可编辑 .pptx。</li>
+              <li>支持图片槽、黑占位、页脚来源、备注依据。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>技术节点</strong>
+            <ul>
+              <li>升级 <code>exporters.build_pptx()</code>。</li>
+              <li>图片不确定时放候选提示，不强行放错。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>成果标准</strong>
+            <ul>
+              <li>导出的 PPTX 可继续编辑。</li>
+              <li>缺图页明确写出需要哪类图片。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="label"><b>阶段 4</b><span>人工替图界面</span></div>
+          <div>
+            <strong>目标</strong>
+            <ul>
+              <li>提供页列表、预览、候选图池和拖图替换。</li>
+              <li>让人工 40% 变成顺手的编辑流程。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>技术节点</strong>
+            <ul>
+              <li>前端读取 DeckPlan 和 FileAsset 缩略图。</li>
+              <li>保存替图后的 DeckPlan 再渲染。</li>
+            </ul>
+          </div>
+          <div>
+            <strong>成果标准</strong>
+            <ul>
+              <li>设计师能在页面内替换图片槽。</li>
+              <li>MVP 后置，不抢阶段 1-2。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>六、MVP 页面清单</h2>
+        <div class="hint">先做两套模板，每套 8-12 页，不做 30 页大而全</div>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <span class="tag purple">模板 A</span>
+          <h3>前期研判 Deck</h3>
+          <div class="slide-list">
+            <div class="slide"><b>1. 封面判断</b><span>项目一句话机会，而非普通封面。</span></div>
+            <div class="slide"><b>2. 资料盘点</b><span>已有材料、缺失材料、不可读材料。</span></div>
+            <div class="slide"><b>3. 区位机会</b><span>城市关系带来的具体设计机会。</span></div>
+            <div class="slide"><b>4. 场地约束</b><span>红线、交通、景观、界面矛盾。</span></div>
+            <div class="slide"><b>5. 人群与需求</b><span>使用者或甲方诉求的关键转译。</span></div>
+            <div class="slide"><b>6. 竞品空白</b><span>同类方案都在做什么，本项目避开什么。</span></div>
+            <div class="slide"><b>7. 机会命题</b><span>最值得主创推进的 2-3 个问题。</span></div>
+            <div class="slide"><b>8. 下一步资料清单</b><span>缺哪些图、哪些数据、哪些判断。</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <span class="tag blue">模板 B</span>
+          <h3>设计策略 Deck</h3>
+          <div class="slide-list">
+            <div class="slide"><b>1. 主概念</b><span>一句话 main idea + 概念图槽。</span></div>
+            <div class="slide"><b>2. 场地回应</b><span>概念如何来自场地，而非套话。</span></div>
+            <div class="slide"><b>3. 空间策略</b><span>入口、序列、核心空间、高潮。</span></div>
+            <div class="slide"><b>4. 体量策略</b><span>形体动作与指标/界面关系。</span></div>
+            <div class="slide"><b>5. 立面策略</b><span>材料、光影、比例、识别度。</span></div>
+            <div class="slide"><b>6. 体验场景</b><span>人视、到达、活动、灰空间。</span></div>
+            <div class="slide"><b>7. 标杆转译</b><span>借鉴底层逻辑，不模仿符号。</span></div>
+            <div class="slide"><b>8. 风险与补图</b><span>最弱逻辑、缺图项、人工深化动作。</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>七、三条红线的落地方式</h2>
+        <div class="hint">决定这个能力是否专业，而不是玩具</div>
+      </div>
+      <div class="grid cols-3">
+        <div class="card">
+          <span class="tag red">红线 1</span>
+          <h3>图片槽是一等对象</h3>
+          <ul>
+            <li>每页必须声明所需图片类型。</li>
+            <li>匹配不确定时推荐候选，不强行确定。</li>
+            <li>缺图时生成黑占位和明确缺图说明。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag gold">红线 2</span>
+          <h3>来源可追溯</h3>
+          <ul>
+            <li>每页记录文本来源和图像来源。</li>
+            <li>来源包含文件、页码、资产 ID、caption。</li>
+            <li>PPT 页脚和备注区保留依据。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag cyan">红线 3</span>
+          <h3>判断不空泛</h3>
+          <ul>
+            <li>页标题必须是判断句。</li>
+            <li>禁止“项目分析/区位分析/设计理念”。</li>
+            <li>每页必须回答“所以呢”。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>八、成果标准</h2>
+        <div class="hint">用可验收标准防止范围膨胀</div>
+      </div>
+      <div class="grid cols-2">
+        <div class="metric"><span class="dot"></span><div><b>DeckPlan 可读</b><span>产品、设计师、开发都能直接审阅 JSON，知道每页想表达什么。</span></div></div>
+        <div class="metric"><span class="dot"></span><div><b>页面有判断</b><span>8-12 页中 90% 以上标题为具体判断句，不是栏目名。</span></div></div>
+        <div class="metric"><span class="dot"></span><div><b>图片槽可替</b><span>每个图片槽都有类型、需求说明、候选图或黑占位。</span></div></div>
+        <div class="metric"><span class="dot"></span><div><b>来源能追</b><span>每页至少有一条可回查来源；图片能回到 FileAsset 或源文件页码。</span></div></div>
+        <div class="metric"><span class="dot"></span><div><b>缺失诚实</b><span>缺图、不可读、材料不足必须显式说明，不用 AI 编造。</span></div></div>
+        <div class="metric"><span class="dot"></span><div><b>PPT 可深化</b><span>导出的 PPTX 是底稿，设计师能继续替图、改字、调版。</span></div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>九、研发优先级与风险</h2>
+        <div class="hint">这是一条大线，不与 P0 检索抢工</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>优先级</th>
+            <th>事项</th>
+            <th>判断</th>
+            <th>处理方式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>P0 后启动</strong></td>
+            <td>DeckPlan 大纲规划</td>
+            <td>现在可先出规划，不写代码</td>
+            <td>确认 schema、阶段、验收标准后再排研发</td>
+          </tr>
+          <tr>
+            <td><strong>MVP 核心</strong></td>
+            <td>素材盘点 + DeckPlan JSON</td>
+            <td>价值在中间层，不在 PPT 导出</td>
+            <td>阶段 1-2 优先，阶段 3 延后</td>
+          </tr>
+          <tr>
+            <td><strong>高风险</strong></td>
+            <td>图片语义匹配</td>
+            <td>第一版很难全自动准确</td>
+            <td>只做候选推荐 + 人工替换</td>
+          </tr>
+          <tr>
+            <td><strong>高风险</strong></td>
+            <td>版式稳定</td>
+            <td>自动排版容易拼贴感强</td>
+            <td>固定两套模板，限制页面类型</td>
+          </tr>
+          <tr>
+            <td><strong>高风险</strong></td>
+            <td>判断空泛</td>
+            <td>通用 AI 容易生成漂亮废话</td>
+            <td>标题校验 + 来源约束 + “所以呢”检查</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="footer">
+      <strong>一句话口径：</strong>
+      PPT研发不是 PPT 导出功能，而是 DeckPlan 驱动的项目图文研判底稿能力；AI 先搭结构和证据骨架，人工再替图深化。
+    </div>
+  </main>
+</body>
+</html>
