@@ -533,7 +533,7 @@ export const api = {
   async staging(paths: string[]): Promise<StagingResult> {
     return request('/api/staging', { method: 'POST', body: JSON.stringify({ paths }) })
   },
-  /** 启动入库 job(五段流水线)，返回 job_id;进度经 /api/ingest/{id}/stream 的 SSE 推。 */
+  /** 启动入库 job(四段流水线:落盘/解析/入库索引/归档抽图)，返回 job_id;进度经 /api/ingest/{id}/stream 的 SSE 推。 */
   async ingestStart(paths: string[]): Promise<{ job_id: string }> {
     return request('/api/ingest', { method: 'POST', body: JSON.stringify({ paths }) })
   },
@@ -653,7 +653,7 @@ export const api = {
   ): Promise<{ status: string; created: number; existing: number; message: string }> {
     return request(`/api/projects/${projectId}/skill-results/${resultId}/to-assignments`, { method: 'POST' })
   },
-  // ── MoA 方案评审「设计委员会」(功能/甲方/成本三位评图人并发 + reasoner 聚合) ──
+  // ── MoA 方案评审「设计委员会」(设计总监/空间设计师/形式设计师三视角并发 + reasoner 聚合) ──
   async runMoaReview(projectId: number): Promise<MoaReviewResult> {
     return request(`/api/review-checklist/moa?project_id=${projectId}`, { method: 'POST' })
   },

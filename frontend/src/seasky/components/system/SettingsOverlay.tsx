@@ -92,7 +92,7 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
       /* 重拉状态 */
       const s = await api.getSettings()
       setSt((prev) => (prev ? { ...prev, keySet: s.deepseek_api_key_set, repoPath: s.repository_root_path } : prev))
-      /* 路径类变更 → 广播,让其它消费者(CleanupWizard 仓库 / CleanupOverlay 工作目录 / 首页收件箱 pill)
+      /* 路径类变更 → 广播,让其它消费者(CleanupWizard 仓库+工作目录 / 首页收件箱 pill)
          即时重读,杜绝「设置改了、别处还是旧值」的同步断链(事件命名约定:一类变更一个事件)。 */
       if (done.some((d) => d === '仓库' || d === '工作目录' || d === '收件箱')) {
         window.dispatchEvent(new CustomEvent('romai:settings-updated'))

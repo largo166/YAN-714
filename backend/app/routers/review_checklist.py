@@ -1,6 +1,7 @@
 """方案评审检查清单路由（MoA 版）。
 
-使用 MoA Lite 调度器：三位专家（功能/甲方/成本）并行分析，聚合模型整合输出结构化检查清单。
+使用 MoA Lite 调度器：三位评图人（设计总监/空间设计师/形式设计师,设计版三视角,见 moa.BUILTIN_MOA_PRESETS）
+并行分析，聚合模型整合输出结构化检查清单。
 
 端点：
 - POST /api/review-checklist/moa — 触发 MoA 方案评审
@@ -197,14 +198,21 @@ def get_review_history(project_id: int, limit: int = 5, db: Session = Depends(ge
         ProjectAnalysis.project_id == project_id,
         ProjectAnalysis.task == "review_moa"
     ).order_by(ProjectAnalysis.created_at.desc()).limit(limit).all()
-    
+
+    def _preview(a: ProjectAnalysis) -> str:
+        # 脏数据防御:content 非合法 JSON 时不 500,如实回 N/A(与上方端点的 parse 兜底同款口径)
+        try:
+            return json.loads(a.content).get("overall_score", "N/A") if a.content else "N/A"
+        except (ValueError, AttributeError):
+            return "N/A"
+
     return {
         "count": len(analyses),
         "items": [
             {
                 "id": a.id,
                 "created_at": a.created_at,
-                "checklist_preview": json.loads(a.content).get("overall_score", "N/A") if a.content else "N/A",
+                "checklist_preview": _preview(a),
             }
             for a in analyses
         ]

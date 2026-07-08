@@ -2,7 +2,7 @@ import { FlowBtn, FlowCard, FlowTonePill } from './flowKit'
 
 /* b2 · 一键清理动作卡(跳板版,ADR-001 裁决:破坏动作只在 b1 权威面执行)。
    营地收回独立执行权——不在对话气泡里跑 scan/preview/apply,只做"去数据基地清理"的深链跳板。
-   b1 的 CleanupOverlay(全屏浮层+两步双闸+撤销)是唯一权威操作面。 */
+   b1 的 CleanupWizard(三步向导:仓库→选取→执行,带确认屏与 SSE 进度)是唯一权威操作面。 */
 
 export function CleanupFlowCard({ onGoCleanup }: { onGoCleanup: () => void }) {
   return (

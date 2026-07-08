@@ -21,6 +21,8 @@ param(
   [string]$Exe = "dist_exe/ROM-AI.exe",
   [string]$DataDir = "",
   [switch]$KeepData,                 # 不清理 DataDir(L3 升级冒烟用,保留预置的老库)
+  [switch]$ExpectKeyless,            # T0-2 出包检查:断言包内无预置 key(keyless 包出包前必跑)
+  [switch]$ExpectKey,                # 反向:断言预置 key 已注入(显式带 key 包用)
   [int]$ReadyTimeoutSec = 40
 )
 
@@ -57,6 +59,16 @@ Write-Host "data_dir: $DataDir  (clean=$cleanup keepData=$KeepData)"
 $env:ROMAI_SMOKE = "1"
 $env:ROMAI_SMOKE_SECONDS = "90"
 $env:ROMAI_DATA_DIR = $DataDir
+
+# ── 密闭性:冒烟测的是「包里有什么」,不是「宿主机有什么」──
+# 开发机系统环境常有 DEEPSEEK_API_KEY 等变量,exe 子进程会继承 → pydantic Settings 环境变量
+# 优先于 env_file → keyless 包也会 seed 出 key,-ExpectKeyless 误报。启动前清掉,结束后恢复。
+$_isolated = @{}
+foreach ($k in @("DEEPSEEK_API_KEY","IMAGE_API_KEY","IMAGE_API_PROVIDER","IMAGE_API_BASE_URL")) {
+  $v = [Environment]::GetEnvironmentVariable($k)
+  if ($null -ne $v) { $_isolated[$k] = $v; Remove-Item "Env:$k" -ErrorAction SilentlyContinue }
+}
+if ($_isolated.Count -gt 0) { Write-Host ("env isolated: " + ($_isolated.Keys -join ", ")) }
 
 $proc = $null
 try {
@@ -117,6 +129,9 @@ try {
   Step "GET /api/settings (预置key状态)" {
     $r = Get-Json "/api/settings"
     Write-Host -NoNewline ("deepseek_api_key_set=$($r.deepseek_api_key_set) ")
+    # T0-2 出包防呆:keyless 包断言无 key;带 key 包断言有 key。两开关都不给则只报告不断言。
+    if ($ExpectKeyless -and $r.deepseek_api_key_set) { throw "断言失败:期望 keyless,但包内预置了 DeepSeek key(.env.bundle 被打入?)" }
+    if ($ExpectKey -and -not $r.deepseek_api_key_set) { throw "断言失败:期望预置 key,但未注入(构建时忘了 ROMAI_BUNDLE_KEY=1?)" }
   }
 
   # ── 前端 dist 同源托管(SPA index)──
@@ -131,6 +146,7 @@ try {
     try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
   }
   Remove-Item Env:ROMAI_SMOKE, Env:ROMAI_SMOKE_SECONDS, Env:ROMAI_DATA_DIR -ErrorAction SilentlyContinue
+  foreach ($k in $_isolated.Keys) { [Environment]::SetEnvironmentVariable($k, $_isolated[$k]) }  # 恢复宿主 env
   if ($cleanup -and -not $KeepData) {
     Start-Sleep -Milliseconds 500
     try { Remove-Item -Recurse -Force $DataDir -ErrorAction SilentlyContinue } catch {}

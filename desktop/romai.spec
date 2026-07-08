@@ -38,12 +38,24 @@ if ALEMBIC_DIR.is_dir():
 if ALEMBIC_INI.is_file():
     datas.append((str(ALEMBIC_INI), "."))                # → _MEIPASS/alembic.ini
 
-# ── 预置 key 分发(可选):若 desktop/.env.bundle 存在,打进 _MEIPASS 根 ──
-# 不入 git(.gitignore 的 .env.*)。首启 config._bootstrap_bundled_env 复制到 DATA_DIR/.env。
-# 无此文件时正常打包(空 key,收件人自己在设置页填)。
+# ── 预置 key 分发(显式开关制,2026-07-08 T0-2 防呆) ──
+# 旧行为:desktop/.env.bundle 在场就静默打入 → 忘了移走就把真 key 发出去。
+# 新行为:默认 keyless——即使 .env.bundle 在场也【不】打入;
+#         只有构建时显式设 ROMAI_BUNDLE_KEY=1 才打入,且打入时在构建输出里大声宣告。
+# 首启注入机制不变:config._bootstrap_bundled_env 复制 _MEIPASS/.env.bundle → DATA_DIR/.env。
+import os as _os
 BUNDLE_ENV = ROOT / "desktop" / ".env.bundle"
-if BUNDLE_ENV.is_file():
+_want_key = _os.environ.get("ROMAI_BUNDLE_KEY", "").strip() == "1"
+if _want_key:
+    if not BUNDLE_ENV.is_file():
+        raise SystemExit("ROMAI_BUNDLE_KEY=1 但 desktop/.env.bundle 不存在——要么建文件,要么去掉开关。")
     datas.append((str(BUNDLE_ENV), "."))
+    print("=" * 62)
+    print("!! 本次打包内含预置 key (.env.bundle) —— 仅限可信范围分发 !!")
+    print("=" * 62)
+else:
+    if BUNDLE_ENV.is_file():
+        print("[keyless] desktop/.env.bundle 在场但未打入(默认 keyless;要预置 key 请设 ROMAI_BUNDLE_KEY=1)")
 # 带数据/模板的第三方包
 for pkg in ("docx", "pptx", "fitz", "pymupdf"):
     try:

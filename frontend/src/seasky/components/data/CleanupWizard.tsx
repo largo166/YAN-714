@@ -9,7 +9,7 @@ import { GhostButton, Label, Pill } from '../common/PillButton'
 
 /* ═══ b1 · 一键清理+入库 三步向导(海天全高抽屉) ═══
    ①仓库(repository_root_path 受管资料库根) ②选取(选桌面文件/文件夹→staging收料单)
-   ③执行(五段入库流水线:落盘→解析→入库索引→归档抽图, SSE 逐文件逐段进度)。
+   ③执行(四段入库流水线:落盘→解析→入库索引→归档抽图, SSE 逐文件逐段进度)。
 
    dev 态说明(检查点① · 无新列版):
    - 选文件夹走 FolderPicker(自绘 list-dir)降级;原生对话框+多选文件待 exe 阶段接 pywebview 桥。
@@ -320,7 +320,7 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
             </div>
           )}
 
-          {/* ── 第三步:执行(五段入库流水线 + SSE 进度) ── */}
+          {/* ── 第三步:执行(四段入库流水线 + SSE 进度) ── */}
           {step === 3 && (
             <div className="flex flex-col gap-4">
               {!running && !receipt && (
@@ -328,7 +328,7 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
                   <div className="rounded-skcard border-[0.5px] border-sk-border bg-sk-card p-4">
                     <div className="font-skcjk text-[13px] text-sk-fg">将入库 <b className="text-sk-primary">{selectedSupportedCount()}</b> 个可解析文件{staging?.selection_mode === 'multi' && !forceSingle ? `（${effectiveIngestPaths().length} 个项目）` : ''}</div>
                     <div className="mt-1 break-all font-skmono text-[11px] text-sk-muted2">目标仓库:{repoPath}</div>
-                    <div className="mt-2 font-skcjk text-[12px] font-medium text-sk-ok">五段:识别 → 抽取 → 切块 → 索引 → 归档</div>
+                    <div className="mt-2 font-skcjk text-[12px] font-medium text-sk-ok">四段:落盘 → 解析(识别·抽取·切块) → 入库索引 → 归档抽图</div>
                   </div>
                   <div><GhostButton pri disabled={selectedSupportedCount() === 0} onClick={() => void doIngest()}>开始入库</GhostButton></div>
                 </>

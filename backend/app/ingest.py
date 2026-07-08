@@ -1,6 +1,6 @@
 """一键清理·入库编排器（检查点① 铁条3，dev 态）。
 
-把 inbox.scan_once 的单文件五段逻辑抽成可复用编排，对 staging 选中的文件逐个跑：
+把 inbox.scan_once 的单文件逐段逻辑抽成可复用编排，对 staging 选中的文件逐个跑四段：
   落盘 → 解析(识别·抽取·切块，parse_file 一次原子调用) → 入库+索引 → 归档抽图。
 逐文件逐段真实推进度（不拆假进度：解析是一次调用，如实标一段）。
 
@@ -10,7 +10,7 @@
   本 dev 版不做续跑：进程重开进度即丢、重跑（回执去重仍靠 _already_imported，不会产生重复入库）。
 - 归档全部完成后，挂一次研判触发钩子（零·B2）：对项目排队调现有 analyze（复用，不新造）。
 
-DeepSeek 边界（零·B1）：五段内零 LLM，纯机械确定性。研判在五段之后的独立异步环节。
+DeepSeek 边界（零·B1）：四段内零 LLM，纯机械确定性。研判在四段之后的独立异步环节。
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ from .routers.project_files import (
 _JOBS: dict[str, dict] = {}
 _LOCK = threading.Lock()
 
-# 五段真实边界（解析含识别·抽取·切块，一次原子调用，如实标一段，不拆假进度）
+# 四段真实边界（解析含识别·抽取·切块，一次原子调用，如实标一段，不拆假进度）
 STAGES = ["落盘", "解析(识别·抽取·切块)", "入库索引", "归档抽图"]
 
 
@@ -87,7 +87,7 @@ def _group_by_source(paths: list[str]) -> dict[str, list[Path]]:
 
 
 def _ingest_worker(job_id: str, paths: list[str]) -> None:
-    """后台线程：逐文件跑五段。自建 DB 会话（不跨线程共享）。"""
+    """后台线程：逐文件跑四段。自建 DB 会话（不跨线程共享）。"""
     db = SessionLocal()
     try:
         groups = _group_by_source(paths)
@@ -179,7 +179,7 @@ def _ingest_worker(job_id: str, paths: list[str]) -> None:
                 skipped=skipped, failed=failed, project_ids=list(project_ids))
 
         # 归档全部完成 → 研判触发钩子（零·B2）：对每个项目排队跑一次现有 analyze（复用，不新造）。
-        # 非阻塞：失败/未配 key 不影响入库回执，五段回执已在上面 done 事件给出。
+        # 非阻塞：失败/未配 key 不影响入库回执，四段回执已在上面 done 事件给出。
         for pid in project_ids:
             _trigger_analysis(db, pid, job_id)
     finally:
@@ -192,7 +192,7 @@ def _trigger_analysis(db, project_id: int, job_id: str) -> None:
     真实复用入口 = project_analysis.analyze 的核心三步（analysis.gather_material →
     structured_judgment.run_structured → 落 ProjectAnalysis，task='overview'，force=False 读缓存）。
     该端点带 FastAPI Depends，不宜在后台线程直接调；精确复用（抽公共函数或 httpx 自调）
-    留到 S4.5 独立校准。本 S4 版只记事件、不阻断入库回执——五段回执已在 done 事件给出。
+    留到 S4.5 独立校准。本 S4 版只记事件、不阻断入库回执——四段回执已在 done 事件给出。
     """
     _event(job_id, kind="analysis", project_id=project_id, status="deferred",
             reason="研判触发钩子待 S4.5 精确复用 analyze(overview)；本版不阻断入库")
