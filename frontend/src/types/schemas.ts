@@ -317,6 +317,10 @@ export const KnowledgeHitSchema = z.object({
   project_id: z.number().default(0),
   project_name: z.string().default(''),
   project_file_id: z.number().default(0),
+  // ── P0+ 资产卡(已批):可定位态/文件夹/绝对路径(复制用) ──
+  locate_status: z.string().default(''),
+  folder_hint: z.string().default(''),
+  abs_path: z.string().default(''),
 })
 export type KnowledgeHit = z.infer<typeof KnowledgeHitSchema>
 

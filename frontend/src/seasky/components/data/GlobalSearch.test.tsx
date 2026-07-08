@@ -34,7 +34,8 @@ function hit(over: Record<string, unknown> = {}) {
   return {
     document_id: 1, title: '总图.pdf', snippet: '…总图…', score: 1, matched_text: '总图',
     engine: 'fts5', locator: '', file_type: 'pdf', doc_type: '图纸', updated_at: '2026-07-08T00:00:00',
-    project_id: 1, project_name: '石家庄市庄地块', project_file_id: 11, ...over,
+    project_id: 1, project_name: '石家庄市庄地块', project_file_id: 11,
+    locate_status: '可定位', folder_hint: '…/市庄/图纸/', abs_path: 'C:\\仓库\\市庄\\图纸\\总图.pdf', ...over,
   }
 }
 
@@ -79,7 +80,8 @@ describe('GlobalSearch 交互', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
     expect(h.api.searchKnowledge).not.toHaveBeenCalled() // 未猜
     expect(screen.getByText(/匹配到 2 个项目/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '市庄二期' }))
+    /* 候选卡是含项目名+城市甲方阶段两行的 button——按文本找再点父 button */
+    await userEvent.click(screen.getByText('市庄二期'))
     await waitFor(() => expect(h.api.searchKnowledge).toHaveBeenCalledWith('总图', 24, 2))
   })
 
@@ -92,17 +94,25 @@ describe('GlobalSearch 交互', () => {
     expect(screen.getByText(/未识别项目「不存在」,已按全库检索/)).toBeInTheDocument()
   })
 
-  it('命中按类型分组;reveal 按钮仅 project_file_id>0 出现', async () => {
+  it('命中按类型分组;缺失卡无打开/复制路径按钮(不假按钮)', async () => {
     h.api.searchKnowledge.mockResolvedValue({
       query: '', engine: 'fts5',
-      hits: [hit(), hit({ document_id: 2, title: '纪要.md', doc_type: '会议纪要', project_file_id: 0 })],
+      hits: [
+        hit(),
+        hit({ document_id: 2, title: '纪要.md', doc_type: '会议纪要', project_file_id: 0, locate_status: '', abs_path: '' }),
+        hit({ document_id: 3, title: '旧图.dwg', locate_status: '文件缺失', abs_path: '' }),
+      ],
     })
     mountOpen()
     await userEvent.type(screen.getByRole('textbox'), '总图')
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
-    await waitFor(() => expect(screen.getByText('图纸')).toBeInTheDocument())
-    expect(screen.getByText('会议纪要')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: '打开所在位置' })).toHaveLength(1) // 只有 file_id>0 那条
+    await waitFor(() => expect(screen.getAllByText('图纸').length).toBeGreaterThan(0)) // 分组头+卡meta行均含
+    expect(screen.getAllByText('会议纪要').length).toBeGreaterThan(0)
+    // 可定位卡有四动作;缺失卡与无关联卡都不显示"打开所在位置"与复制路径
+    expect(screen.getAllByRole('button', { name: '打开所在位置' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: '复制文件路径' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /复制文件名/ })).toHaveLength(3) // 复制文件名人人有
+    expect(screen.getByText(/物理文件不在预期位置/)).toBeInTheDocument() // 缺失卡红字指引
   })
 
   it('reveal 失败(文件缺失404) → 如实显示可读错误,不静默', async () => {
@@ -114,5 +124,19 @@ describe('GlobalSearch 交互', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '打开所在位置' })).toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: '打开所在位置' }))
     await waitFor(() => expect(screen.getByText(/库健康体检/)).toBeInTheDocument())
+  })
+
+  it('复制三件套:路径/文件夹/文件名内容正确(P0+-2)', async () => {
+    const written: string[] = []
+    Object.assign(navigator, { clipboard: { writeText: (t: string) => { written.push(t); return Promise.resolve() } } })
+    h.api.searchKnowledge.mockResolvedValue({ query: '', engine: 'fts5', hits: [hit()] })
+    mountOpen()
+    await userEvent.type(screen.getByRole('textbox'), '总图')
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    await waitFor(() => expect(screen.getByRole('button', { name: '复制文件路径' })).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '复制文件路径' }))
+    await userEvent.click(screen.getByRole('button', { name: '复制文件夹路径' }))
+    await userEvent.click(screen.getByRole('button', { name: /复制文件名/ }))
+    expect(written).toEqual(['C:\\仓库\\市庄\\图纸\\总图.pdf', 'C:\\仓库\\市庄\\图纸', '总图.pdf'])
   })
 })

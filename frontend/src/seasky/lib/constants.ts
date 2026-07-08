@@ -36,6 +36,7 @@ export const LS_KEYS = {
   board: 'romai_seasky_board',
   campTab: 'romai_seasky_camp_tab',
   model: 'romai_seasky_model',
+  recentSearchProject: 'romai_seasky_recent_search_proj', // P0+:重名弹选最近置顶
 } as const
 
 /** 设计基准逻辑分辨率(流体舞台的缩放基准) */

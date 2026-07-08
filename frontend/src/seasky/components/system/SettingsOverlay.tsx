@@ -3,63 +3,150 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import FolderPicker from '@/components/FolderPicker'
 
-import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
-import { GhostButton, Pill } from '../common/PillButton'
+import { GhostButton } from '../common/PillButton'
 
-/* ═══ 设置浮层(退役前置:紫黑 SettingsDrawer 的核心配置能力海天化) ═══
-   四项:DeepSeek Key/知识仓库/工作目录/收件箱——全走既有端点,密钥只写不回显。
-   三路径语义(别串台):
-   - 知识仓库 = repository_root_path(受管资料库根,整理入库落 {仓库}/{项目名}/)
-   - 工作目录 = workspace_path(一键清理垃圾作用的设计工作目录)
-   - 收件箱   = inbox_root_path(60s 自动扫描入库的目录)
-   三者各选各的文件夹,不可混填。选文件夹走 FolderPicker(dev);exe 走 pywebview 原生桥。 */
+/* ═══ 设置 · 两栏化(P0+ 已批,小样v4确认) ═══
+   左栏两分区 IA(Linkly 骨架·海天皮):偏好设置(通用/快捷键/数据隐私/关于)+
+   功能(资料路径/项目库/索引/AI引擎/检索/集成·规划)。
+   已批取舍:「账户」有意不设(无账户=隐私卖点);MCP 并入「集成(规划)」占位。
+   右栏行范式:标题+一句人话说明+右侧控件/态徽标;"规划"标签项不假装已有。
+   数据全真:健康/checks 走 /api/knowledge/health;路径走 settings/workspace/inbox 现有端点。 */
 
-type PickTarget = 'repo' | 'ws' | 'inbox'
+type PageKey = 'general' | 'hotkeys' | 'privacy' | 'about' | 'paths' | 'projects' | 'index' | 'ai' | 'search' | 'integrations'
 
-interface SettingsState {
-  keySet: boolean
-  repoPath: string
-  wsPath: string
-  inboxPath: string
+const NAV: { section: string; items: { key: PageKey; label: string; plan?: boolean }[] }[] = [
+  {
+    section: '偏好设置',
+    items: [
+      { key: 'general', label: '通用' },
+      { key: 'hotkeys', label: '快捷键' },
+      { key: 'privacy', label: '数据隐私' },
+      { key: 'about', label: '关于' },
+    ],
+  },
+  {
+    section: '功能',
+    items: [
+      { key: 'paths', label: '资料路径' },
+      { key: 'projects', label: '项目库' },
+      { key: 'index', label: '索引' },
+      { key: 'ai', label: 'AI 引擎' },
+      { key: 'search', label: '检索' },
+      { key: 'integrations', label: '集成', plan: true },
+    ],
+  },
+]
+
+type Health = Awaited<ReturnType<typeof api.knowledgeHealth>> & {
+  checks?: { fts: boolean; ocr: boolean; repo_path_set: boolean; repo_path_ok: boolean; last_indexed_at: string }
+}
+
+/* ── 行范式原子 ── */
+function Row({ title, desc, plan, children }: { title: string; desc: string; plan?: boolean; children?: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 border-b-[0.5px] border-sk-hairsoft py-3.5 last:border-b-0">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 font-skcjk text-[13px] font-normal tracking-[0.05em] text-sk-fg">
+          {title}
+          {plan && (
+            <span className="rounded-full border-[0.5px] border-sk-hairsoft px-2 py-[1px] font-skcjk text-[9px] font-light tracking-[0.1em] text-sk-muted2">
+              规划中
+            </span>
+          )}
+        </div>
+        <div className="mt-1 font-skcjk text-[10.5px] font-light leading-[1.65] tracking-[0.04em] text-sk-muted2">{desc}</div>
+      </div>
+      <div className="flex flex-none items-center gap-2 pt-1">{children}</div>
+    </div>
+  )
+}
+
+function Dot({ text, tone }: { text: string; tone: 'ok' | 'warn' | 'risk' | 'mut' }) {
+  const c = { ok: 'text-sk-ok', warn: 'text-sk-warn', risk: 'text-sk-risk', mut: 'text-sk-muted2' }[tone]
+  const bg = { ok: 'bg-[#7ec9a5]', warn: 'bg-[#c9b27f]', risk: 'bg-[#cf7f7f]', mut: 'bg-[#a1a5aa]' }[tone]
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border-[0.5px] border-sk-hairsoft px-2.5 py-[2px] font-skcjk text-[10px] font-light ${c}`}>
+      <i className={`inline-block h-[5px] w-[5px] rounded-full ${bg}`} />
+      {text}
+    </span>
+  )
+}
+
+function Sect({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-1 mt-4 font-sans text-[8.5px] font-medium uppercase tracking-[0.26em] text-sk-muted2">{children}</div>
+  )
+}
+
+function PageHead({ cn, en, note }: { cn: string; en: string; note: string }) {
+  return (
+    <div className="flex items-baseline gap-3 border-b-[0.5px] border-sk-hairsoft pb-3">
+      <span className="font-skcjk text-[16px] font-normal tracking-[0.1em] text-sk-fg">{cn}</span>
+      <span className="font-sans text-[9px] font-light uppercase tracking-[0.22em] text-sk-muted2">{en}</span>
+      <span className="ml-auto font-skcjk text-[10.5px] font-light text-sk-muted2">{note}</span>
+    </div>
+  )
+}
+
+function Kbd({ k }: { k: string }) {
+  return (
+    <span className="rounded-[6px] border-[0.5px] border-sk-hair px-2 py-[2px] font-sans text-[10px] text-sk-muted">{k}</span>
+  )
 }
 
 export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [st, setSt] = useState<SettingsState | null>(null)
+  const [page, setPage] = useState<PageKey>('general')
   const [err, setErr] = useState('')
-  const [draft, setDraft] = useState({ key: '', repo: '', ws: '', inbox: '' })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
-  const [picker, setPicker] = useState<PickTarget | null>(null)
-  /* 库健康体检(只读):四态计数 + root 脱节 */
-  const [health, setHealth] = useState<Awaited<ReturnType<typeof api.knowledgeHealth>> | null>(null)
+  const [picker, setPicker] = useState<'repo' | 'ws' | 'inbox' | null>(null)
+  const [keySet, setKeySet] = useState(false)
+  const [draft, setDraft] = useState({ key: '', repo: '', ws: '', inbox: '' })
+  const [saved, setSaved] = useState({ repo: '', ws: '', inbox: '' })
+  const [health, setHealth] = useState<Health | null>(null)
   const [healthBusy, setHealthBusy] = useState(false)
-  const [healthErr, setHealthErr] = useState('')
-  const runHealth = async () => {
-    setHealthBusy(true); setHealthErr(''); setHealth(null)
-    try { setHealth(await api.knowledgeHealth()) }
-    catch (e) { setHealthErr((e as Error).message) }
-    finally { setHealthBusy(false) }
-  }
+  const [projList, setProjList] = useState<{ id: number; name: string; city: string; client: string }[]>([])
+  const [stats, setStats] = useState<{ documents: number; indexed: number; engine: string } | null>(null)
+  const [typeStats, setTypeStats] = useState<[string, number][]>([])
 
+  /* 打开即拉全量(设置/工作目录/收件箱/健康/项目/统计) */
   useEffect(() => {
     if (!open) return
     let alive = true
     ;(async () => {
-      try {
-        const [s, w, i] = await Promise.allSettled([api.getSettings(), api.workspaceStatus(), api.inboxStatus()])
-        if (!alive) return
-        const settings = s.status === 'fulfilled' ? s.value : null
-        const ws = w.status === 'fulfilled' ? w.value : null
-        const ib = i.status === 'fulfilled' ? i.value : null
-        setSt({
-          keySet: settings?.deepseek_api_key_set ?? false,
-          repoPath: settings?.repository_root_path ?? '',
-          wsPath: ws?.workspace_path ?? '',
-          inboxPath: ib?.inbox_root_path ?? '',
-        })
-        setDraft({ key: '', repo: settings?.repository_root_path ?? '', ws: ws?.workspace_path ?? '', inbox: ib?.inbox_root_path ?? '' })
-      } catch (e) {
-        if (alive) setErr((e as Error).message)
+      const [s, w, i, h, p, st, docs] = await Promise.allSettled([
+        api.getSettings(),
+        api.workspaceStatus(),
+        api.inboxStatus(),
+        api.knowledgeHealth(),
+        api.listProjects(),
+        api.getKnowledgeStats(),
+        api.listKnowledgeDocs(),
+      ])
+      if (!alive) return
+      if (s.status === 'fulfilled') {
+        setKeySet(s.value.deepseek_api_key_set)
+        setSaved((v) => ({ ...v, repo: s.value.repository_root_path ?? '' }))
+        setDraft((d) => ({ ...d, repo: s.value.repository_root_path ?? '' }))
+      }
+      if (w.status === 'fulfilled') {
+        setSaved((v) => ({ ...v, ws: w.value.workspace_path ?? '' }))
+        setDraft((d) => ({ ...d, ws: w.value.workspace_path ?? '' }))
+      }
+      if (i.status === 'fulfilled') {
+        setSaved((v) => ({ ...v, inbox: i.value.inbox_root_path ?? '' }))
+        setDraft((d) => ({ ...d, inbox: i.value.inbox_root_path ?? '' }))
+      }
+      if (h.status === 'fulfilled') setHealth(h.value as Health)
+      if (p.status === 'fulfilled') setProjList(p.value.items as never)
+      if (st.status === 'fulfilled') setStats(st.value)
+      if (docs.status === 'fulfilled') {
+        const m = new Map<string, number>()
+        for (const d of docs.value.items as { type?: string }[]) {
+          const t = d.type || '其他'
+          m.set(t, (m.get(t) ?? 0) + 1)
+        }
+        setTypeStats([...m.entries()].sort((a, b) => b[1] - a[1]))
       }
     })()
     return () => {
@@ -68,32 +155,31 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
   }, [open])
 
   const save = async () => {
-    setBusy(true); setMsg(''); setErr('')
+    setBusy(true)
+    setMsg('')
+    setErr('')
     const done: string[] = []
     try {
       if (draft.key.trim()) {
         await api.updateSettings({ deepseek_api_key: draft.key.trim() })
         done.push('AI Key')
         setDraft((d) => ({ ...d, key: '' }))
+        setKeySet(true)
       }
-      if (draft.repo.trim() && draft.repo.trim() !== st?.repoPath) {
+      if (draft.repo.trim() && draft.repo.trim() !== saved.repo) {
         await api.updateSettings({ repository_root_path: draft.repo.trim() })
         done.push('仓库')
       }
-      if (draft.ws.trim() !== (st?.wsPath ?? '')) {
+      if (draft.ws.trim() !== saved.ws) {
         await api.workspaceConfig(draft.ws.trim())
         done.push('工作目录')
       }
-      if (draft.inbox.trim() !== (st?.inboxPath ?? '')) {
+      if (draft.inbox.trim() !== saved.inbox) {
         await api.inboxConfig(draft.inbox.trim())
         done.push('收件箱')
       }
       setMsg(done.length ? `已保存:${done.join(' / ')}` : '没有改动。')
-      /* 重拉状态 */
-      const s = await api.getSettings()
-      setSt((prev) => (prev ? { ...prev, keySet: s.deepseek_api_key_set, repoPath: s.repository_root_path } : prev))
-      /* 路径类变更 → 广播,让其它消费者(CleanupWizard 仓库+工作目录 / 首页收件箱 pill)
-         即时重读,杜绝「设置改了、别处还是旧值」的同步断链(事件命名约定:一类变更一个事件)。 */
+      setSaved({ repo: draft.repo.trim(), ws: draft.ws.trim(), inbox: draft.inbox.trim() })
       if (done.some((d) => d === '仓库' || d === '工作目录' || d === '收件箱')) {
         window.dispatchEvent(new CustomEvent('romai:settings-updated'))
       }
@@ -104,11 +190,317 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
     }
   }
 
+  const runHealth = async () => {
+    setHealthBusy(true)
+    try {
+      setHealth((await api.knowledgeHealth()) as Health)
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setHealthBusy(false)
+    }
+  }
+
   if (!open) return null
-  const row = 'flex items-center gap-3'
-  const label = 'w-[96px] flex-none font-skcjk text-[12px] font-light tracking-[0.08em] text-sk-muted'
-  const input =
-    'min-w-0 flex-1 border-0 border-b border-sk-hair bg-transparent pb-1 font-skcjk text-[12.5px] font-light text-sk-fg outline-none placeholder:text-sk-muted2 focus:border-sk-primary transition-colors'
+
+  const pathRow = (
+    title: string,
+    desc: string,
+    field: 'repo' | 'ws' | 'inbox',
+  ) => (
+    <Row title={title} desc={desc}>
+      <span className="max-w-[200px] truncate font-skmono text-[10.5px] text-sk-muted">{draft[field] || '未配置'}</span>
+      <GhostButton className="px-3 py-[5px]" onClick={() => setPicker(field)}>
+        选择
+      </GhostButton>
+    </Row>
+  )
+
+  /* ── 各页内容 ── */
+  const pages: Record<PageKey, React.ReactNode> = {
+    general: (
+      <>
+        <PageHead cn="通用" en="General" note="应用偏好" />
+        <Row title="视觉主题" desc="海天 OS(深色)。锁版视觉面,主题切换未开放。">
+          <Dot text="海天" tone="mut" />
+        </Row>
+        <Row title="开机动画" desc="启动时的海平线开场。已看过则自动跳过,可在开场时按 Esc 直达。">
+          <Dot text="智能跳过" tone="ok" />
+        </Row>
+        <Row title="数据目录" desc="索引、设置和日志的存储位置(%LOCALAPPDATA%\ROM-AI)。非必要切勿修改。" />
+      </>
+    ),
+    hotkeys: (
+      <>
+        <PageHead cn="快捷键" en="Hotkeys" note="全键盘操作" />
+        <Sect>全局</Sect>
+        <Row title="全局检索" desc="任何板块唤起检索浮层。">
+          <Kbd k="Ctrl" />
+          <Kbd k="K" />
+        </Row>
+        <Row title="切换板块" desc="五大板块直达。">
+          <Kbd k="1" />
+          <span className="font-skcjk text-[10px] text-sk-muted2">…</span>
+          <Kbd k="5" />
+        </Row>
+        <Sect>检索浮层</Sect>
+        <Row title="执行检索" desc="输入框内回车。">
+          <Kbd k="Enter" />
+        </Row>
+        <Row title="关闭浮层" desc="检索/设置浮层通用。">
+          <Kbd k="Esc" />
+        </Row>
+        <Sect>开场</Sect>
+        <Row title="暂停 / 跳过开机动画" desc="影片阶段可用。">
+          <Kbd k="Space" />
+          <Kbd k="Esc" />
+        </Row>
+      </>
+    ),
+    privacy: (
+      <>
+        <PageHead cn="数据隐私" en="Privacy" note="哪些数据会离开这台机器 · 如实分级" />
+        <div className="mt-3.5 rounded-[12px] border-[0.5px] border-sk-hair bg-[rgba(242,241,238,.02)] px-4.5 py-3.5 px-[18px]">
+          <div className="mb-1.5 font-skcjk text-[12.5px] font-normal tracking-[0.08em] text-sk-fg">我们不做的事</div>
+          {[
+            '永不公网——检索、文档、未来的对外接口全部只在本机(投标资料涉密纪律)',
+            '不采集遥测,不上报任何使用数据',
+            '不做强制账号,全部能力本机可用',
+            '密钥仅写入不回显',
+          ].map((t) => (
+            <div key={t} className="flex gap-2 py-[5px] font-skcjk text-[11.5px] font-light text-sk-muted">
+              <span className="text-sk-ok">✓</span>
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3.5 flex gap-2.5">
+          <div className="flex-1 rounded-[12px] border-[0.5px] border-sk-hair bg-[rgba(242,241,238,.02)] px-4 py-3">
+            <Dot text="本机" tone="ok" />
+            <div className="mt-2 font-skcjk text-[10.5px] font-light leading-[1.6] text-sk-muted2">
+              任务在本地完成,数据不离开这台机器。
+              <br />
+              文档原文 / 全文索引 / OCR / 库体检
+            </div>
+          </div>
+          <div className="flex-1 rounded-[12px] border-[0.5px] border-sk-hair bg-[rgba(242,241,238,.02)] px-4 py-3">
+            <Dot text="第三方(仅AI调用)" tone="warn" />
+            <div className="mt-2 font-skcjk text-[10.5px] font-light leading-[1.6] text-sk-muted2">
+              仅发送该任务所需文本。
+              <br />
+              AI 研判·DeepSeek / 生图·APImart / 腾讯会议
+            </div>
+          </div>
+          <div className="flex-1 rounded-[12px] border-[0.5px] border-[rgba(207,127,127,.35)] bg-[rgba(242,241,238,.02)] px-4 py-3">
+            <Dot text="公网" tone="risk" />
+            <div className="mt-2 font-skcjk text-[10.5px] font-light leading-[1.6] text-sk-muted2">
+              0 项 · 永久禁止。
+              <br />
+              无隧道、无远程访问——设计决定,非待开发。
+            </div>
+          </div>
+        </div>
+        <Sect>逐项分级</Sect>
+        <Row title="文档原文" desc="存储在本机知识仓库,永不上传。">
+          <Dot text="本机" tone="ok" />
+        </Row>
+        <Row title="全文索引" desc="FTS5 本机索引,检索时不联网。">
+          <Dot text="本机" tone="ok" />
+        </Row>
+        <Row title="AI 研判 / 纪要 / 技能" desc="调用 DeepSeek,仅发送该任务所需文本;停用 Key 即完全本地。">
+          <Dot text="第三方" tone="warn" />
+        </Row>
+        <Row title="生图" desc="APImart,仅发送提示词与参考图。">
+          <Dot text="第三方" tone="warn" />
+        </Row>
+        <Row title="远程 / 公网访问" desc="无隧道、无远程访问能力。这是设计决定,不是待开发项。">
+          <Dot text="禁止" tone="risk" />
+        </Row>
+      </>
+    ),
+    about: (
+      <>
+        <PageHead cn="关于" en="About" note="应用信息" />
+        <Row title="版本" desc="ROM-AI 内测版。">
+          <span className="font-sans text-[11px] text-sk-muted">internal-0.2+</span>
+        </Row>
+        <Row title="数据目录" desc="索引、设置和日志的存储位置。exe 形态在 %LOCALAPPDATA%\ROM-AI。" />
+        <Row title="设计语言" desc="海天 OS——海平线、深水层、细字重。锁版视觉面。" />
+      </>
+    ),
+    paths: (
+      <>
+        <PageHead cn="资料路径" en="Paths" note="三条路径各司其职 · 不可混填" />
+        {pathRow('知识仓库', '整理入库的资料复制到这里,按项目归档。检索与打开位置都指向此根。', 'repo')}
+        {pathRow('工作目录', '「一键清理」作用的设计工作目录——只扫描整理,不迁移文件。', 'ws')}
+        {pathRow('收件箱', '同事丢文件的中转文件夹。点「立即扫描」把新文件收进知识仓库,留空=停用。', 'inbox')}
+        <div className="flex items-center gap-3 pt-3">
+          <GhostButton pri onClick={() => void save()}>
+            {busy ? '保存中…' : '保存'}
+          </GhostButton>
+          {msg && <span className="font-skcjk text-[11.5px] font-light text-sk-ok">{msg}</span>}
+          {err && <span className="font-skcjk text-[11.5px] font-light text-sk-risk">{err}</span>}
+        </div>
+      </>
+    ),
+    projects: (
+      <>
+        <PageHead cn="项目库" en="Projects" note={`${projList.length} 个项目`} />
+        {projList.length === 0 && (
+          <div className="py-3 font-skcjk text-[12px] font-light text-sk-muted">暂无项目。入库资料时按来源文件夹自动建项。</div>
+        )}
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
+          {projList.map((p) => (
+            <div key={p.id} className="rounded-[12px] border-[0.5px] border-sk-hair bg-[rgba(242,241,238,.02)] px-4 py-3">
+              <div className="truncate font-skcjk text-[13px] font-normal tracking-[0.04em] text-sk-fg">{p.name}</div>
+              <div className="mt-1 font-skcjk text-[10.5px] font-light tracking-[0.06em] text-sk-muted2">
+                {p.city || '—'} · {p.client || '—'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    ),
+    index: (
+      <>
+        <PageHead cn="索引" en="Index" note="库的真实状态 · 只读" />
+        <div className="mt-4">
+          <span className="font-sans text-[34px] font-medium text-sk-fg [font-variant-numeric:tabular-nums]">
+            {stats ? stats.documents : '…'}
+          </span>
+          <span className="ml-2 font-skcjk text-[12px] font-light text-sk-muted2">
+            个文档{stats && stats.indexed >= stats.documents ? ' · 全部已入全文索引' : stats ? ` · 已索引 ${stats.indexed}` : ''}
+          </span>
+        </div>
+        {typeStats.length > 0 && (
+          <>
+            <div className="mt-2.5 flex h-[6px] overflow-hidden rounded-full">
+              {typeStats.map(([t, n], i) => (
+                <i key={t} style={{ flex: n, background: ['#7fb3cf', '#a8cfe0', '#4f7f9e', '#d7e5ec', 'rgba(161,165,170,.35)'][i % 5] }} />
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-skcjk text-[10px] font-light text-sk-muted2">
+              {typeStats.map(([t, n], i) => (
+                <span key={t}>
+                  <i
+                    className="mr-1 inline-block h-[6px] w-[6px] rounded-[2px]"
+                    style={{ background: ['#7fb3cf', '#a8cfe0', '#4f7f9e', '#d7e5ec', 'rgba(161,165,170,.5)'][i % 5] }}
+                  />
+                  {t} {n}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+        <Sect>检索能力</Sect>
+        <Row title="全文检索" desc="FTS5 全文索引+中文分词。异常时自动降级为基础匹配,不中断检索。">
+          {health?.checks ? <Dot text={health.checks.fts ? '运行中' : '已降级'} tone={health.checks.fts ? 'ok' : 'warn'} /> : <Dot text="…" tone="mut" />}
+        </Row>
+        <Row title="图片文字识别" desc="扫描件与图片的 OCR(RapidOCR,本机推理,不联网)。">
+          {health?.checks ? <Dot text={health.checks.ocr ? '已就绪 ✓' : '未安装'} tone={health.checks.ocr ? 'ok' : 'mut'} /> : <Dot text="…" tone="mut" />}
+        </Row>
+        <Row title="语义检索" desc="按含义找资料(同义词/跨语言)。未接入——列在路线图 P4,不占资源。">
+          <Dot text="未接入" tone="mut" />
+        </Row>
+        <Sect>库健康</Sect>
+        <Row
+          title="文件完整性"
+          desc={
+            health
+              ? `最近体检:${health.counts.missing} 丢失 · ${health.counts.detached} 根脱节 · ${health.counts.orphan} 孤儿。四态体检按需运行。`
+              : '四态体检(在位/丢失/孤儿/根脱节)按需运行。'
+          }
+        >
+          {health &&
+            (health.counts.missing + health.counts.detached > 0 ? (
+              <Dot text={`${health.counts.missing + health.counts.detached} 异常`} tone="risk" />
+            ) : health.counts.orphan > 0 ? (
+              <Dot text={`${health.counts.orphan} 孤儿`} tone="warn" />
+            ) : (
+              <Dot text="全部在位 ✓" tone="ok" />
+            ))}
+          <GhostButton className="px-3 py-[5px]" onClick={() => void runHealth()}>
+            {healthBusy ? '体检中…' : '库健康体检'}
+          </GhostButton>
+        </Row>
+        <Row title="最后入库" desc="最近一次资料进入知识仓库的时间。">
+          <span className="font-skcjk text-[11px] font-light text-sk-muted">
+            {health?.checks?.last_indexed_at ? health.checks.last_indexed_at.slice(0, 16).replace('T', ' ') : '—'}
+          </span>
+        </Row>
+      </>
+    ),
+    ai: (
+      <>
+        <PageHead cn="AI 引擎" en="AI Engine" note="生成引擎与本地智能能力" />
+        <Sect>生成引擎</Sect>
+        <div className="flex items-center gap-3 rounded-[12px] border-[0.5px] border-sk-hair bg-[rgba(242,241,238,.02)] px-4 py-3">
+          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] border-[0.5px] border-[rgba(127,179,207,.4)] font-sans text-[11px] font-medium text-sk-primary">
+            DS
+          </span>
+          <span className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="font-skcjk text-[13px] font-normal text-sk-fg">DeepSeek</span>
+            <Dot text={keySet ? '就绪' : '未配置'} tone={keySet ? 'ok' : 'mut'} />
+            <span className="rounded-full border-[0.5px] border-sk-hairsoft px-2 py-[1px] font-skcjk text-[9.5px] font-light text-sk-muted2">
+              1 模型
+            </span>
+          </span>
+        </div>
+        <div className="mt-2.5 flex items-center gap-2.5">
+          <input
+            className="min-w-0 flex-1 border-0 border-b border-sk-hair bg-transparent pb-1 font-skcjk text-[12px] font-light text-sk-fg outline-none placeholder:text-sk-muted2 focus:border-sk-primary"
+            type="password"
+            placeholder={keySet ? '已配置(留空不改;输入新值覆盖)' : '未配置 · 粘贴 API Key'}
+            value={draft.key}
+            onChange={(e) => setDraft((d) => ({ ...d, key: e.target.value }))}
+          />
+          <GhostButton pri className="flex-none px-3.5 py-[5px]" onClick={() => void save()}>
+            {busy ? '…' : '保存'}
+          </GhostButton>
+        </div>
+        {msg && <div className="mt-1.5 font-skcjk text-[11px] font-light text-sk-ok">{msg}</div>}
+        {err && <div className="mt-1.5 font-skcjk text-[11px] font-light text-sk-risk">{err}</div>}
+        <Row title="回复语言" desc="固定 AI 回复与纪要的语言;「跟随用户」时按你的消息判断。中英混合汇报场景用。" plan>
+          <Dot text="跟随用户" tone="mut" />
+        </Row>
+        <Sect>本地能力</Sect>
+        <Row title="本地 OCR" desc="扫描件与图片的文字识别(RapidOCR,本机推理,不联网)。">
+          {health?.checks ? <Dot text={health.checks.ocr ? '已就绪 ✓' : '未安装'} tone={health.checks.ocr ? 'ok' : 'mut'} /> : <Dot text="…" tone="mut" />}
+        </Row>
+        <Row title="全文检索引擎" desc="FTS5 全文索引。异常时检索自动降级为基础匹配。">
+          {health?.checks ? <Dot text={health.checks.fts ? '运行中' : '已降级'} tone={health.checks.fts ? 'ok' : 'warn'} /> : <Dot text="…" tone="mut" />}
+        </Row>
+        <Row title="语义检索" desc="按含义找资料(同义词/跨语言)。未接入——列在路线图 P4,不占资源。">
+          <Dot text="未接入" tone="mut" />
+        </Row>
+      </>
+    ),
+    search: (
+      <>
+        <PageHead cn="检索" en="Search" note="怎么找资料" />
+        <Row title="全局检索" desc="Ctrl+K 任意板块唤起;「@项目名 关键词」限定单项目,重名弹选不猜。">
+          <Kbd k="Ctrl" />
+          <Kbd k="K" />
+        </Row>
+        <Row title="板内检索" desc="数据基地首页检索行,与全局检索共用同一通路——结果永远一致。" />
+        <Row title="打开所在位置" desc="命中卡直接在资源管理器定位文件;文件缺失时如实提示并指向库健康体检。" />
+        <Row title="检索历史" desc="最近检索词与最近项目(仅本机 localStorage,不上传)。" plan>
+          <Dot text="规划 P1-5" tone="mut" />
+        </Row>
+      </>
+    ),
+    integrations: (
+      <>
+        <PageHead cn="集成" en="Integrations" note="对外供给 · 规划中" />
+        <Row title="MCP 服务" desc="让 Claude Desktop 等 AI 工具检索本机项目资料。仅本机,永不公网。路线图 P5。" plan>
+          <Dot text="规划 P5" tone="mut" />
+        </Row>
+        <Row title="腾讯会议" desc="项目中心一键建会已接入(真实外呼)。">
+          <Dot text="已接入" tone="ok" />
+        </Row>
+      </>
+    ),
+  }
 
   return (
     <div
@@ -117,85 +509,44 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <GlassCard className="w-[min(560px,90%)] !bg-[rgba(10,12,14,.94)]">
-        <CardHead
-          title="设置"
-          en="Settings"
-          right={
-            <span className="flex items-center gap-3">
-              <HeadNote>密钥仅写入 · 不回显</HeadNote>
-              <GhostButton className="px-3.5 py-[5px]" onClick={onClose}>关闭</GhostButton>
-            </span>
-          }
-        />
-        {!st && !err && <div className="py-3 font-skcjk text-[12px] font-light text-sk-muted2">读取配置中…</div>}
-        {st && (
-          <div className="flex flex-col gap-4 py-1">
-            <div className={row}>
-              <span className={label}>DeepSeek Key</span>
-              <input
-                className={input}
-                type="password"
-                placeholder={st.keySet ? '已配置(留空不改;输入新值覆盖)' : '未配置 · 粘贴 API Key'}
-                value={draft.key}
-                onChange={(e) => setDraft((d) => ({ ...d, key: e.target.value }))}
-              />
-              <Pill tone={st.keySet ? 'ok' : 'default'}>{st.keySet ? '已配置' : '未配置'}</Pill>
-            </div>
-            <div className={row}>
-              <span className={label}>知识仓库</span>
-              <input className={input} placeholder="资料复制入库的根目录,如 C:\\仓库" value={draft.repo} onChange={(e) => setDraft((d) => ({ ...d, repo: e.target.value }))} />
-              <GhostButton className="flex-none px-3 py-[5px]" onClick={() => setPicker('repo')}>选择</GhostButton>
-            </div>
-            <div className={row}>
-              <span className={label}>工作目录</span>
-              <input className={input} placeholder="一键清理垃圾作用的设计工作目录" value={draft.ws} onChange={(e) => setDraft((d) => ({ ...d, ws: e.target.value }))} />
-              <GhostButton className="flex-none px-3 py-[5px]" onClick={() => setPicker('ws')}>选择</GhostButton>
-            </div>
-            <div className={row}>
-              <span className={label}>收件箱</span>
-              <input className={input} placeholder="60s 自动扫描入库的目录(留空=停用)" value={draft.inbox} onChange={(e) => setDraft((d) => ({ ...d, inbox: e.target.value }))} />
-              <GhostButton className="flex-none px-3 py-[5px]" onClick={() => setPicker('inbox')}>选择</GhostButton>
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <GhostButton pri onClick={() => void save()}>{busy ? '保存中…' : '保存'}</GhostButton>
-              {msg && <span className="font-skcjk text-[11.5px] font-light text-sk-ok">{msg}</span>}
-              {err && <span className="font-skcjk text-[11.5px] font-light text-sk-risk">{err}</span>}
-            </div>
-            {/* 库健康体检(只读):四态计数 + root 脱节警示。数据操作前的诚实体检。 */}
-            <div className="mt-3 border-t-[0.5px] border-sk-hairsoft pt-3">
-              <div className="flex items-center gap-3">
-                <GhostButton onClick={() => void runHealth()}>{healthBusy ? '体检中…' : '库健康体检'}</GhostButton>
-                {healthErr && <span className="font-skcjk text-[11.5px] font-light text-sk-risk">{healthErr}</span>}
-              </div>
-              {health && (
-                <div className="mt-2 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap gap-x-5 gap-y-1">
-                    {([['正常', health.counts.ok, 'ok'], ['文件丢失', health.counts.missing, 'risk'], ['仓库根脱节', health.counts.detached, 'risk'], ['孤儿文件', health.counts.orphan, 'warn']] as const).map(([k, v, tone]) => (
-                      <span key={k} className="font-skcjk text-[11.5px] text-sk-muted"><b className={`mr-1 font-sans text-[15px] font-medium [font-variant-numeric:tabular-nums] ${v ? (tone === 'risk' ? 'text-sk-risk' : tone === 'warn' ? 'text-sk-warn' : 'text-sk-ok') : 'text-sk-muted2'}`}>{v}</b>{k}</span>
-                    ))}
-                    <span className="font-skcjk text-[11px] text-sk-muted2">共 {health.total_records} 条记录</span>
-                  </div>
-                  {health.root_detached.length > 0 && (
-                    <div className="rounded-[8px] border-[0.5px] border-sk-risk/40 bg-[rgba(207,127,127,.06)] px-3 py-2">
-                      <div className="font-skcjk text-[11.5px] font-medium text-sk-risk">⚠ 检测到 {health.root_detached.length} 个仓库根脱节(整根文件访问不到)</div>
-                      {health.root_detached.map((r) => (
-                        <div key={r.storage_root} className="mt-0.5 break-all font-skmono text-[10.5px] text-sk-muted">
-                          {r.root_state === 'missing' ? '🔴 不存在' : '🟡 空置'} · {r.storage_root || '(空)'} · {r.record_count} 条记录受影响
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {health.counts.ok === health.total_records && health.total_records > 0 && (
-                    <span className="font-skcjk text-[11px] font-light text-sk-ok">✓ 全部文件在位,库健康</span>
-                  )}
+      <div className="flex h-[min(640px,88%)] w-[min(1020px,95%)] flex-col rounded-skcomposer border-[0.5px] border-sk-border bg-[rgba(10,12,14,.94)] p-6 px-7">
+        {/* 头 */}
+        <div className="flex flex-none items-baseline gap-3 pb-2">
+          <span className="font-skcjk text-[15px] font-normal tracking-[0.18em] text-sk-fg">设 置</span>
+          <span className="font-sans text-[9px] font-light uppercase tracking-[0.26em] text-sk-muted2">Settings</span>
+          <span className="ml-auto font-skcjk text-[10.5px] font-light tracking-[0.1em] text-sk-muted2">密钥仅写入 · 不回显</span>
+          <GhostButton className="px-3.5 py-[5px]" onClick={onClose}>
+            关闭
+          </GhostButton>
+        </div>
+        {/* 两栏 */}
+        <div className="flex min-h-0 flex-1 pt-1.5">
+          <nav className="flex w-[172px] flex-none flex-col gap-0.5 border-r-[0.5px] border-sk-hairsoft py-1 pr-3">
+            {NAV.map((sec) => (
+              <div key={sec.section} className="mb-2">
+                <div className="mb-1 px-3.5 font-sans text-[8.5px] font-medium uppercase tracking-[0.26em] text-sk-muted2">
+                  {sec.section}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-        {err && !st && <div className="py-2 font-skcjk text-[12px] font-light text-sk-risk">{err}</div>}
-      </GlassCard>
+                {sec.items.map((it) => (
+                  <button
+                    key={it.key}
+                    className={`block w-full cursor-pointer rounded-[10px] border-0 px-3.5 py-2 text-left font-skcjk text-[12.5px] tracking-[0.06em] ${
+                      page === it.key
+                        ? 'bg-[rgba(127,179,207,.14)] font-normal text-sk-fg'
+                        : 'bg-transparent font-light text-sk-muted hover:text-sk-fg'
+                    }`}
+                    onClick={() => setPage(it.key)}
+                  >
+                    {it.label}
+                    {it.plan && <span className="ml-1.5 font-skcjk text-[8.5px] tracking-[0.15em] text-sk-muted2">规划</span>}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+          <main className="sk-scroll min-w-0 flex-1 overflow-y-auto py-1 pl-6">{pages[page]}</main>
+        </div>
+      </div>
 
       {/* 三路径选文件夹(dev 降级;exe 走 pywebview 原生桥)。选中回填对应字段,不混填。 */}
       <FolderPicker

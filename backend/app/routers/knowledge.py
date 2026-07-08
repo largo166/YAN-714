@@ -1,5 +1,6 @@
 """知识库文档 API（Phase 4B）。"""
 import re
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -14,8 +15,33 @@ router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 @router.get("/health")
 def library_health(db: Session = Depends(get_db)) -> dict:
     """库完整性体检(只读):四态(记录在文件在/文件丢/孤儿/root脱节)。
-    汇总计数全量真值;明细默认前 200 带 total。真库清洗前置(数据操作铁律第0条)。"""
-    return storage_probe.check_library(db)
+    汇总计数全量真值;明细默认前 200 带 total。真库清洗前置(数据操作铁律第0条)。
+    P0+(已批):+checks 轻量段(现有数据源聚合,不建表)——索引页能力行/最后入库时间用。"""
+    result = storage_probe.check_library(db)
+    # ── checks:全部来自现有能力探测,零新表零缓存 ──
+    from .. import ocr
+
+    cfg = db.get(models.AppSetting, 1)
+    repo = (cfg.repository_root_path if cfg else "") or ""
+    repo_ok = False
+    if repo:
+        try:
+            repo_ok = Path(repo).is_dir()
+        except OSError:
+            repo_ok = False
+    last_doc = (
+        db.query(models.KnowledgeDocument.updated_at)
+        .order_by(models.KnowledgeDocument.updated_at.desc())
+        .first()
+    )
+    result["checks"] = {
+        "fts": retrieval.fts5_available(db),          # 全文检索引擎可用
+        "ocr": ocr.available(),                        # 本地 OCR 就绪
+        "repo_path_set": bool(repo),                   # 仓库根已配置
+        "repo_path_ok": repo_ok,                       # 仓库根可达(未配置=False,如实)
+        "last_indexed_at": last_doc[0].isoformat() if last_doc and last_doc[0] else "",
+    }
+    return result
 
 NOT_CONFIGURED_MSG = "AI 引擎未配置，请先在设置中配置 API Key"
 NO_MATERIAL_MSG = "文档无正文，无法生成摘要（不伪造）。"
@@ -228,6 +254,20 @@ def search_documents(payload: schemas.KnowledgeSearchIn, db: Session = Depends(g
                 h.project_id = pf.project_id
                 h.project_file_id = pf.id
                 h.project_name = pnames.get(pf.project_id, "")
+                # P0+(已批):可定位态+路径——storage_probe 单一口径,禁第二份拼接
+                phys = storage_probe.resolve_physical(pf.stored_path, pf.storage_root)
+                if phys is None:
+                    h.locate_status = "路径异常"
+                else:
+                    h.folder_hint = "…/" + "/".join(Path(pf.stored_path).parts[:-1][-2:]) + "/" if len(Path(pf.stored_path).parts) > 1 else ""
+                    try:
+                        if phys.exists():
+                            h.locate_status = "可定位"
+                            h.abs_path = str(phys)  # 仅可定位时回填(复制路径动作用)
+                        else:
+                            h.locate_status = "文件缺失"
+                    except OSError:
+                        h.locate_status = "未知"
         # doc_type 过滤:命中层内存过滤(top_k≤50 零成本),不动 FTS 查询——纯加法,None=不过滤
         if payload.doc_type:
             out = [h for h in out if h.doc_type == payload.doc_type]

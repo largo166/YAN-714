@@ -496,6 +496,10 @@ class KnowledgeHitOut(BaseModel):
     project_id: int = 0       # 归属项目(经 ProjectFile.indexed_doc_id 反查;无关联=0)
     project_name: str = ""    # 归属项目名(前端结果卡直显,免二次查询)
     project_file_id: int = 0  # 关联项目文件(reveal 用;无关联=0 → 前端不显示打开按钮)
+    # ── P0+ 资产卡增强(2026-07-08 已批):可定位态+路径展示,复用 storage_probe 单一口径 ──
+    locate_status: str = ""   # 可定位/文件缺失/路径异常/""(无关联文件=未知,不伪造)
+    folder_hint: str = ""     # 所在文件夹(stored_path 目录段,展示用短路径)
+    abs_path: str = ""        # 绝对路径(仅可定位时回填;复制路径动作用——本机应用,选型A已批)
 
 
 class SendMessageOut(BaseModel):

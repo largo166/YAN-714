@@ -4,14 +4,17 @@ import { createPortal } from 'react-dom'
 import { api } from '@/lib/api'
 import type { KnowledgeHit } from '@/types/schemas'
 
+import { LS_KEYS } from '../../lib/constants'
+import { lsGet, lsSet } from '../../lib/storage'
 import type { ProjectBridge } from '../../services/projectBridge'
 import { GhostButton, Pill } from '../common/PillButton'
 
-/* ═══ P0 检索第一生产力(2026-07-08) · 全局检索浮层 ═══
+/* ═══ P0/P0+ 检索第一生产力 · 全局检索浮层(收敛版,小样已批) ═══
    Ctrl+K 全局唤起(跨项目入口;b1 板内检索行保留,共用同一 search 通路——禁双源)。
-   @语法:仅前端解析成 project_id 传现有通路,不改检索心脏;重名弹选不猜;
-   未匹配降级为全库检索并提示。类型分组卡片;reveal 走唯一后端口径(storage_probe)。
-   Portal 到 #sk-overlay 覆盖层——锁版首屏零改动。 */
+   @语法:仅前端解析成 project_id 传现有通路,不改检索心脏;重名弹选不猜(候选卡带
+   城市/甲方/阶段,最近选择置顶);未匹配降级为全库检索并提示(例外才说话,无常显状态行)。
+   资产卡六要素(项目/类型/格式/文件夹/日期/可定位态)+动作条(打开位置+复制三件套;
+   缺失卡只留复制文件名——没有可打开的东西就不给按钮)。Portal 到 #sk-overlay,锁版首屏零改动。 */
 
 /** @语法解析:'@市庄 总图' → {projTerm:'市庄', rest:'总图'};无@ → {projTerm:null, rest:原文} */
 export function parseAtQuery(raw: string): { projTerm: string | null; rest: string } {
@@ -28,43 +31,72 @@ export function matchProjects(term: string, projects: { id: number; name: string
 
 const TYPE_ORDER = ['任务书', '会议纪要', '方案文本', '图纸', '案例', '方法', '其他'] as const
 
+const STAGE_CN: Record<string, string> = {
+  brief: '前期', massing: '强排', concept: '概念', scheme: '方案', develop: '深化',
+}
+
+async function copyText(text: string): Promise<boolean> {
+  /* clipboard 优先;pywebview/权限受限时降级 execCommand(打包实测项) */
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
 export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: () => void; proj: ProjectBridge }) {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [hits, setHits] = useState<KnowledgeHit[] | null>(null)
   const [err, setErr] = useState('')
-  const [notice, setNotice] = useState('') /* @降级提示 / 弹选指引 */
-  const [candidates, setCandidates] = useState<{ id: number; name: string }[] | null>(null) /* 重名弹选 */
+  const [notice, setNotice] = useState('') /* 例外才说话:@降级 / 弹选指引 */
+  const [candidates, setCandidates] = useState<{ id: number; name: string }[] | null>(null)
   const [pendingRest, setPendingRest] = useState('')
   const [revealErr, setRevealErr] = useState<Record<number, string>>({})
+  const [copied, setCopied] = useState('') /* 轻量复制回执:'docid:kind' */
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
-      /* 打开即聚焦;重置上次的弹选/提示(检索结果保留,回来还在) */
       setTimeout(() => inputRef.current?.focus(), 30)
       setCandidates(null)
       setNotice('')
     }
   }, [open])
 
-  const runSearch = useCallback(
-    async (query: string, projectId?: number, extraNotice = '') => {
-      setBusy(true)
-      setErr('')
-      setHits(null)
-      setCandidates(null)
-      setNotice(extraNotice)
-      try {
-        const r = await api.searchKnowledge(query, 24, projectId)
-        setHits(r.hits)
-      } catch (e) {
-        setErr((e as Error).message)
-      } finally {
-        setBusy(false)
-      }
+  const runSearch = useCallback(async (query: string, projectId?: number, extraNotice = '') => {
+    setBusy(true)
+    setErr('')
+    setHits(null)
+    setCandidates(null)
+    setNotice(extraNotice)
+    try {
+      const r = await api.searchKnowledge(query, 24, projectId)
+      setHits(r.hits)
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const pickCandidate = useCallback(
+    (c: { id: number; name: string }) => {
+      lsSet(LS_KEYS.recentSearchProject, String(c.id)) /* 最近选择置顶(P0+-4) */
+      void runSearch(pendingRest, c.id, `项目「${c.name}」内检索`)
     },
-    [],
+    [pendingRest, runSearch],
   )
 
   const submit = useCallback(() => {
@@ -81,15 +113,17 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
     }
     const matches = matchProjects(projTerm, proj.projects)
     if (matches.length === 1) {
+      lsSet(LS_KEYS.recentSearchProject, String(matches[0].id))
       void runSearch(rest, matches[0].id, `项目「${matches[0].name}」内检索`)
     } else if (matches.length > 1) {
-      /* 重名弹选:不猜 */
-      setCandidates(matches)
+      /* 重名弹选:不猜。最近选择置顶。 */
+      const recent = lsGet(LS_KEYS.recentSearchProject)
+      const sorted = [...matches].sort((a, b) => (String(b.id) === recent ? 1 : 0) - (String(a.id) === recent ? 1 : 0))
+      setCandidates(sorted)
       setPendingRest(rest)
       setHits(null)
       setNotice(`「${projTerm}」匹配到 ${matches.length} 个项目,请选择:`)
     } else {
-      /* 未匹配:降级全库并提示 */
       void runSearch(rest, undefined, `未识别项目「${projTerm}」,已按全库检索`)
     }
   }, [q, busy, proj.projects, runSearch])
@@ -99,12 +133,19 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
     try {
       await api.revealProjectFile(h.project_id, h.project_file_id)
     } catch (e) {
-      /* 404=文件缺失(后端带体检指引话术)——如实呈现,不静默 */
       setRevealErr((m) => ({ ...m, [h.document_id]: (e as Error).message }))
     }
   }, [])
 
-  /* 类型分组(TYPE_ORDER 顺序;未知类型归"其他"末尾) */
+  const doCopy = useCallback(async (h: KnowledgeHit, kind: 'path' | 'folder' | 'name') => {
+    const text = kind === 'path' ? h.abs_path : kind === 'folder' ? h.abs_path.replace(/[\\/][^\\/]+$/, '') : h.title
+    if (!text) return
+    if (await copyText(text)) {
+      setCopied(`${h.document_id}:${kind}`)
+      setTimeout(() => setCopied(''), 1500)
+    }
+  }, [])
+
   const grouped = useMemo(() => {
     if (!hits) return []
     const g = new Map<string, KnowledgeHit[]>()
@@ -122,6 +163,12 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
   const overlay = document.getElementById('sk-overlay')
   if (!overlay) return null
 
+  const projMeta = (id: number) => {
+    const p = proj.projects.find((x) => x.id === id) as { city?: string; client?: string; current_stage?: string } | undefined
+    if (!p) return ''
+    return `${p.city || '—'} · ${p.client || '—'} · ${STAGE_CN[p.current_stage || ''] || p.current_stage || '—'}阶段`
+  }
+
   return createPortal(
     <div
       className="absolute inset-0 z-skoverlay flex items-start justify-center bg-[rgba(6,8,10,.6)] pt-[9%] backdrop-blur-[7px]"
@@ -131,7 +178,7 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
       data-testid="global-search"
     >
       <div className="flex max-h-[76%] w-[min(760px,90%)] flex-col rounded-skcomposer border-[0.5px] border-sk-border bg-[rgba(10,12,14,.96)] p-6 px-7">
-        {/* 检索行 */}
+        {/* 检索行(placeholder 承担 @语法教学,无底部 kbd 行) */}
         <div className="flex flex-none items-center gap-3 border-b-2 border-sk-hairsoft pb-2.5">
           <input
             ref={inputRef}
@@ -152,25 +199,38 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
           </GhostButton>
         </div>
 
-        {/* 提示行(@降级/弹选指引) */}
+        {/* 提示行:例外才说话(@降级黄字/弹选指引/范围确认) */}
         {notice && <div className="mt-2 flex-none font-skcjk text-[11.5px] font-light text-sk-warn">{notice}</div>}
 
-        {/* 重名弹选:不猜 */}
+        {/* 重名弹选候选卡:城市·甲方·阶段;最近置顶带角标 */}
         {candidates && (
-          <div className="mt-2 flex flex-none flex-wrap gap-2">
-            {candidates.map((c) => (
-              <button
-                key={c.id}
-                className="cursor-pointer rounded-full border-[0.5px] border-[rgba(127,179,207,.4)] bg-transparent px-4 py-1.5 font-skcjk text-[12px] font-light text-sk-primary transition-colors hover:bg-sk-primary hover:text-[#0a0c0e]"
-                onClick={() => void runSearch(pendingRest, c.id, `项目「${c.name}」内检索`)}
-              >
-                {c.name}
-              </button>
-            ))}
+          <div className="mt-2.5 flex flex-none flex-wrap gap-2.5">
+            {candidates.map((c, i) => {
+              const isRecent = i === 0 && String(c.id) === lsGet(LS_KEYS.recentSearchProject)
+              return (
+                <button
+                  key={c.id}
+                  className={`cursor-pointer rounded-[12px] border-[0.5px] bg-[rgba(242,241,238,.02)] px-4 py-2.5 text-left ${
+                    isRecent
+                      ? 'border-[rgba(127,179,207,.5)] shadow-[0_0_12px_rgba(127,179,207,.12)]'
+                      : 'border-sk-hair'
+                  }`}
+                  onClick={() => pickCandidate(c)}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-skcjk text-[13px] font-normal tracking-[0.04em] text-sk-fg">{c.name}</span>
+                    {isRecent && (
+                      <span className="font-sans text-[8.5px] font-medium uppercase tracking-[0.22em] text-sk-primary">最近</span>
+                    )}
+                  </div>
+                  <div className="mt-1 font-skcjk text-[10.5px] font-light tracking-[0.06em] text-sk-muted2">{projMeta(c.id)}</div>
+                </button>
+              )
+            })}
           </div>
         )}
 
-        {/* 结果区:三态 + 类型分组卡片 */}
+        {/* 结果区:三态 + 类型分组(命中数在分组头) + 资产卡 */}
         <div className="sk-scroll mt-3 min-h-0 flex-1 overflow-y-auto">
           {busy && <div className="py-3 font-skcjk text-[12.5px] font-light text-sk-muted2">正在全文检索…</div>}
           {err && <div className="py-3 font-skcjk text-[12.5px] font-light text-sk-risk">检索失败:{err}</div>}
@@ -188,39 +248,81 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
                 {type}
                 <span className="font-sans text-[10.5px] font-light text-sk-muted2">{list.length}</span>
               </div>
-              {list.map((h) => (
-                <div key={h.document_id} className="border-b-[0.5px] border-sk-hairsoft py-2 last:border-b-0">
-                  <div className="flex items-center gap-2.5">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-skcjk text-[13px] font-normal text-sk-fg">{h.title}</div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-skcjk text-[10.5px] font-light text-sk-muted2">
-                        {h.project_name && <span className="text-sk-primary">{h.project_name}</span>}
-                        {h.file_type && <span>{h.file_type}</span>}
-                        {h.updated_at && <span>{h.updated_at.slice(0, 10)}</span>}
-                        {h.locator && <Pill>{h.locator}</Pill>}
-                      </div>
-                      {h.snippet && (
-                        <div className="mt-1 line-clamp-2 font-skcjk text-[11.5px] font-light leading-[1.7] text-sk-muted">{h.snippet}</div>
+              {list.map((h) => {
+                const missing = h.locate_status === '文件缺失' || h.locate_status === '路径异常'
+                const locatable = h.locate_status === '可定位'
+                return (
+                  <div key={h.document_id} className="border-b-[0.5px] border-sk-hairsoft py-2.5 last:border-b-0">
+                    {/* 资产卡六要素:标题 / 项目·类型·格式·文件夹·日期·可定位态 */}
+                    <div className="truncate font-skcjk text-[13px] font-normal text-sk-fg">{h.title}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-skcjk text-[10.5px] font-light text-sk-muted2">
+                      {h.project_name && <span className="text-sk-primary">{h.project_name}</span>}
+                      {h.doc_type && <span>{h.doc_type}</span>}
+                      {h.file_type && <span>{h.file_type}</span>}
+                      {h.folder_hint && <span className="font-skmono text-[10px]">{h.folder_hint}</span>}
+                      {h.updated_at && <span>{h.updated_at.slice(0, 10)}</span>}
+                      {h.locator && <Pill>{h.locator}</Pill>}
+                      {h.locate_status && (
+                        <span
+                          className={`rounded-full border-[0.5px] px-2 py-[1px] font-sans text-[9px] tracking-[0.1em] ${
+                            locatable
+                              ? 'border-[rgba(126,201,165,.4)] text-sk-ok'
+                              : missing
+                                ? 'border-[rgba(207,127,127,.4)] text-sk-risk'
+                                : 'border-sk-hair text-sk-muted2'
+                          }`}
+                        >
+                          {h.locate_status}
+                        </span>
                       )}
                     </div>
-                    {h.project_file_id > 0 && (
-                      <GhostButton className="flex-none px-3 py-[5px] text-[11px]" onClick={() => void reveal(h)}>
-                        打开所在位置
-                      </GhostButton>
+                    {missing ? (
+                      <div className="mt-1 font-skcjk text-[11px] font-light text-sk-risk">
+                        物理文件不在预期位置——建议到设置页跑一次「库健康体检」。
+                      </div>
+                    ) : (
+                      h.snippet && (
+                        <div className="mt-1 line-clamp-2 font-skcjk text-[11.5px] font-light leading-[1.7] text-sk-muted">{h.snippet}</div>
+                      )
+                    )}
+                    {/* 动作条:可定位=四动作;缺失=只留复制文件名(不假按钮) */}
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {locatable && h.project_file_id > 0 && (
+                        <GhostButton className="flex-none px-3 py-[4px] text-[10.5px]" onClick={() => void reveal(h)}>
+                          打开所在位置
+                        </GhostButton>
+                      )}
+                      {locatable && h.abs_path && (
+                        <>
+                          <button
+                            className="cursor-pointer rounded-full border-[0.5px] border-sk-hairsoft bg-transparent px-3 py-[4px] font-skcjk text-[10.5px] font-light text-sk-muted hover:text-sk-primary"
+                            onClick={() => void doCopy(h, 'path')}
+                          >
+                            {copied === `${h.document_id}:path` ? '已复制 ✓' : '复制文件路径'}
+                          </button>
+                          <button
+                            className="cursor-pointer rounded-full border-[0.5px] border-sk-hairsoft bg-transparent px-3 py-[4px] font-skcjk text-[10.5px] font-light text-sk-muted hover:text-sk-primary"
+                            onClick={() => void doCopy(h, 'folder')}
+                          >
+                            {copied === `${h.document_id}:folder` ? '已复制 ✓' : '复制文件夹路径'}
+                          </button>
+                        </>
+                      )}
+                      <button
+                        className="cursor-pointer rounded-full border-[0.5px] border-sk-hairsoft bg-transparent px-3 py-[4px] font-skcjk text-[10.5px] font-light text-sk-muted hover:text-sk-primary"
+                        onClick={() => void doCopy(h, 'name')}
+                      >
+                        {copied === `${h.document_id}:name` ? '已复制 ✓' : '复制文件名'}
+                      </button>
+                    </div>
+                    {revealErr[h.document_id] && (
+                      <div className="mt-1 font-skcjk text-[11px] font-light text-sk-risk">{revealErr[h.document_id]}</div>
                     )}
                   </div>
-                  {revealErr[h.document_id] && (
-                    <div className="mt-1 font-skcjk text-[11px] font-light text-sk-risk">{revealErr[h.document_id]}</div>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           ))}
-        </div>
-
-        {/* 底部 kbd 提示 */}
-        <div className="mt-2 flex-none font-sans text-[9.5px] font-light uppercase tracking-[0.2em] text-sk-muted2">
-          Ctrl+K 唤起 · @project scope · Esc close
         </div>
       </div>
     </div>,
