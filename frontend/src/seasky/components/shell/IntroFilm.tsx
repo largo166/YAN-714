@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 
-import { boost, energy, order, sweep, trigWave } from '../../lib/seaUniforms'
-import { LS_KEYS } from '../../lib/constants'
-import { lsSet } from '../../lib/storage'
+import { FilmSea, filmSweep, filmTrigWave } from './FilmSea'
 
-/* ═══ 开机影片 s0-s6(母版 GSAP 时间线 1:1 迁移) ═══
-   影片是命令式编排——GSAP 直驱 DOM,React 只负责挂载结构与生命周期。 */
+/* ═══ 开机影片 s0-s6(v12 海面地形版,2026-07-09 换版已批) ═══
+   影片是命令式编排——GSAP 直驱 DOM,React 只负责挂载结构与生命周期。
+   v12 增量:three.js 粒子海背景(FilmSea,局部 uniforms)+ 舞台渐变底;时间线与母版逐拍一致。
+   无音效(v12 源内 Music 即空桩,连桩不带);每次开机都播(无「看过」记忆,决议档 20260709)。 */
 
 const Q = 0.6
 const S = 1.2
@@ -30,13 +30,20 @@ export function IntroFilm({ paused, onComplete, onProgress }: IntroFilmProps) {
     const q = (sel: string) => root.querySelectorAll(sel)
     const scenes = Array.from(root.querySelectorAll<HTMLElement>('.sk-scene'))
 
+    /* v12:海面与叙事参数解耦——boost/order/energy 是影片本地哑对象(粒子海不读),
+       tween 原样保留只为锁时间线节拍;sweep/trigWave 走 FilmSea 局部通道。 */
+    const boost = { v: 0 }
+    const order = { v: 0 }
+    const energy = { v: 0.35 }
+    const trigWave = filmTrigWave
+    const sweep = filmSweep
+
     const tl = gsap.timeline({
       paused: true,
       defaults: { ease: 'premium', duration: S },
       onUpdate: () => doneRef.current.onProgress(tl.progress()),
       onComplete: () => {
-        lsSet(LS_KEYS.seenIntro, '1') /* 看完记「已看过」 */
-        doneRef.current.onComplete()
+        doneRef.current.onComplete() /* 播完直接进主界面;每次开机都播,不记「已看过」 */
       },
     })
     tlRef.current = tl
@@ -211,6 +218,9 @@ export function IntroFilm({ paused, onComplete, onProgress }: IntroFilmProps) {
     tl.play()
     return () => {
       tl.kill()
+      /* show()推镜与打字字符 tween 在时间线外创建——skip 卸载时一并杀,防僵尸 tween 打在脱挂 DOM 上 */
+      scenes.forEach((s) => gsap.killTweensOf(s))
+      root.querySelectorAll('#sk-field i').forEach((el) => gsap.killTweensOf(el))
       tlRef.current = null
     }
   }, [])
@@ -232,7 +242,24 @@ export function IntroFilm({ paused, onComplete, onProgress }: IntroFilmProps) {
   const label = 'font-sans text-[10.5px] font-medium uppercase tracking-[0.3em] [text-indent:0.3em] text-sk-muted2'
 
   return (
-    <div ref={rootRef} className="absolute inset-0">
+    <div
+      ref={rootRef}
+      className="isolate absolute inset-0 z-[2]"
+      style={{
+        /* v12 舞台渐变底:不透明,覆住后方;isolate+z-2 成为独立堆叠上下文——
+           压过 AppShell 常驻 scrim(z-1),避免双 scrim 把海压暗一倍(对抗审查修) */
+        background: 'linear-gradient(to bottom,#0a0c0e 0%,#0c1420 30%,#122236 46%,#0e1826 58%,#0a0c0e 100%)',
+      }}
+    >
+      <FilmSea />
+      {/* v12 scrim:中央压暗给文字呼吸 */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[1]"
+        style={{
+          background:
+            'radial-gradient(ellipse 85% 80% at 42% 50%, rgba(10,12,14,.6), rgba(10,12,14,.24) 55%, rgba(10,12,14,0))',
+        }}
+      />
       {/* s0 */}
       <section id="sk-s0" className="sk-scene invisible absolute inset-0 z-[5] flex flex-col items-center justify-center">
         <div className={`l1 ${maskLine}`}>

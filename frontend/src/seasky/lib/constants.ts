@@ -28,10 +28,9 @@ export const BOARD_PILLARS = [
   { no: '05', zh: '管理驾驶舱', role: '只读大盘\n跨项目聚合不打扰执行' },
 ] as const
 
-/** localStorage 键(与原型完全同名——用户既有的记忆无缝延续) */
+/** localStorage 键(与原型完全同名——用户既有的记忆无缝延续)
+    skipIntro/seenIntro 已退役(2026-07-09 换版决议:每次开机都播)——键名不复用。 */
 export const LS_KEYS = {
-  skipIntro: 'romai_skip_intro',
-  seenIntro: 'romai_seen_intro',
   projects: 'romai_projects_v1',
   board: 'romai_seasky_board',
   campTab: 'romai_seasky_camp_tab',

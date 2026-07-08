@@ -1,45 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 
-import { LS_KEYS } from '../../lib/constants'
-import { lsGet, lsRemove, lsSet } from '../../lib/storage'
-
-/** 开机 Skip(母版等价):首帧即可点,Esc 同效,勾选「下次直达」记住 */
+/** 开机 Skip(右下角低调常驻):首帧即可点,Esc 同效,任何时刻立即进主界面。
+    每次开机都播(2026-07-09 换版决议)——无「下次直达」勾选、无「已看过」记忆。 */
 export function SkipIntro({ onSkip }: { onSkip: () => void }) {
-  const [checked, setChecked] = useState(
-    () => lsGet(LS_KEYS.skipIntro) === '1' || lsGet(LS_KEYS.seenIntro) === '1',
-  )
-
-  const toggle = useCallback((v: boolean) => {
-    setChecked(v)
-    if (v) lsSet(LS_KEYS.skipIntro, '1')
-    else {
-      lsSet(LS_KEYS.skipIntro, '0')
-      lsRemove(LS_KEYS.seenIntro) /* 取消勾选=下次重看影片 */
-    }
-  }, [])
-
   return (
     <button
       className="absolute bottom-[58px] right-6 z-[72] cursor-pointer rounded-full border-[0.5px] border-sk-hairsoft bg-[rgba(10,12,14,.4)] px-[22px] py-[9px] font-sans text-[10px] font-medium uppercase tracking-[0.28em] text-sk-muted2 backdrop-blur-[8px] transition-all duration-[250ms] hover:border-[rgba(127,179,207,.4)] hover:text-sk-primary"
-      onClick={() => {
-        lsSet(LS_KEYS.seenIntro, '1')
-        onSkip()
-      }}
+      onClick={onSkip}
     >
-      Skip
-      <label
-        className="ml-3.5 inline-flex cursor-pointer items-center gap-[7px] border-l-[0.5px] border-sk-hairsoft pl-3.5 tracking-[0.14em]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <input
-          type="checkbox"
-          className="h-[11px] w-[11px] cursor-pointer accent-sk-primary"
-          checked={checked}
-          onChange={(e) => toggle(e.target.checked)}
-        />
-        下次直达
-      </label>
+      跳过 Skip
     </button>
   )
 }

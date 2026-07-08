@@ -2,22 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { LS_KEYS, type BoardIndex, type Phase } from '../lib/constants'
 import { installGo, parseEntryUrl } from '../lib/go'
-import { lsGet, lsSet } from '../lib/storage'
+import { lsSet } from '../lib/storage'
 
 /**
  * 阶段机 + 板块导航(工程化自母版 film → gate → boards → app)。
- * 入口优先级:?go=N 直达 app > #intro 强制影片 > 已看过/勾选直达/减动效 → gate > 影片。
+ * 入口优先级:?go=N 直达 app > 减动效 → gate(晕动症红线) > 影片。
+ * 每次开机都播(2026-07-09 换版决议)——「已看过/勾选直达」记忆退役;skip 随时可跳兜底。
  */
 export function useBoardNavigation() {
   const [entry] = useState(parseEntryUrl)
   const [phase, setPhase] = useState<Phase>(() => {
     if (entry.go != null) return 'app'
-    if (entry.forceIntro) return 'film'
-    const skip =
-      matchMedia('(prefers-reduced-motion: reduce)').matches ||
-      lsGet(LS_KEYS.skipIntro) === '1' ||
-      lsGet(LS_KEYS.seenIntro) === '1'
-    return skip ? 'gate' : 'film'
+    /* 减动效人群不进影片(无障碍优先,红线保留) */
+    return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'gate' : 'film'
   })
   const [board, setBoard] = useState<BoardIndex>(() => entry.go ?? 0)
 

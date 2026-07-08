@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { gsap } from '../../lib/gsapSetup'
 
-import { BOARD_STATUS, LS_KEYS, type BoardIndex } from '../../lib/constants'
+import { BOARD_STATUS, type BoardIndex } from '../../lib/constants'
 import { energy, horizonY, sweepOnce, trigWave } from '../../lib/seaUniforms'
-import { lsSet } from '../../lib/storage'
 import { useBoardNavigation } from '../../hooks/useBoardNavigation'
 import { useBoardLive } from '../../hooks/useBoardLive'
 import { useCaptureMode } from '../../hooks/useCaptureMode'
@@ -85,8 +84,7 @@ export function AppShell() {
           setFilmPaused((p) => !p)
         }
         if (e.code === 'Escape') {
-          lsSet(LS_KEYS.seenIntro, '1')
-          nav.toGate()
+          nav.toGate() /* 每次开机都播(2026-07-09):Esc 只跳本次,不记「已看过」 */
         }
         return
       }
@@ -137,7 +135,9 @@ export function AppShell() {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black">
       <div ref={stageRef} className="relative h-[720px] w-[1280px] origin-center overflow-hidden bg-sk-bg">
-        <SeaCanvas />
+        {/* 影片期不挂常驻海(v12 影片自带粒子海+不透明底,后方 fbm 海全遮挡仍满帧=纯浪费;
+            uniforms 是模块单例,gate 相重挂无损契约——对抗审查修) */}
+        {phase !== 'film' && <SeaCanvas />}
         {/* scrim */}
         <div
           className="pointer-events-none absolute inset-0 z-[1]"
