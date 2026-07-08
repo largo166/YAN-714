@@ -12,7 +12,7 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev:clean"],
       "cwd": "frontend",
       "port": 5173,
       "autoPort": false

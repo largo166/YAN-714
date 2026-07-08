@@ -153,7 +153,7 @@ export function MeetingChainCard({ projectId, meetings, minutes, todos }: Meetin
       >
         {listErr && <div className="py-1 font-skcjk text-[12px] font-light text-sk-risk">{listErr}</div>}
         {list && list.length === 0 && (
-          <div className="py-1 font-skcjk text-[12px] font-light text-sk-muted">本项目还没有会议记录。</div>
+          <div className="py-1 font-skcjk text-[12px] font-light text-sk-muted">本项目还没有会议记录。点左侧「创建会议」磁贴发起第一场。</div>
         )}
         {!list && !listErr && <div className="py-1 font-skcjk text-[12px] font-light text-sk-muted2">加载中…</div>}
         {list?.map((m) => (

@@ -5,7 +5,9 @@ import type { ProjectMilestone, ProjectOverview, ProjectProgress, ProjectRisk } 
 import { projectService as ps } from '../services'
 
 /* b0 项目中心真源聚合:overview/progress/milestones/risks/研判摘要,随项目切换重拉。
-   各请求独立失败不互相拖垮;三态如实。 */
+   各请求独立失败不互相拖垮;三态如实。
+   封板可信度包(2026-07-08):①无项目时 loading 落地为 false(修"…永挂");
+   ②逐源记错——单源失败也如实报(此前只有 4 源全败才报,错误伪装成空态)。 */
 
 export interface ProjectLive {
   loading: boolean
@@ -23,7 +25,12 @@ export function useProjectLive(active: boolean, projectId: number | null): Proje
   })
 
   useEffect(() => {
-    if (!active || projectId == null) return
+    if (!active) return
+    if (projectId == null) {
+      /* 无项目:loading 必须落地,否则数字区永远"…"(空态指引由 ProjectSwitcher 承担) */
+      setState({ loading: false, err: null, overview: null, progress: null, milestones: [], risks: [], analysisLead: null })
+      return
+    }
     let alive = true
     setState((s) => ({ ...s, loading: true, err: null }))
     ;(async () => {
@@ -44,10 +51,19 @@ export function useProjectLive(active: boolean, projectId: number | null): Proje
         const pref = okOnes.find((a) => a.task === 'overview') ?? okOnes[0]
         if (pref) lead = pref.content.split('\n').find((l) => l.trim()) ?? null
       }
-      const failed = [ov, pg, ms, rk].filter((r) => r.status === 'rejected').length
+      /* 逐源记错:失败源如实点名(错误≠空库);全败给更重的话 */
+      const srcNames = ['总览', '进度', '里程碑', '风险'] as const
+      const failedNames = [ov, pg, ms, rk]
+        .map((r, i) => (r.status === 'rejected' ? srcNames[i] : null))
+        .filter(Boolean) as string[]
       setState({
         loading: false,
-        err: failed === 4 ? '项目数据加载失败(后端不可达?)' : null,
+        err:
+          failedNames.length === 4
+            ? '项目数据加载失败(后端不可达?)'
+            : failedNames.length > 0
+              ? `部分数据加载失败——${failedNames.join('/')}`
+              : null,
         overview: pick(ov),
         progress: pick(pg),
         milestones: (pick(ms) as ProjectMilestone[] | null) ?? [],

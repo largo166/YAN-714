@@ -54,6 +54,14 @@ export function useProjectBridge(): ProjectBridge {
     void reload()
   }, [reload])
 
+  /* 入库可能新建项目(romai:projects-updated,CleanupWizard done 时派发)→ 切换器即时可见,
+     修「入库完新项目要重启才出现」(封板可信度包,2026-07-08;事件命名约定:一类数据一事件)。 */
+  useEffect(() => {
+    const onProjects = () => void reload()
+    window.addEventListener('romai:projects-updated', onProjects)
+    return () => window.removeEventListener('romai:projects-updated', onProjects)
+  }, [reload])
+
   const switchProject = useCallback((id: number) => {
     setCurId(id)
     lsSet(LS_CUR, String(id))

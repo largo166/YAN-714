@@ -4,7 +4,9 @@ import type { Agent, Broadcast, TeamMember } from '@/types/schemas'
 
 import { hubService as hs } from '../services'
 
-/* b3 协作平台真源聚合:成员/甲方画像/智能体/通知,独立失败不互拖 */
+/* b3 协作平台真源聚合:成员/甲方画像/智能体/通知,独立失败不互拖。
+   封板可信度包(2026-07-08):errs 聚合为 err 供板内渲染(错误不再静默成空列表);
+   监听 romai:broadcast-updated(驾驶舱发通知→横幅即时更新,事件命名约定)。 */
 
 export interface HubLive {
   loading: boolean
@@ -13,6 +15,8 @@ export interface HubLive {
   agents: Agent[]
   broadcasts: Broadcast[]
   errs: string[]
+  /** 四源任一失败的聚合提示(null=全部成功)。板内渲染用,错误≠空库。 */
+  err: string | null
   reloadMembers: () => void
 }
 
@@ -65,5 +69,18 @@ export function useHubLive(active: boolean): HubLive {
     }
   }, [memberVer])
 
-  return { loading, members, clients, agents, broadcasts, errs, reloadMembers: () => setMemberVer((v) => v + 1) }
+  /* 驾驶舱发通知 → 协作板横幅即时重拉(romai:broadcast-updated,一类数据一事件) */
+  useEffect(() => {
+    const onBroadcast = () => {
+      hs.listBroadcasts().then(setBroadcasts).catch(() => null)
+    }
+    window.addEventListener('romai:broadcast-updated', onBroadcast)
+    return () => window.removeEventListener('romai:broadcast-updated', onBroadcast)
+  }, [])
+
+  return {
+    loading, members, clients, agents, broadcasts, errs,
+    err: errs.length ? `部分数据加载失败——${errs.join(' / ')}` : null,
+    reloadMembers: () => setMemberVer((v) => v + 1),
+  }
 }

@@ -76,7 +76,9 @@ dev（5173）不禁用——但它的产出**不构成结论**。证据必须来
 ## 事件命名约定（数据同步，2026-07-07）
 一类数据变更配一个专属事件,由该类数据的**所有**消费者监听——禁止"万能刷新事件"把所有 hook 拉一遍(那是数据源糊化)。已有:
 - `romai:knowledge-updated`——知识库变更(入库完成)。消费者:数据基地首页大字/最近入库。
-- `romai:settings-updated`——设置路径变更(仓库/工作目录/收件箱)。消费者:CleanupWizard(仓库)/CleanupOverlay(工作目录)/useKnowledgeLive(收件箱 pill)。
+- `romai:settings-updated`——设置路径变更(仓库/工作目录/收件箱)。消费者:CleanupWizard(仓库+工作目录)/useKnowledgeLive(收件箱 pill)。
+- `romai:projects-updated`——项目列表变更(入库新建项目)。消费者:projectBridge(项目切换器)。(2026-07-08 封板可信度包)
+- `romai:broadcast-updated`——通知/广播变更(驾驶舱发布)。消费者:useHubLive(协作板横幅)。(2026-07-08 封板可信度包)
 > 加新的路径/数据消费者时,必须一并订阅对应事件,否则就是下一个"设置↔X 不同步"。
 
 ## 其它铁律（详见 MEMORY.md）

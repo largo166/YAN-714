@@ -170,6 +170,11 @@ function CockpitInner({
         </div>
       </div>
 
+      {/* 数据加载失败可见(封板可信度:错误≠空库,失败源如实点名,不再静默成空态) */}
+      {live.err && (
+        <div className="flex-none font-skcjk text-[12px] font-light text-sk-risk" data-in>{live.err}</div>
+      )}
+
       {/* 数据网格:a b | c(日历主角) / d d | c */}
       <div
         className="grid min-h-0 flex-1 gap-3.5"

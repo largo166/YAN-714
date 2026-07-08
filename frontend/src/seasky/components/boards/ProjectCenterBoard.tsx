@@ -50,7 +50,7 @@ export function ProjectCenterBoard({ proj, active }: { proj: ProjectBridge; acti
         <div className="font-skcjk text-[27px] font-light leading-[1.4] tracking-[0.14em] [text-indent:0.14em] text-sk-fg" data-in>
           <ProjectSwitcher proj={proj} />
         </div>
-        {live.err && <div className="font-skcjk text-[12px] font-light text-sk-risk" data-in>项目数据加载失败:{live.err}</div>}
+        {live.err && <div className="font-skcjk text-[12px] font-light text-sk-risk" data-in>{live.err}</div>}
         <div className="flex gap-[30px] py-0.5" data-in>
           <StatBlock
             compact alignLeft tone="pri"

@@ -162,6 +162,9 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
           /* hotfix1(2026-07-07):入库真完成 → 通知首页重拉真实统计(不依赖用户点「去数据基地看」)。
              根治「抽屉入库 8、首页仍 0」——首页 useKnowledgeLive 监听此事件 ver++ 重拉。 */
           window.dispatchEvent(new CustomEvent('romai:knowledge-updated'))
+          /* 封板可信度包(2026-07-08):入库可能新建项目(ingest._find_or_create_project)——
+             专属事件让项目切换器(projectBridge)即时重拉,修「入库完新项目在切换器看不见」。 */
+          window.dispatchEvent(new CustomEvent('romai:projects-updated'))
         }
         setEvents((prev) => [...prev, ev])
       }
@@ -361,7 +364,8 @@ export function CleanupWizard({ open, onClose }: { open: boolean; onClose: () =>
 
                   {receipt && (
                     <div className="flex items-center gap-3">
-                      <button className="font-skcjk text-[11.5px] text-sk-primary" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('romai:seasky:recent-refresh')) }}>去数据基地看最近入库 →</button>
+                      {/* 数据刷新已由 done 事件的 knowledge-updated 完成;此按钮只负责关向导回 b1(死事件 recent-refresh 已清,全仓无监听者) */}
+                      <button className="font-skcjk text-[11.5px] text-sk-primary" onClick={onClose}>去数据基地看最近入库 →</button>
                     </div>
                   )}
                 </div>

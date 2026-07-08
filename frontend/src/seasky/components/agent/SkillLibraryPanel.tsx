@@ -48,6 +48,9 @@ export function SkillLibraryPanel({
           </span>
         </div>
         {err && <div className="py-2 font-skcjk text-[12.5px] font-light text-sk-risk">技能目录加载失败:{err}</div>}
+        {!loading && !err && cats.length === 0 && (
+          <div className="py-2 font-skcjk text-[12.5px] font-light text-sk-muted">暂无技能。检查后端连接后重新打开此面板。</div>
+        )}
         {cats.map(([cat, list]) => (
           <div key={cat} className="mb-4">
             <div className="mb-[9px] flex items-center gap-2 font-skcjk text-[12.5px] font-normal tracking-[0.12em] text-sk-fg">

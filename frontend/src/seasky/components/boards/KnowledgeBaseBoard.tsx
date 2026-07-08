@@ -45,7 +45,7 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
             {([
               [idxRate, '索引完成率'],
               [cjk, `索引块 · CJK(引擎 ${live.stats?.engine ?? '—'})`],
-              [String(live.typeStats.length || '—'), '资料类型'],
+              [live.loading ? '…' : String(live.typeStats.length), '资料类型'],
             ] as const).map(([v, k]) => (
               <div key={k} className="flex flex-col gap-2 font-sans text-[22px] font-medium text-sk-primary">
                 {v}

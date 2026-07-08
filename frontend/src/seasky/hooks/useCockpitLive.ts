@@ -5,7 +5,9 @@ import type { AiUsageItem, BossDashboard, Broadcast, WorkloadItem } from '@/type
 import { cockpitService as cks } from '../services'
 
 /* b4 驾驶舱真源:门禁(sessionStorage 记住本次解锁)+ 用量/工作量/大盘/广播;
-   日历=前端聚合(里程碑单源起步,会议聚合后补——降级预案已批) */
+   日历=前端聚合(里程碑单源起步,会议聚合后补——降级预案已批)。
+   封板可信度包(2026-07-08):数据层加 err(四源/日历失败不再静默丢弃,错误≠空库);
+   sendBroadcast 成功后派发 romai:broadcast-updated(协作板横幅即时更新)。 */
 
 export interface CalendarEvent {
   date: string /* YYYY-MM-DD */
@@ -24,6 +26,8 @@ export interface CockpitLive {
   dash: BossDashboard | null
   broadcasts: Broadcast[]
   calEvents: CalendarEvent[]
+  /** 数据源失败聚合提示(null=全部成功)。板内渲染用,失败不再伪装成空态。 */
+  err: string | null
   sendBroadcast: (text: string) => Promise<void>
 }
 
@@ -38,6 +42,8 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
   const [dash, setDash] = useState<BossDashboard | null>(null)
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
+  const [errs, setErrs] = useState<string[]>([])
+  const [calErr, setCalErr] = useState('')
   const [dataVer, setDataVer] = useState(0)
 
   /* 门禁状态:configured=有口令→locked;未配置→setup;本会话已解锁→open */
@@ -98,10 +104,16 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
         cks.listBroadcasts(),
       ])
       if (!alive) return
+      const es: string[] = []
       if (u.status === 'fulfilled') setUsage(u.value)
+      else es.push(`AI用量:${u.reason}`)
       if (w.status === 'fulfilled') setWorkload(w.value)
+      else es.push(`工作量:${w.reason}`)
       if (d.status === 'fulfilled') setDash(d.value)
+      else es.push(`大盘:${d.reason}`)
       if (b.status === 'fulfilled') setBroadcasts(b.value)
+      else es.push(`通知:${b.reason}`)
+      setErrs(es)
       setLoading(false)
     })()
     return () => {
@@ -119,14 +131,16 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
       )
       if (!alive) return
       const evs: CalendarEvent[] = []
+      let failed = 0
       settled.forEach((r, idx) => {
-        if (r.status !== 'fulfilled') return
+        if (r.status !== 'fulfilled') { failed += 1; return }
         for (const m of r.value.ms) {
           /* 里程碑 due 是自然语言(今日/周五前),只收 YYYY-MM-DD 形款进日历,其余不硬编日期(不伪造) */
           const m2 = m.due.match(/(\d{4})-(\d{2})-(\d{2})/)
           if (m2) evs.push({ date: m2[0], label: m.title.slice(0, 24), projIdx: idx })
         }
       })
+      setCalErr(failed > 0 ? `日历:${failed} 个项目的里程碑加载失败` : '')
       setCalEvents(evs)
     })()
     return () => {
@@ -137,7 +151,14 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
   const sendBroadcast = useCallback(async (text: string) => {
     await cks.createBroadcast(text)
     setDataVer((v) => v + 1)
+    /* 通知类数据变更 → 专属事件,协作板横幅(useHubLive)监听重拉(一类数据一事件) */
+    window.dispatchEvent(new CustomEvent('romai:broadcast-updated'))
   }, [])
 
-  return { gate, gateErr, unlock, setup, loading, usage, workload, dash, broadcasts, calEvents, sendBroadcast }
+  const allErrs = [...errs, ...(calErr ? [calErr] : [])]
+  return {
+    gate, gateErr, unlock, setup, loading, usage, workload, dash, broadcasts, calEvents,
+    err: allErrs.length ? `部分数据加载失败——${allErrs.join(' / ')}` : null,
+    sendBroadcast,
+  }
 }
