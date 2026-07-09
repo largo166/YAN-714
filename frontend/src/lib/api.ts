@@ -624,6 +624,10 @@ export const api = {
   async listAssets(projectId: number, status: 'active' | 'trashed' = 'active'): Promise<{ items: FileAsset[]; total: number }> {
     return request(`/api/projects/${projectId}/assets${status !== 'active' ? `?status=${status}` : ''}`)
   },
+  // 跨项目资产(2026-07-09 bug2 根治):不受单项目作用域;每条带 project_id/project_name
+  async listAllAssets(status: 'active' | 'trashed' = 'active'): Promise<{ items: FileAssetGlobal[]; total: number }> {
+    return request(`/api/assets/all${status !== 'active' ? `?status=${status}` : ''}`)
+  },
   // 改分类(asset_type)或软移除/恢复(status='trashed'|'active')——只改登记,不删图/源文件
   async updateAsset(projectId: number, assetId: number, body: { asset_type?: string; status?: string }): Promise<{ id: number; asset_type: string; status: string }> {
     return request(`/api/projects/${projectId}/assets/${assetId}`, { method: 'PATCH', body: JSON.stringify(body) })
@@ -936,6 +940,11 @@ export interface FileAsset {
   caption: string
   width: number
   height: number
+}
+// 跨项目资产:FileAsset + 项目归属(bug2 根治)
+export interface FileAssetGlobal extends FileAsset {
+  project_id: number
+  project_name: string
 }
 export interface TaskAssignment {
   id: number

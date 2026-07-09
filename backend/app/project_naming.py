@@ -43,10 +43,16 @@ _GENERIC_NAMES = {
 }
 
 
-def reject_as_project(source_path: str | Path, repo_root: str | Path | None = None) -> str | None:
+def reject_as_project(
+    source_path: str | Path,
+    repo_root: str | Path | None = None,
+    expandable: bool = False,
+) -> str | None:
     """硬拒绝该路径作为项目根;返回错误文案(命中)或 None(通过)。
 
     拒绝:① 仓库根本身 ② 盘符根(c:\\) ③ 系统/用户特殊目录(desktop/users/... 顶层)。
+    expandable=True:该系统目录其下有含文件的子目录,入库会按 A 语义拆成各子项目(不建脏的父级项目),
+      故放行(2026-07-09:选父级 Pictures 而其下有 市庄-00 时不再误拒)。仓库根/盘符根仍硬拒(不受 expandable 影响)。
     """
     p = Path(str(source_path))
     norm = _norm(p)
@@ -61,8 +67,8 @@ def reject_as_project(source_path: str | Path, repo_root: str | Path | None = No
     if parent == p or not p.name:
         return "不能把「磁盘根目录」作为项目——请选择具体的项目文件夹。"
 
-    # ③ 系统/用户特殊目录
-    if p.name.strip().lower() in _SYSTEM_DIR_NAMES:
+    # ③ 系统/用户特殊目录:其下有成型子项目(expandable)时放行——按 A 语义拆子项目,不建脏父级项目
+    if p.name.strip().lower() in _SYSTEM_DIR_NAMES and not expandable:
         return f"「{p.name}」是系统目录,不能作为项目——请选择其下具体的项目文件夹,或包含项目的父目录。"
 
     return None

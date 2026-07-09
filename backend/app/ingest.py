@@ -64,25 +64,90 @@ def get_job(job_id: str) -> Optional[dict]:
         return dict(job) if job else None
 
 
-def _group_by_source(paths: list[str]) -> dict[str, list[Path]]:
-    """把选中的绝对路径（文件/文件夹混合）按来源文件夹归组，递归展开文件夹里的受支持文件。"""
+_SKIP_DIRS = {"_done", "_failed", "_trash", "_assets", "_ROMAI_CLEANUP_QUARANTINE"}
+
+
+def _dir_has_supported_file(root: Path) -> bool:
+    """目录(递归)内是否至少一个受支持文件——判定该目录是否成一个项目。"""
     import os
 
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for fn in filenames:
+            if parsing.is_supported(fn):
+                return True
+    return False
+
+
+def _subdirs_with_files(top: Path) -> list[Path]:
+    """top 的一级子目录里,递归含受支持文件的那些(A 语义:每个=一个项目)。"""
+    out: list[Path] = []
+    try:
+        for child in sorted(top.iterdir()):
+            if not child.is_dir() or child.name in _SKIP_DIRS:
+                continue
+            if _dir_has_supported_file(child):
+                out.append(child)
+    except OSError:
+        pass
+    return out
+
+
+def _collect_supported(root: Path, direct_only: bool = False) -> list[Path]:
+    """收集 root 下受支持文件。direct_only=True 只取直属(不递归子目录,子目录已各自成项目)。"""
+    import os
+
+    files: list[Path] = []
+    if direct_only:
+        try:
+            for f in sorted(root.iterdir()):
+                if f.is_file() and parsing.is_supported(f.name):
+                    files.append(f)
+        except OSError:
+            pass
+        return files
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for fn in filenames:
+            if parsing.is_supported(fn):
+                files.append(Path(dirpath) / fn)
+    return files
+
+
+def _group_by_source(paths: list[str]) -> dict[str, list[Path]]:
+    """把选中路径归组为项目。A 语义(2026-07-09 与 staging 对齐,补齐执行侧缺口):
+    - 选中目录且其一级子目录(含文件)存在 → 每个子目录=一个项目(避免把父级如 Pictures 整个当一个脏项目);
+      父目录直属散落文件也各自不丢:归到父目录自身一个组(仅直属,不递归)。
+    - 选中目录为叶子(无成型子项目) → 整目录一个项目(原行为)。
+    - 选中文件 → 归其父目录组(原行为)。
+    这样选父级 Pictures 时,市庄-00 自动成独立项目,不再撞"系统目录"守卫、不建脏项目。
+    """
     groups: dict[str, list[Path]] = {}
-    _skip = {"_done", "_failed", "_trash", "_assets", "_ROMAI_CLEANUP_QUARANTINE"}
     for raw in paths:
         top = Path(raw)
-        if not top.exists():
+        try:
+            if not top.exists():
+                continue
+        except OSError:
             continue
         if top.is_file():
             if parsing.is_supported(top.name):
                 groups.setdefault(str(top.parent), []).append(top)
             continue
-        for dirpath, dirnames, filenames in os.walk(top):
-            dirnames[:] = [d for d in dirnames if d not in _skip]
-            for fn in filenames:
-                if parsing.is_supported(fn):
-                    groups.setdefault(str(top), []).append(Path(dirpath) / fn)
+        subs = _subdirs_with_files(top)
+        if subs:
+            for sub in subs:
+                fs = _collect_supported(sub)
+                if fs:
+                    groups.setdefault(str(sub), []).extend(fs)
+            # 父目录直属散落文件(不递归,子目录已各自成组)→ 归父目录自身,不丢
+            direct = _collect_supported(top, direct_only=True)
+            if direct:
+                groups.setdefault(str(top), []).extend(direct)
+        else:
+            fs = _collect_supported(top)
+            if fs:
+                groups.setdefault(str(top), []).extend(fs)
     return groups
 
 

@@ -34,7 +34,17 @@ def start(payload: schemas.StagingIn, db: Session = Depends(get_db)) -> schemas.
     cfg = db.get(models.AppSetting, 1)
     repo_root = (cfg.repository_root_path if cfg else "") or ""
     for p in paths:
-        reason = project_naming.reject_as_project(p, repo_root or None)
+        # expandable:该路径其下有含文件子目录 → 入库按 A 语义拆子项目,系统目录名不误拒(2026-07-09 bug1 根治)
+        expandable = False
+        try:
+            from pathlib import Path as _P
+
+            tp = _P(p)
+            if tp.is_dir() and ingest._subdirs_with_files(tp):
+                expandable = True
+        except OSError:
+            pass
+        reason = project_naming.reject_as_project(p, repo_root or None, expandable=expandable)
         if reason:
             raise HTTPException(400, reason)
     job_id = ingest.start_ingest(paths)

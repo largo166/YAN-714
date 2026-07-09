@@ -152,6 +152,7 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
         onClose={() => setAssetPoolOpen(false)}
         projectId={proj.cur?.id ?? null}
         projectName={proj.cur?.name}
+        allProjects
       />
     </>
   )

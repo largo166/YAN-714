@@ -35,10 +35,14 @@ interface Props {
   onClose: () => void
   projectId: number | null
   projectName?: string
+  allProjects?: boolean /* true:跨项目视图(数据基地入口),读 listAllAssets,不受单项目作用域(bug2 根治) */
 }
 
-export function ImageAssetPool({ open, onClose, projectId, projectName }: Props) {
-  const [assets, setAssets] = useState<FileAsset[]>([])
+/* 内部统一用带项目归属的资产形状(单项目模式 project_id 补当前项目) */
+type Asset = FileAsset & { project_id: number; project_name?: string }
+
+export function ImageAssetPool({ open, onClose, projectId, projectName, allProjects = false }: Props) {
+  const [assets, setAssets] = useState<Asset[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('') /* 列表加载失败(占据网格区) */
@@ -53,22 +57,31 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
 
   /* 拉资产 + 源文件名映射(名字映射失败不阻断资产展示) */
   const load = useCallback(async () => {
-    if (projectId == null) return
+    if (!allProjects && projectId == null) return
     setLoading(true)
     setErr('')
     try {
-      const r = await ks.listAssets(projectId)
-      if (finishedRef.current) return
-      setAssets(r.items)
-      setTotal(r.total)
-      try {
-        const f = await ks.listProjectFiles(projectId)
+      if (allProjects) {
+        const r = await ks.listAllAssets()
         if (finishedRef.current) return
-        const map: Record<number, string> = {}
-        for (const it of f.items) map[it.id] = it.filename
-        setFileNames(map)
-      } catch {
-        /* 源文件名仅用于更友好的显示,拉不到就退回 caption / 资产 #id */
+        setAssets(r.items as Asset[])
+        setTotal(r.total)
+        /* 跨项目模式:源文件名映射跨项目不便,退回 caption / 资产 #id,不拉 */
+      } else {
+        const pid = projectId as number
+        const r = await ks.listAssets(pid)
+        if (finishedRef.current) return
+        setAssets(r.items.map((a) => ({ ...a, project_id: pid })))
+        setTotal(r.total)
+        try {
+          const f = await ks.listProjectFiles(pid)
+          if (finishedRef.current) return
+          const map: Record<number, string> = {}
+          for (const it of f.items) map[it.id] = it.filename
+          setFileNames(map)
+        } catch {
+          /* 源文件名仅用于更友好的显示,拉不到就退回 caption / 资产 #id */
+        }
       }
     } catch (e) {
       if (finishedRef.current) return
@@ -76,11 +89,11 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
     } finally {
       if (!finishedRef.current) setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, allProjects])
 
   /* 打开:复位 + 拉取;关闭:置 finished 守卫迟到回调 */
   useEffect(() => {
-    if (open && projectId != null) {
+    if (open && (allProjects || projectId != null)) {
       finishedRef.current = false
       setFilter('all')
       setSelectedId(null)
@@ -93,15 +106,15 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
     } else {
       finishedRef.current = true
     }
-  }, [open, projectId, load])
+  }, [open, projectId, allProjects, load])
 
   /* 资产池是资产数据的消费者:入库抽图完成(knowledge-updated)时,若抽屉开着则重拉 */
   useEffect(() => {
-    if (!open || projectId == null) return
+    if (!open || (!allProjects && projectId == null)) return
     const onUpd = () => { void load() }
     window.addEventListener('romai:knowledge-updated', onUpd)
     return () => window.removeEventListener('romai:knowledge-updated', onUpd)
-  }, [open, projectId, load])
+  }, [open, projectId, allProjects, load])
 
   /* 每类真实数量(来自已拉取资产) */
   const counts = useMemo(() => {
@@ -119,14 +132,14 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
   /* 当前选中资产(随 assets 变化重算,改类型后详情同步) */
   const selected = useMemo(() => assets.find((a) => a.id === selectedId) ?? null, [assets, selectedId])
 
-  /* 改类型:PATCH 成功后就地更新本地状态(只改登记,不删图) */
+  /* 改类型:PATCH 成功后就地更新本地状态(只改登记,不删图)。用资产自身 project_id(跨项目模式各图归属不同) */
   const onChangeType = useCallback(
-    async (asset: FileAsset, newType: string) => {
-      if (projectId == null || newType === asset.asset_type) return
+    async (asset: Asset, newType: string) => {
+      if (newType === asset.asset_type) return
       setSavingType(true)
       setSaveErr('')
       try {
-        await ks.updateAsset(projectId, asset.id, { asset_type: newType })
+        await ks.updateAsset(asset.project_id, asset.id, { asset_type: newType })
         if (finishedRef.current) return
         setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, asset_type: newType } : a)))
       } catch (e) {
@@ -135,28 +148,28 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
         if (!finishedRef.current) setSavingType(false)
       }
     },
-    [projectId],
+    [],
   )
 
-  /* 定位原文件(资源管理器);失败如实红字 */
+  /* 定位原文件(资源管理器);失败如实红字。用资产自身 project_id */
   const onReveal = useCallback(
-    async (sourceFileId: number) => {
-      if (projectId == null || sourceFileId <= 0) return
+    async (assetProjectId: number, sourceFileId: number) => {
+      if (sourceFileId <= 0) return
       setRevealErr('')
       try {
-        await ks.revealProjectFile(projectId, sourceFileId)
+        await ks.revealProjectFile(assetProjectId, sourceFileId)
       } catch (e) {
         if (!finishedRef.current) setRevealErr((e as Error).message)
       }
     },
-    [projectId],
+    [],
   )
 
   if (!open) return null
   const overlay = document.getElementById('sk-overlay')
   if (!overlay) return null
 
-  const locked = projectId == null
+  const locked = !allProjects && projectId == null
 
   /* 名字:caption 首行 → 源文件名 → 资产 #id */
   const nameOf = (a: FileAsset): string => {
@@ -190,7 +203,13 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
             right={<GhostButton className="px-3 py-1" onClick={onClose}>关闭</GhostButton>}
           />
           <div className="mt-2 font-skcjk text-[11.5px] tracking-[0.04em] text-sk-muted2">
-            {locked ? '请先选择项目' : <>当前项目 · <span className="text-sk-muted">{projectName || `#${projectId}`}</span></>}
+            {allProjects ? (
+              <>全部项目 · <span className="text-sk-muted">{total} 张图片资产</span></>
+            ) : locked ? (
+              '请先选择项目'
+            ) : (
+              <>当前项目 · <span className="text-sk-muted">{projectName || `#${projectId}`}</span></>
+            )}
           </div>
           {!locked && !loading && !err && total > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -206,7 +225,7 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
 
         {/* 主体:左网格 + 右详情两栏 */}
         <div className="flex min-h-0 flex-1">
-          {projectId == null ? (
+          {locked ? (
             <div className="flex flex-1 items-center justify-center px-6 text-center font-skcjk text-[12.5px] font-light text-sk-muted2">
               请先选择项目。
             </div>
@@ -231,10 +250,11 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
                     {shown.map((a) => (
                       <AssetCell
                         key={a.id}
-                        thumbUrl={ks.assetThumbUrl(projectId, a.id)}
+                        thumbUrl={ks.assetThumbUrl(a.project_id, a.id)}
                         ext={a.ext}
                         name={nameOf(a)}
                         typeLabel={TYPE_LABEL[a.asset_type] ?? a.asset_type}
+                        subLabel={allProjects ? a.project_name : undefined}
                         badge={cornerBadge(a)}
                         selected={a.id === selectedId}
                         onClick={() => setSelectedId(a.id)}
@@ -250,7 +270,7 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
                   <div className="sk-scroll flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-5">
                     {/* 大图 + 尺寸角标 */}
                     <div className="relative flex items-center justify-center overflow-hidden rounded-skcard border-[0.5px] border-sk-hairsoft bg-sk-card">
-                      <BigImage src={ks.assetImageUrl(projectId, selected.id)} ext={selected.ext} />
+                      <BigImage src={ks.assetImageUrl(selected.project_id, selected.id)} ext={selected.ext} />
                       {selected.width > 0 && selected.height > 0 && (
                         <span className="absolute bottom-1.5 right-1.5 rounded-[5px] bg-[rgba(6,8,10,.72)] px-1.5 py-0.5 font-sans text-[9.5px] text-sk-muted [font-variant-numeric:tabular-nums]">
                           {selected.width} × {selected.height}
@@ -261,6 +281,9 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
                     {/* 名字 / 源文件 / 说明 */}
                     <div className="flex flex-col gap-1.5">
                       <div className="break-all font-skcjk text-[12.5px] leading-[1.6] text-sk-fg">{nameOf(selected)}</div>
+                      {allProjects && selected.project_name && (
+                        <div className="font-skcjk text-[10.5px] font-light text-sk-primary">项目 · {selected.project_name}</div>
+                      )}
                       {fileNames[selected.source_file_id] && (
                         <div className="break-all font-skcjk text-[10.5px] font-light text-sk-muted2">
                           源文件 · {fileNames[selected.source_file_id]}
@@ -295,7 +318,7 @@ export function ImageAssetPool({ open, onClose, projectId, projectName }: Props)
                     {/* 定位原文件 + 用于报告(占位) */}
                     <div className="flex flex-col gap-2 border-t-[0.5px] border-sk-hairsoft pt-3">
                       {selected.source_file_id > 0 && (
-                        <GhostButton className="w-full" onClick={() => void onReveal(selected.source_file_id)}>
+                        <GhostButton className="w-full" onClick={() => void onReveal(selected.project_id, selected.source_file_id)}>
                           打开原文件位置
                         </GhostButton>
                       )}
@@ -350,6 +373,7 @@ function AssetCell({
   ext,
   name,
   typeLabel,
+  subLabel,
   badge,
   selected,
   onClick,
@@ -358,6 +382,7 @@ function AssetCell({
   ext: string
   name: string
   typeLabel: string
+  subLabel?: string
   badge: string | null
   selected: boolean
   onClick: () => void
@@ -393,7 +418,10 @@ function AssetCell({
         )}
       </div>
       <span className="truncate font-skcjk text-[10.5px] text-sk-muted">{name}</span>
-      <Pill className="self-start px-2 py-0.5 text-[9.5px] tracking-[0.06em]">{typeLabel}</Pill>
+      <div className="flex items-center gap-1.5">
+        <Pill className="self-start px-2 py-0.5 text-[9.5px] tracking-[0.06em]">{typeLabel}</Pill>
+        {subLabel && <span className="truncate font-skcjk text-[9px] font-light text-sk-primary">{subLabel}</span>}
+      </div>
     </button>
   )
 }

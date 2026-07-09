@@ -16,6 +16,7 @@ export const knowledgeService = {
   extractAssets: api.extractFileAssets,
   // 图片资产池(2026-07-09):读列表/改类型软删/缩略图·大图 URL/打开原文件
   listAssets: api.listAssets,
+  listAllAssets: api.listAllAssets,
   updateAsset: api.updateAsset,
   assetThumbUrl: api.assetThumbUrl,
   assetImageUrl: api.assetImageUrl,

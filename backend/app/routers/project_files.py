@@ -14,6 +14,8 @@ from ..database import get_db
 from ..safe_paths import sanitize_filename
 
 router = APIRouter(prefix="/api/projects", tags=["project-files"])
+# 跨项目资产视图(2026-07-09 bug2 根治):资产池"全部项目"档读此端点,不受单项目作用域限制
+assets_router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 # batch-ingest 批量接入管线已删除(2026-07,前端全站零调用;数据基地走浏览器选文件回环上传)。
 # 需要时从 git 历史找回:endpoints batch-ingest/preview|import 及其 helpers。
@@ -495,6 +497,35 @@ def list_assets(project_id: int, status: str = "active", db: Session = Depends(g
     items = [
         {
             "id": r.id, "source_file_id": r.source_file_id, "ext": r.ext,
+            "asset_type": r.asset_type, "status": r.status,
+            "page_no": r.page_no, "slide_no": r.slide_no, "shape_index": r.shape_index,
+            "caption": r.caption, "width": r.width, "height": r.height,
+        }
+        for r in rows
+    ]
+    return {"items": items, "total": len(items)}
+
+
+@assets_router.get("/all")
+def list_all_assets(status: str = "active", db: Session = Depends(get_db)) -> dict:
+    """跨项目图片资产(2026-07-09 bug2 根治):不受单项目作用域限制,带项目名。
+    资产池"全部项目"档读此——图片散落在自动建的项目里也能一处看全,附 project_id/project_name。"""
+    st = status if status in ("active", "trashed") else "active"
+    rows = (
+        db.query(models.FileAsset)
+        .filter(models.FileAsset.status == st)
+        .order_by(models.FileAsset.id.desc())
+        .all()
+    )
+    pids = {r.project_id for r in rows}
+    pname: dict[int, str] = {}
+    if pids:
+        for pr in db.query(models.Project).filter(models.Project.id.in_(pids)).all():
+            pname[pr.id] = pr.name
+    items = [
+        {
+            "id": r.id, "project_id": r.project_id, "project_name": pname.get(r.project_id, f"#{r.project_id}"),
+            "source_file_id": r.source_file_id, "ext": r.ext,
             "asset_type": r.asset_type, "status": r.status,
             "page_no": r.page_no, "slide_no": r.slide_no, "shape_index": r.shape_index,
             "caption": r.caption, "width": r.width, "height": r.height,
