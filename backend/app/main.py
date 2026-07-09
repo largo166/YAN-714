@@ -26,6 +26,7 @@ from .routers import review_checklist
 from .routers import admin
 from .routers import staging
 from .routers import ingest
+from .routers import app_meta
 
 
 @asynccontextmanager
@@ -70,6 +71,7 @@ app.include_router(result_send.router)
 app.include_router(admin.router)
 app.include_router(staging.router)
 app.include_router(ingest.router)
+app.include_router(app_meta.router)
 
 
 # ── 前端托管：构建产物存在时(exe / 生产)同源托管 dist，免第二个端口/CORS ──

@@ -20,9 +20,9 @@ export interface BoardLive {
   hub: HubLive
 }
 
-export function useBoardLive(): BoardLive {
-  const knowledge = useKnowledgeLive(true)
-  const skills = useSkillsLive(true)
-  const hub = useHubLive(true)
+export function useBoardLive(enabled = true): BoardLive {
+  const knowledge = useKnowledgeLive(enabled)
+  const skills = useSkillsLive(enabled)
+  const hub = useHubLive(enabled)
   return { knowledge, skills, hub }
 }

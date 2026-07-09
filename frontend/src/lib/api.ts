@@ -103,21 +103,36 @@ import {
 
 // API 基址：运行时按页面来源判定，避免构建期 env 缓存坑。
 // - 显式 VITE_API_BASE_URL（非空）优先。
-// - Vite 开发服务器(端口 5173) → 打本地 FastAPI 8000。
-// - 其余(exe / 同源托管 dist，任意端口) → 相对同源('')，请求走 /api。
-function resolveApiBase(): string {
+// - Vite 开发/预览端口(5173 dev / 4173 vite preview) → 打本地 FastAPI 8000。
+//   （2026-07-10 防呆:4173 也纳入——vite preview 只托管静态 dist、无 /api,
+//    此前落到同源'' → /api 打到自己返回 HTML → 满屏"Unexpected token '<'"红错。）
+// - 其余(exe / 8000 后端同源托管 dist，或未来端口) → 相对同源('')，请求走 /api。
+const DEV_PREVIEW_PORTS = new Set(['5173', '4173'])
+export function resolveApiBase(): string {
   const explicit = import.meta.env.VITE_API_BASE_URL as string | undefined
   if (explicit) return explicit
-  if (typeof window !== 'undefined' && window.location.port === '5173') return 'http://127.0.0.1:8000'
+  if (typeof window !== 'undefined' && DEV_PREVIEW_PORTS.has(window.location.port)) return 'http://127.0.0.1:8000'
   return ''
 }
 const BASE_URL: string = resolveApiBase()
 
+/** 后端未连接的可读错误(防呆):替代 "Unexpected token '<'" 一类看不懂的红字。 */
+function backendUnreachableMessage(): string {
+  const here = typeof window !== 'undefined' ? window.location.origin : ''
+  return `后端未连接。请从 http://127.0.0.1:8000/seasky.html 打开本应用（当前 ${here || '页面'} 未接到后端服务）。`
+}
+
 async function request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
-    ...options,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
+      ...options,
+    })
+  } catch {
+    // 网络层失败(后端没起/端口不通):给人话,不抛底层 TypeError
+    throw new Error(backendUnreachableMessage())
+  }
   if (!res.ok) {
     let detail = res.statusText
     try {
@@ -129,6 +144,15 @@ async function request<T = unknown>(path: string, options: RequestInit = {}): Pr
     throw new Error(`API ${res.status}: ${detail}`)
   }
   if (res.status === 204) return undefined as T
+  // 防呆:期望 JSON 但收到 HTML(多为静态服务器 SPA 回退首页,即"没连到后端")。
+  // 不再把 <!doctype html> 硬解析成 JSON 抛 "Unexpected token '<'",而是给人话。
+  const ctype = res.headers.get('content-type') || ''
+  if (!ctype.includes('application/json')) {
+    const head = (await res.text()).slice(0, 20).toLowerCase()
+    if (head.includes('<!doctype') || head.includes('<html')) {
+      throw new Error(backendUnreachableMessage())
+    }
+  }
   return (await res.json()) as T
 }
 
@@ -152,6 +176,10 @@ export const api = {
 
   async health(): Promise<HealthStatus> {
     return request<HealthStatus>('/health')
+  },
+  /** 前后端一致性自检:后端版本 + 后端托管 dist 的入口哈希(前端据此判断自身是否过期)。 */
+  async appVersion(): Promise<{ backend_version: string; dist_hash: string | null }> {
+    return request('/api/app/version')
   },
 
   // ── 项目 ──

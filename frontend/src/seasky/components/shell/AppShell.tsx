@@ -7,6 +7,7 @@ import { energy, horizonY, sweepOnce, trigWave } from '../../lib/seaUniforms'
 import { useBoardNavigation } from '../../hooks/useBoardNavigation'
 import { useBoardLive } from '../../hooks/useBoardLive'
 import { useCaptureMode } from '../../hooks/useCaptureMode'
+import { useBackendGate } from '../../hooks/useBackendGate'
 import { useProjectBridge } from '../../services/projectBridge'
 import { AgentCampBoard } from '../boards/AgentCampBoard'
 import { CockpitBoard } from '../boards/CockpitBoard'
@@ -21,6 +22,7 @@ import { SeaCanvas } from './SeaCanvas'
 import { FilmSea } from './FilmSea'
 import { CineLayer, SkipIntro, useFluidStage } from './SkipIntro'
 import { StatusBar, TopNavCapsules } from './TopNavCapsules'
+import { BackendDisconnected, VersionMismatchBanner } from './BackendGate'
 import { SettingsOverlay } from '../system/SettingsOverlay'
 import { GlobalSearch } from '../data/GlobalSearch'
 
@@ -31,7 +33,8 @@ export function AppShell() {
   const capture = useCaptureMode()
   const nav = useBoardNavigation()
   const proj = useProjectBridge()
-  const boardLive = useBoardLive() /* 汇聚层:状态栏 + b1/b2/b3 单一数据源(hotfix1) */
+  const backend = useBackendGate() /* 全局后端连接/版本闸(根治红字反复出现) */
+  const boardLive = useBoardLive(backend.status !== 'disconnected') /* 汇聚层:状态栏 + b1/b2/b3 单一数据源(hotfix1);后端断连时不拉,免散报红字 */
   const [filmPaused, setFilmPaused] = useState(false)
   const [progress, setProgress] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -180,7 +183,10 @@ export function AppShell() {
         {phase === 'gate' && <GateScene onUnlock={nav.toBoards} />}
         {phase === 'boards' && <BoardsSelect onEnter={enterFromBoards} />}
 
-        {/* app 壳:五板块恒挂载 display 切换 */}
+        {/* app 壳:五板块恒挂载 display 切换。
+            后端未连接/未确认时(app 相)不挂载板,改由 BackendDisconnected 全屏接管或短暂等待——
+            杜绝各板 fetch 失败在闸后散报红字(根治红字反复出现)。 */}
+        {!(phase === 'app' && backend.status !== 'ok') && (
         <div ref={appRef} className="absolute inset-0 z-[8]" style={{ display: phase === 'app' ? 'block' : 'none' }}>
           <TopNavCapsules board={board} onSwitch={nav.switchBoard} onOpenSettings={() => setSettingsOpen(true)} />
           <BoardFrame active={phase === 'app' && board === 0} skipAnim={capture}>
@@ -213,10 +219,20 @@ export function AppShell() {
           <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
           <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} proj={proj} />
         </div>
+        )}
 
         {/* 下拉/浮层 Portal 根:在 stage 内(继承流体缩放 scale)、boards 之上,收纳 DropMenu 展开层——
             使其脱离标题 data-in 入场动画残留 transform 造成的层叠上下文陷阱,而非靠调大 z-index 比大小 */}
         <div id="sk-overlay" className="pointer-events-none absolute inset-0 z-[45]" />
+
+        {/* 全局后端连接闸(根治红字反复出现):仅 app 相且未连接 → 整屏单一提示,盖住各板,杜绝满屏红字。
+            版本不一致 → 非阻断顶部横幅(已批:只提示不拦)。film/gate/boards 相不拦(那几相不依赖后端数据)。 */}
+        {phase === 'app' && backend.status === 'disconnected' && (
+          <BackendDisconnected message={backend.message} onRetry={backend.retry} />
+        )}
+        {phase === 'app' && backend.status === 'ok' && backend.versionMismatch && (
+          <VersionMismatchBanner gate={backend} onRefresh={() => window.location.reload()} />
+        )}
 
         <CineLayer hideBars={phase === 'app'} />
       </div>
