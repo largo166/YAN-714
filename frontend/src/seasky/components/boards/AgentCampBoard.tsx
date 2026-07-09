@@ -5,7 +5,7 @@ import type { Skill, SkillRun } from '@/types/schemas'
 
 import { useLocalStorage } from '../../hooks/useLocalStorage'
 import type { SkillsLive } from '../../hooks/useSkillsLive'
-import { LS_KEYS, MODELS } from '../../lib/constants'
+import { LS_KEYS } from '../../lib/constants'
 import { cn } from '../../lib/cn'
 import { campService as cs } from '../../services'
 import { AgentComposer } from '../agent/AgentComposer'
@@ -66,7 +66,6 @@ export function AgentCampBoard({
 }) {
   const [tabRaw, setTab] = useLocalStorage(LS_KEYS.campTab, 'ask')
   const tab = tabRaw === 'agents' ? 'agents' : 'ask'
-  const [model, setModel] = useLocalStorage(LS_KEYS.model, MODELS[0])
   const [view, setView] = useState<'hero' | 'convo'>('hero')
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [picker, setPicker] = useState(false) /* 方案评审:快速/设计委员会 模式选择(紫黑同款能力) */
@@ -366,8 +365,6 @@ export function AgentCampBoard({
                 ? '写下要共创的事,或按 / 挑一项能力'
                 : '写下要交办的任务,或按 / 挑一位设计智能体'
             }
-            model={model}
-            onModelSelect={setModel}
             onSend={heroSend}
             onDraft={(t) => { composerText.current = t }}
             onAttach={startOrganize}

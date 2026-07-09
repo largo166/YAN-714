@@ -29,12 +29,12 @@ export const BOARD_PILLARS = [
 ] as const
 
 /** localStorage 键(与原型完全同名——用户既有的记忆无缝延续)
-    skipIntro/seenIntro 已退役(2026-07-09 换版决议:每次开机都播)——键名不复用。 */
+    skipIntro/seenIntro 已退役(2026-07-09 换版决议:每次开机都播)——键名不复用。
+    model 已退役(2026-07-09 T1-6 已批决议:撤模型选择器,虚构型号删除)——键名不复用。 */
 export const LS_KEYS = {
   projects: 'romai_projects_v1',
   board: 'romai_seasky_board',
   campTab: 'romai_seasky_camp_tab',
-  model: 'romai_seasky_model',
   recentSearchProject: 'romai_seasky_recent_search_proj', // P0+:重名弹选最近置顶
   bg: 'romai_seasky_bg', // 五板块背景:'sea'(fbm海,默认) | 'particle'(粒子) | 'static'(静态,不动)
 } as const
@@ -44,5 +44,3 @@ export const STAGE_BASE = { w: 1280, h: 720 } as const
 
 /** 海系四阶(项目分段色:日历/工作量共用) */
 export const PROJ_COLORS = ['#7fb3cf', '#a8cfe0', '#4f7f9e', '#d7e5ec'] as const
-
-export const MODELS = ['ROM Max · 深推理', 'ROM Pro · 均衡', 'ROM Lite · 快问快答'] as const

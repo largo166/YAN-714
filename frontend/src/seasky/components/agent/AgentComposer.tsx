@@ -1,15 +1,12 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 
-import { ModelSelector } from './ModelSelector'
-
-/* ═══ 大 composer(基准板核心件,构图冻结):圆角容器 / + 附件 / 模型切换 / Enter 发送 ═══
+/* ═══ 大 composer(基准板核心件,构图冻结):圆角容器 / + 附件 / Enter 发送 ═══
+   T1-6 已批决议(2026-07-09):撤模型选择器,虚构型号(ROM Max/Pro/Lite)删除;多模型挂起能力池。
    b2 接真波:+ 号从「仅展示文件名」升级为真接入入口(onAttach 交给动作卡);
    onDraft 让快捷卡能取到草稿文本作为技能输入(紫黑 composer 同语义)。 */
 
 interface AgentComposerProps {
   placeholder: string
-  model: string
-  onModelSelect: (m: string) => void
   onSend: (text: string) => void
   onDraft?: (text: string) => void
   onAttach?: (files: File[]) => void
@@ -18,7 +15,7 @@ interface AgentComposerProps {
   onClearPending?: () => void
 }
 
-export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDraft, onAttach, onSlash, pendingLabel, onClearPending }: AgentComposerProps) {
+export function AgentComposer({ placeholder, onSend, onDraft, onAttach, onSlash, pendingLabel, onClearPending }: AgentComposerProps) {
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [hasText, setHasText] = useState(false)
@@ -89,7 +86,6 @@ export function AgentComposer({ placeholder, model, onModelSelect, onSend, onDra
               e.target.value = ''
             }}
           />
-          <ModelSelector model={model} onSelect={onModelSelect} />
           <button
             className={`grid h-[34px] w-[34px] flex-none cursor-pointer place-items-center rounded-full border-0 text-[15px] transition-colors duration-200 ${
               hasText || pendingLabel ? 'bg-sk-primary text-[#0a0c0e] hover:bg-[#8fc0da]' : 'bg-[rgba(242,241,238,.08)] text-sk-muted'
