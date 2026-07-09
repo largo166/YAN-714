@@ -83,9 +83,12 @@ export function HubBoard({ active: _active, live }: { active: boolean; live: Hub
         </div>
       </figure>
 
-      {/* 数据加载失败可见(封板可信度:错误≠空库,四源任一失败在此如实提示) */}
+      {/* 数据加载失败可见(封板可信度:错误≠空库,四源任一失败在此如实提示 + 一键重试) */}
       {live.err && (
-        <div className="font-skcjk text-[12px] font-light text-sk-risk" data-in>{live.err}</div>
+        <div className="flex items-center gap-3 font-skcjk text-[12px] font-light text-sk-risk" data-in>
+          <span>{live.err}</span>
+          <GhostButton onClick={live.reload} className="px-3 py-1 text-[10.5px]">重试 ↻</GhostButton>
+        </div>
       )}
 
       {/* 三列(构图不变,数据全真) */}

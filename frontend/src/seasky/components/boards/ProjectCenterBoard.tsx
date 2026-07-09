@@ -11,7 +11,6 @@ import { ImageAssetPool } from '../data/ImageAssetPool'
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { Dot, GhostButton, Label, Pill } from '../common/PillButton'
 import { MRow, StatBlock } from '../common/StatBlock'
-
 /* ═══ b0 项目中心:左图右文(构图冻结)——全卡接真:
    HERO 数字=progress/overview;阶段带=current_stage;会议链/研判/里程碑=真端点 ═══ */
 
@@ -54,7 +53,12 @@ export function ProjectCenterBoard({ proj, active }: { proj: ProjectBridge; acti
         <div className="font-skcjk text-[27px] font-light leading-[1.4] tracking-[0.14em] [text-indent:0.14em] text-sk-fg" data-in>
           <ProjectSwitcher proj={proj} />
         </div>
-        {live.err && <div className="font-skcjk text-[12px] font-light text-sk-risk" data-in>{live.err}</div>}
+        {live.err && (
+          <div className="flex items-center gap-3 font-skcjk text-[12px] font-light text-sk-risk" data-in>
+            <span>{live.err}</span>
+            <GhostButton onClick={live.reload} className="px-3 py-1 text-[10.5px]">重试 ↻</GhostButton>
+          </div>
+        )}
         <div className="flex gap-[30px] py-0.5" data-in>
           <StatBlock
             compact alignLeft tone="pri"

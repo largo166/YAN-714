@@ -145,6 +145,32 @@ def test_manual_create_infers_design_type(client):
     assert r.json()["design_doc_type"] == "效果图"
 
 
+def test_patch_doc_type_manual_override(client):
+    """P1-1 手动改类型:PATCH 改 design_doc_type + 置 confirmed;非法类型 422;纯元数据不炸检索。"""
+    # 建一份自动推断为"效果图"的文档
+    doc = client.post("/api/knowledge/documents", json={"title": "社区入口夜景效果图说明", "content_text": "x"}).json()
+    assert doc["design_doc_type"] == "效果图"
+    assert doc["design_type_confirmed"] is False
+
+    # 人工改为"图纸" → 成功 + confirmed=True
+    r = client.patch(f"/api/knowledge/documents/{doc['id']}/doc-type", json={"design_doc_type": "图纸"})
+    assert r.status_code == 200
+    assert r.json()["design_doc_type"] == "图纸"
+    assert r.json()["design_type_confirmed"] is True
+
+    # 复读确认已落库(元数据写生效)
+    again = client.get(f"/api/knowledge/documents/{doc['id']}").json()
+    assert again["design_doc_type"] == "图纸" and again["design_type_confirmed"] is True
+
+    # 非法类型 → 422,不写入
+    bad = client.patch(f"/api/knowledge/documents/{doc['id']}/doc-type", json={"design_doc_type": "不存在的类"})
+    assert bad.status_code == 422
+    assert client.get(f"/api/knowledge/documents/{doc['id']}").json()["design_doc_type"] == "图纸"  # 未被污染
+
+    # 不存在的文档 → 404
+    assert client.patch("/api/knowledge/documents/999999/doc-type", json={"design_doc_type": "图纸"}).status_code == 404
+
+
 def test_legacy_rows_read_fallback(client):
     """存量行(design_doc_type 为空)检索时按旧类映射兜底——双轨读不炸不漏。"""
     from app.database import SessionLocal

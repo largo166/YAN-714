@@ -408,6 +408,15 @@ export const api = {
       await request(`/api/knowledge/documents/${id}/generate-metadata`, { method: 'POST' }),
     )
   },
+  /** P1-1:人工改文档建筑语义类型(design_doc_type,16 类之一)。纯元数据写,置 design_type_confirmed。 */
+  async updateKnowledgeDocType(id: number, designDocType: string): Promise<KnowledgeDoc> {
+    return KnowledgeDocSchema.parse(
+      await request(`/api/knowledge/documents/${id}/doc-type`, {
+        method: 'PATCH',
+        body: JSON.stringify({ design_doc_type: designDocType }),
+      }),
+    )
+  },
 
   // ── 项目结构化认知（P2 脊椎）──
   async listCognition(projectId: number): Promise<ProjectCognition[]> {

@@ -21,6 +21,8 @@ export interface KnowledgeLive {
   typeStats: [string, number][]
   recent: DocLite[]
   inbox: { configured: boolean; accessible: boolean; pending: number } | null
+  /** 手动重试(B④):bump ver 强制重拉 stats+文档+收件箱。 */
+  reload: () => void
 }
 
 export function useKnowledgeLive(active: boolean): KnowledgeLive {
@@ -92,5 +94,5 @@ export function useKnowledgeLive(active: boolean): KnowledgeLive {
 
   const recent = useMemo(() => docs.slice(0, 5), [docs])
 
-  return { loading, err, stats, typeStats, recent, inbox }
+  return { loading, err, stats, typeStats, recent, inbox, reload: () => setVer((v) => v + 1) }
 }

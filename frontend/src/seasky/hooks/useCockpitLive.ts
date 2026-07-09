@@ -29,6 +29,8 @@ export interface CockpitLive {
   /** 数据源失败聚合提示(null=全部成功)。板内渲染用,失败不再伪装成空态。 */
   err: string | null
   sendBroadcast: (text: string) => Promise<void>
+  /** 手动重试(B④):bump dataVer 强制重拉四源 + 日历。 */
+  reload: () => void
 }
 
 const SS_KEY = 'romai_seasky_cockpit_open'
@@ -146,7 +148,7 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
     return () => {
       alive = false
     }
-  }, [active, gate, projectIds])
+  }, [active, gate, projectIds, dataVer])
 
   const sendBroadcast = useCallback(async (text: string) => {
     await cks.createBroadcast(text)
@@ -160,5 +162,6 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
     gate, gateErr, unlock, setup, loading, usage, workload, dash, broadcasts, calEvents,
     err: allErrs.length ? `部分数据加载失败——${allErrs.join(' / ')}` : null,
     sendBroadcast,
+    reload: () => setDataVer((v) => v + 1),
   }
 }

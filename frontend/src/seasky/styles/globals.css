@@ -36,6 +36,15 @@ input, textarea { font-family: inherit; }
 @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 .sk-pulse { animation: sk-pulse 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .sk-pulse { animation: none; opacity: 0.7; } }
+
+/* sk-skel(B⑤ 骨架屏·海天语言):海蓝半透块 + 低对比呼吸,纯透明度无位移(守晕动症红线)。
+   已批决议 2026-07-09:骨架 1.2s 低对比,沿用海天风格容器(玻璃感+海蓝块),非通用灰骨架。 */
+.sk-skel {
+  background: linear-gradient(90deg, rgba(127, 179, 207, 0.07), rgba(127, 179, 207, 0.13), rgba(127, 179, 207, 0.07));
+  border-radius: 8px;
+  animation: sk-pulse 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .sk-skel { animation: none; opacity: 0.55; } }
 @keyframes sk-grain {
   0% { transform: translate(0, 0); }
   25% { transform: translate(-1.5%, 1%); }

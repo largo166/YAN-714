@@ -36,6 +36,7 @@ export const LS_KEYS = {
   board: 'romai_seasky_board',
   campTab: 'romai_seasky_camp_tab',
   recentSearchProject: 'romai_seasky_recent_search_proj', // P0+:重名弹选最近置顶
+  recentSearchTerms: 'romai_seasky_recent_search_terms', // P1-5:最近检索词历史(纯前端 localStorage)
   bg: 'romai_seasky_bg', // 五板块背景:'sea'(fbm海,默认) | 'particle'(粒子) | 'static'(静态,不动)
 } as const
 

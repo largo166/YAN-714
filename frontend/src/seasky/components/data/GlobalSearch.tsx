@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import type { KnowledgeHit } from '@/types/schemas'
 
 import { LS_KEYS } from '../../lib/constants'
-import { lsGet, lsSet } from '../../lib/storage'
+import { lsGet, lsGetJSON, lsSet, lsSetJSON } from '../../lib/storage'
 import type { ProjectBridge } from '../../services/projectBridge'
 import { GhostButton, Pill } from '../common/PillButton'
 
@@ -29,12 +29,32 @@ export function matchProjects(term: string, projects: { id: number; name: string
   return projects.filter((p) => p.name.toLowerCase().includes(t))
 }
 
+/* ── P1-5 检索历史(纯前端 localStorage,无后端):最近 8 条检索词,去重、最新在前 ── */
+const RECENT_TERMS_MAX = 8
+
+function loadRecentTerms(): string[] {
+  const arr = lsGetJSON<string[]>(LS_KEYS.recentSearchTerms)
+  return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s.trim()).slice(0, RECENT_TERMS_MAX) : []
+}
+
+function pushRecentTerm(raw: string): string[] {
+  const term = raw.trim()
+  if (!term) return loadRecentTerms()
+  const prev = loadRecentTerms().filter((s) => s !== term)
+  const next = [term, ...prev].slice(0, RECENT_TERMS_MAX)
+  lsSetJSON(LS_KEYS.recentSearchTerms, next)
+  return next
+}
+
 /* P1-1 资料类型 v2:检索分组按建筑语义轴 16 类(design_doc_type);
    旧文档双轨兜底(后端读时已按旧七类映射回填,前端无需再映射)。 */
 const TYPE_ORDER = [
   '文本', '演示', '表格', '效果图', '图纸', '模型', '会议', '汇报',
   '案例', '方法', '规范', '合同', '成本', '甲方资料', '现场资料', '其他',
 ] as const
+
+/* P1-1 手动改类型:可选的 16 类(与后端 doc_type_rules.DESIGN_DOC_TYPES 一致) */
+const DOC_TYPE_OPTIONS = TYPE_ORDER
 
 const STAGE_CN: Record<string, string> = {
   brief: '前期', massing: '强排', concept: '概念', scheme: '方案', develop: '深化',
@@ -70,6 +90,11 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
   const [pendingRest, setPendingRest] = useState('')
   const [revealErr, setRevealErr] = useState<Record<number, string>>({})
   const [copied, setCopied] = useState('') /* 轻量复制回执:'docid:kind' */
+  const [recentTerms, setRecentTerms] = useState<string[]>([]) /* P1-5 最近检索词 */
+  const [typeFilter, setTypeFilter] = useState<string | null>(null) /* P1-1 结果后类型过滤(前端,不改检索) */
+  const [editingType, setEditingType] = useState<number | null>(null) /* P1-1 正在改类型的 document_id */
+  const [typeSaving, setTypeSaving] = useState(false)
+  const [typeErr, setTypeErr] = useState<Record<number, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -77,6 +102,7 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
       setTimeout(() => inputRef.current?.focus(), 30)
       setCandidates(null)
       setNotice('')
+      setRecentTerms(loadRecentTerms())
     }
   }, [open])
 
@@ -85,6 +111,7 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
     setErr('')
     setHits(null)
     setCandidates(null)
+    setTypeFilter(null) /* 新检索清空类型过滤(P1-1) */
     setNotice(extraNotice)
     try {
       const r = await api.searchKnowledge(query, 24, projectId)
@@ -109,6 +136,7 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
     if (!raw.trim() || busy) return
     const { projTerm, rest } = parseAtQuery(raw)
     if (!projTerm) {
+      setRecentTerms(pushRecentTerm(raw)) /* P1-5:记录用户原样检索词 */
       void runSearch(raw.trim())
       return
     }
@@ -116,6 +144,7 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
       setNotice('请在项目名后输入关键词,如「@市庄 总图」')
       return
     }
+    setRecentTerms(pushRecentTerm(raw)) /* P1-5:@语法整条记录,便于原样重搜 */
     const matches = matchProjects(projTerm, proj.projects)
     if (matches.length === 1) {
       lsSet(LS_KEYS.recentSearchProject, String(matches[0].id))
@@ -151,6 +180,43 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
     }
   }, [])
 
+  /* P1-5:点历史词 → 回填输入框并原样重搜(@语法一并复原) */
+  const runFromHistory = useCallback((term: string) => {
+    setQ(term)
+    const { projTerm, rest } = parseAtQuery(term)
+    setRecentTerms(pushRecentTerm(term)) /* 重搜也置顶 */
+    if (!projTerm) { void runSearch(term.trim()); return }
+    if (!rest) { void runSearch(term.trim()); return }
+    const matches = matchProjects(projTerm, proj.projects)
+    if (matches.length === 1) void runSearch(rest, matches[0].id, `项目「${matches[0].name}」内检索`)
+    else void runSearch(rest, undefined, matches.length > 1 ? `「${projTerm}」有多个同名项目,已按全库检索(可在框内重选)` : `未识别项目「${projTerm}」,已按全库检索`)
+  }, [proj.projects, runSearch])
+
+  const clearHistory = useCallback(() => {
+    lsSetJSON(LS_KEYS.recentSearchTerms, [])
+    setRecentTerms([])
+  }, [])
+
+  /* P1-1 手动改类型:调后端 PATCH(纯元数据写),成功后就地更新该 hit 的 design_doc_type(即时重分组,不重搜)。 */
+  const changeDocType = useCallback(async (h: KnowledgeHit, newType: string) => {
+    if (newType === (h.design_doc_type || '')) { setEditingType(null); return }
+    setTypeSaving(true)
+    setTypeErr((m) => ({ ...m, [h.document_id]: '' }))
+    try {
+      await api.updateKnowledgeDocType(h.document_id, newType)
+      setHits((prev) =>
+        prev ? prev.map((x) => (x.document_id === h.document_id ? { ...x, design_doc_type: newType } : x)) : prev,
+      )
+      /* 知识库分类变更 → 广播,数据基地类型带等消费者可刷新(事件命名约定) */
+      window.dispatchEvent(new CustomEvent('romai:knowledge-updated'))
+      setEditingType(null)
+    } catch (e) {
+      setTypeErr((m) => ({ ...m, [h.document_id]: (e as Error).message }))
+    } finally {
+      setTypeSaving(false)
+    }
+  }, [])
+
   const grouped = useMemo(() => {
     if (!hits) return []
     const g = new Map<string, KnowledgeHit[]>()
@@ -164,6 +230,13 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
       (a, b) => (TYPE_ORDER as readonly string[]).indexOf(a[0]) - (TYPE_ORDER as readonly string[]).indexOf(b[0]),
     )
   }, [hits])
+
+  /* P1-1 结果后类型过滤(纯前端):typeFilter=null 显全部;否则只显该类分组。chip 计数用全量 grouped(不随过滤变)。 */
+  const visibleGroups = useMemo(
+    () => (typeFilter ? grouped.filter(([t]) => t === typeFilter) : grouped),
+    [grouped, typeFilter],
+  )
+  const totalHits = useMemo(() => grouped.reduce((n, [, l]) => n + l.length, 0), [grouped])
 
   if (!open) return null
   const overlay = document.getElementById('sk-overlay')
@@ -244,11 +317,67 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
             <div className="py-3 font-skcjk text-[12.5px] font-light text-sk-muted">无命中。可换关键词、去掉 @项目 限定,或先接入更多资料。</div>
           )}
           {!busy && !err && !hits && !candidates && (
-            <div className="py-3 font-skcjk text-[12px] font-light text-sk-muted2">
-              输入关键词全库检索;「@项目名 关键词」限定单项目;命中可直接打开文件所在位置。
+            <div className="py-3">
+              {/* P1-5 最近检索(纯前端 localStorage):点即原样重搜;可清空 */}
+              {recentTerms.length > 0 && (
+                <div className="mb-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="font-sans text-[9.5px] font-medium uppercase tracking-[0.24em] text-sk-muted2">最近检索</span>
+                    <button
+                      className="cursor-pointer font-skcjk text-[10.5px] font-light text-sk-muted2 hover:text-sk-primary"
+                      onClick={clearHistory}
+                    >
+                      清空
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {recentTerms.map((t) => (
+                      <button
+                        key={t}
+                        className="max-w-[220px] cursor-pointer truncate rounded-full border-[0.5px] border-sk-hairsoft bg-transparent px-3 py-[5px] font-skcjk text-[11.5px] font-light text-sk-muted transition-colors hover:border-[rgba(127,179,207,.4)] hover:text-sk-primary"
+                        title={t}
+                        onClick={() => runFromHistory(t)}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="font-skcjk text-[12px] font-light text-sk-muted2">
+                输入关键词全库检索;「@项目名 关键词」限定单项目;命中可直接打开文件所在位置。
+              </div>
             </div>
           )}
-          {grouped.map(([type, list]) => (
+          {/* P1-1 类型过滤条:命中跨 ≥2 类时出;点一下只看该类,再点取消 */}
+          {hits && hits.length > 0 && grouped.length > 1 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                className={`cursor-pointer rounded-full border-[0.5px] px-3 py-[4px] font-skcjk text-[10.5px] font-light transition-colors ${
+                  typeFilter === null
+                    ? 'border-[rgba(127,179,207,.5)] text-sk-primary'
+                    : 'border-sk-hairsoft text-sk-muted2 hover:text-sk-primary'
+                }`}
+                onClick={() => setTypeFilter(null)}
+              >
+                全部 {totalHits}
+              </button>
+              {grouped.map(([t, list]) => (
+                <button
+                  key={t}
+                  className={`cursor-pointer rounded-full border-[0.5px] px-3 py-[4px] font-skcjk text-[10.5px] font-light transition-colors ${
+                    typeFilter === t
+                      ? 'border-[rgba(127,179,207,.5)] text-sk-primary'
+                      : 'border-sk-hairsoft text-sk-muted2 hover:text-sk-primary'
+                  }`}
+                  onClick={() => setTypeFilter((cur) => (cur === t ? null : t))}
+                >
+                  {t} {list.length}
+                </button>
+              ))}
+            </div>
+          )}
+          {visibleGroups.map(([type, list]) => (
             <div key={type} className="mb-4">
               <div className="mb-2 flex items-baseline gap-2 font-skcjk text-[12.5px] font-normal tracking-[0.1em] text-sk-fg">
                 {type}
@@ -263,7 +392,29 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
                     <div className="truncate font-skcjk text-[13px] font-normal text-sk-fg">{h.title}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-skcjk text-[10.5px] font-light text-sk-muted2">
                       {h.project_name && <span className="text-sk-primary">{h.project_name}</span>}
-                      {(h.design_doc_type || h.doc_type) && <span>{h.design_doc_type || h.doc_type}</span>}
+                      {/* P1-1 类型:点一下改(下拉 16 类);纯元数据写,改完就地重分组 */}
+                      {editingType === h.document_id ? (
+                        <select
+                          autoFocus
+                          disabled={typeSaving}
+                          defaultValue={h.design_doc_type || h.doc_type || '其他'}
+                          className="rounded-[6px] border-[0.5px] border-[rgba(127,179,207,.5)] bg-[rgba(10,12,14,.9)] px-1.5 py-[1px] font-skcjk text-[10.5px] text-sk-primary outline-none"
+                          onChange={(e) => void changeDocType(h, e.target.value)}
+                          onBlur={() => setEditingType(null)}
+                        >
+                          {DOC_TYPE_OPTIONS.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          className="cursor-pointer border-b border-dashed border-transparent hover:border-sk-muted2 hover:text-sk-primary"
+                          title="点击改资料类型"
+                          onClick={() => { setEditingType(h.document_id); setTypeErr((m) => ({ ...m, [h.document_id]: '' })) }}
+                        >
+                          {h.design_doc_type || h.doc_type || '未分类'} ✎
+                        </button>
+                      )}
                       {h.file_type && <span>{h.file_type}</span>}
                       {h.folder_hint && <span className="font-skmono text-[10px]">{h.folder_hint}</span>}
                       {h.updated_at && <span>{h.updated_at.slice(0, 10)}</span>}
@@ -282,6 +433,9 @@ export function GlobalSearch({ open, onClose, proj }: { open: boolean; onClose: 
                         </span>
                       )}
                     </div>
+                    {typeErr[h.document_id] && (
+                      <div className="mt-1 font-skcjk text-[10.5px] font-light text-sk-risk">改类型失败:{typeErr[h.document_id]}</div>
+                    )}
                     {missing ? (
                       <div className="mt-1 font-skcjk text-[11px] font-light text-sk-risk">
                         物理文件不在预期位置——建议到设置页跑一次「库健康体检」。

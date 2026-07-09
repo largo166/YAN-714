@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Skill } from '@/types/schemas'
 
@@ -14,30 +14,40 @@ export interface SkillsLive {
   skills: Skill[]
   byId: Record<string, Skill>
   cats: [string, Skill[]][]
+  reload: () => void
 }
 
 export function useSkillsLive(active: boolean): SkillsLive {
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
-  const [loaded, setLoaded] = useState(false)
+  /* ver 驱动重试(B④):reload() bump ver → 强制重拉,即便首载失败也生效。
+     fetchedVer 记住已拉过的 ver,使 active 反复切换不重复请求(进出板不抖),仅 ver 变化才重拉。 */
+  const [ver, setVer] = useState(0)
+  const fetchedVer = useRef(-1)
 
   useEffect(() => {
-    if (!active || loaded) return
+    if (!active || fetchedVer.current === ver) return
+    fetchedVer.current = ver
     let alive = true
+    setLoading(true)
+    setErr(null)
     cs.listSkills()
       .then((d) => {
         if (!alive) return
         setSkills(d.items)
         setErr(null)
-        setLoaded(true)
       })
-      .catch((e) => alive && setErr((e as Error).message))
+      .catch((e) => {
+        if (!alive) return
+        setErr((e as Error).message)
+        fetchedVer.current = -1 /* 失败不锁定:下次 active 或 reload 可再试 */
+      })
       .finally(() => alive && setLoading(false))
     return () => {
       alive = false
     }
-  }, [active, loaded])
+  }, [active, ver])
 
   const byId = useMemo(() => Object.fromEntries(skills.map((s) => [s.id, s])) as Record<string, Skill>, [skills])
   const cats = useMemo(() => {
@@ -50,5 +60,5 @@ export function useSkillsLive(active: boolean): SkillsLive {
     return [...m.entries()].sort((a, b) => CAT_ORDER.indexOf(a[0]) - CAT_ORDER.indexOf(b[0]))
   }, [skills])
 
-  return { loading, err, skills, byId, cats }
+  return { loading, err, skills, byId, cats, reload: () => setVer((v) => v + 1) }
 }

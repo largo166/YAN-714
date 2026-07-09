@@ -544,6 +544,11 @@ class KnowledgeDocOut(BaseModel):
     updated_at: datetime
 
 
+class KnowledgeDocTypeUpdate(BaseModel):
+    """P1-1:人工改文档的建筑语义类型(design_doc_type)。纯元数据写,不碰物理文件。"""
+    design_doc_type: str = Field(min_length=1, max_length=40)
+
+
 class KnowledgeDocListItem(BaseModel):
     """列表项不带全文，省流量。"""
 

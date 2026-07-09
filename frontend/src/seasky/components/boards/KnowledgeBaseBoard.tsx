@@ -11,6 +11,7 @@ import { ImageAssetPool } from '../data/ImageAssetPool'
 import { KnowledgeSearch } from '../data/KnowledgeSearch'
 import { Popover } from '../common/Modal'
 import { GhostButton, Label, Pill } from '../common/PillButton'
+import { BoardSkeleton, RetryState } from '../common/Skeleton'
 import { MRow } from '../common/StatBlock'
 
 /* ═══ b1 数据基地:大字纪念碑(构图冻结)——巨号=真 stats.documents;
@@ -62,6 +63,20 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
     }
   }, [])
 
+  /* B⑤/B④ 首屏三态:骨架(从未拿到 stats 且加载中)/ 重试(首载失败,错误≠空库)。
+     刷新态(已有 stats)不闪骨架,避免抖动——沿用现有 loading/err 内联提示。 */
+  if (live.loading && !live.stats) {
+    return <BoardSkeleton eyebrow="Data Base　记忆底座 · 加载中" variant="mono" />
+  }
+  if (live.err && !live.stats) {
+    return (
+      <div className="absolute inset-0 flex flex-col justify-center gap-[26px] px-24 pb-[118px]">
+        <Label data-in>Data Base{'　'}记忆底座 · 每一份材料都成为记忆</Label>
+        <RetryState message={`数据基地加载失败——${live.err}`} onRetry={live.reload} className="max-w-[520px]" />
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="absolute inset-0 flex flex-col justify-center gap-[26px] px-24 pb-[118px]">
@@ -101,6 +116,9 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
           <div className="flex flex-wrap gap-2.5">
             {live.loading && <span className="font-skcjk text-[12px] font-light text-sk-muted2">类型统计加载中…</span>}
             {live.err && <span className="font-skcjk text-[12px] font-light text-sk-risk">统计加载失败:{live.err}</span>}
+            {!live.loading && !live.err && live.typeStats.length === 0 && (
+              <span className="font-skcjk text-[12px] font-light text-sk-muted2">暂无资料类型。接入资料并入库后,类型分布会出现在这里。</span>
+            )}
             {live.typeStats.slice(0, 6).map(([t, n]) => (
               <div
                 key={t}

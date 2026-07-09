@@ -20,6 +20,7 @@ export function SkillLibraryPanel({
   loading,
   err,
   onPick,
+  onReload,
 }: {
   open: boolean
   onClose: () => void
@@ -27,6 +28,7 @@ export function SkillLibraryPanel({
   loading: boolean
   err: string | null
   onPick: (skillId: string) => void
+  onReload?: () => void
 }) {
   if (!open) return null
   const total = cats.reduce((n, [, list]) => n + list.length, 0)
@@ -47,11 +49,35 @@ export function SkillLibraryPanel({
             </GhostButton>
           </span>
         </div>
-        {err && <div className="py-2 font-skcjk text-[12.5px] font-light text-sk-risk">技能目录加载失败:{err}</div>}
+        {/* B⑤ 骨架:加载中出 chip 行占位(海蓝低对比,守晕动症红线) */}
+        {loading && (
+          <div className="flex flex-col gap-4">
+            {[6, 4, 5].map((n, gi) => (
+              <div key={gi} className="mb-1">
+                <div className="sk-skel mb-[9px] h-3" style={{ width: 96 }} />
+                <div className="flex flex-wrap gap-2">
+                  {Array.from({ length: n }, (_, i) => (
+                    <div key={i} className="sk-skel h-7" style={{ width: 88 + ((i * 17) % 44), borderRadius: 999 }} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {err && (
+          <div className="flex flex-col items-start gap-2.5 py-2">
+            <div className="font-skcjk text-[12.5px] font-light text-sk-risk">技能目录加载失败:{err}</div>
+            {onReload && (
+              <GhostButton className="px-3.5 py-[5px]" onClick={onReload}>
+                重试 ↻
+              </GhostButton>
+            )}
+          </div>
+        )}
         {!loading && !err && cats.length === 0 && (
           <div className="py-2 font-skcjk text-[12.5px] font-light text-sk-muted">暂无技能。检查后端连接后重新打开此面板。</div>
         )}
-        {cats.map(([cat, list]) => (
+        {!loading && cats.map(([cat, list]) => (
           <div key={cat} className="mb-4">
             <div className="mb-[9px] flex items-center gap-2 font-skcjk text-[12.5px] font-normal tracking-[0.12em] text-sk-fg">
               <i className="inline-block h-[7px] w-[7px] rounded-[2px]" style={{ background: list[0]?.color || CAT_COLORS[cat] || '#7fb3cf' }} />

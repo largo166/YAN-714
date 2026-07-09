@@ -492,6 +492,7 @@ export function AgentCampBoard({
           setSkillsOpen(false)
           preSelect(skillId, live.byId[skillId]?.title)
         }}
+        onReload={live.reload}
       />
 
       {/* 命令面板(/ 触发,能力总线确认基座:type-to-filter → 预填 → 发送确认) */}

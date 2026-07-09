@@ -346,6 +346,8 @@ export const KnowledgeDocSchema = z.object({
   type: z.string().default(''),
   description: z.string().default(''),
   resource: z.string().default(''),
+  design_doc_type: z.string().default(''), // P1-1 建筑语义轴 16 类
+  design_type_confirmed: z.boolean().default(false), // 人工确认过
   created_at: z.string(),
   updated_at: z.string(),
 })

@@ -5,6 +5,7 @@ import { PROJ_COLORS } from '../../lib/constants'
 import { cn } from '../../lib/cn'
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { Dot, GhostButton, Label } from '../common/PillButton'
+import { RetryState } from '../common/Skeleton'
 import { MRow } from '../common/StatBlock'
 
 /* ═══ b4 管理驾驶舱:数据网格(构图冻结)——真门禁+真数据 ═══
@@ -170,21 +171,45 @@ function CockpitInner({
         </div>
       </div>
 
-      {/* 数据加载失败可见(封板可信度:错误≠空库,失败源如实点名,不再静默成空态) */}
-      {live.err && (
-        <div className="flex-none font-skcjk text-[12px] font-light text-sk-risk" data-in>{live.err}</div>
-      )}
+      {/* B⑤ 首屏骨架:解锁后数据未到且加载中 → 数据网格骨架(此前无 loading 态,空甜甜圈像空态) */}
+      {live.loading && !live.dash && live.usage.length === 0 ? (
+        <div className="grid min-h-0 flex-1 gap-3.5" style={{ gridTemplateColumns: '1fr 1fr 1.35fr', gridTemplateRows: '1.22fr 0.78fr', gridTemplateAreas: "'a b c' 'd d c'" }} data-in>
+          {(['a', 'b', 'c', 'd'] as const).map((area) => (
+            <GlassCard key={area} style={{ gridArea: area }}>
+              <div className="sk-skel h-3.5" style={{ width: '38%' }} />
+              <div className="mt-3 flex flex-col gap-2.5">
+                {Array.from({ length: area === 'c' ? 5 : 3 }, (_, i) => (
+                  <div key={i} className="sk-skel h-3" style={{ width: i % 2 ? '72%' : '90%' }} />
+                ))}
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      ) : live.err && !live.dash && live.usage.length === 0 ? (
+        /* 全源失败(错误≠空库):如实报 + 重试 */
+        <div className="flex flex-1 items-center justify-center" data-in>
+          <RetryState message={`驾驶舱数据加载失败——${live.err}`} onRetry={live.reload} className="max-w-[520px] items-center text-center" />
+        </div>
+      ) : (
+        <>
+          {/* 部分数据加载失败可见(错误≠空库,失败源如实点名) */}
+          {live.err && (
+            <div className="flex flex-none items-center gap-3 font-skcjk text-[12px] font-light text-sk-risk" data-in>
+              <span>{live.err}</span>
+              <GhostButton onClick={live.reload} className="px-3 py-1 text-[10.5px]">重试 ↻</GhostButton>
+            </div>
+          )}
 
-      {/* 数据网格:a b | c(日历主角) / d d | c */}
-      <div
-        className="grid min-h-0 flex-1 gap-3.5"
-        style={{
-          gridTemplateColumns: '1fr 1fr 1.35fr',
-          gridTemplateRows: '1.22fr 0.78fr',
-          gridTemplateAreas: "'a b c' 'd d c'",
-        }}
-        data-in
-      >
+          {/* 数据网格:a b | c(日历主角) / d d | c */}
+          <div
+            className="grid min-h-0 flex-1 gap-3.5"
+            style={{
+              gridTemplateColumns: '1fr 1fr 1.35fr',
+              gridTemplateRows: '1.22fr 0.78fr',
+              gridTemplateAreas: "'a b c' 'd d c'",
+            }}
+            data-in
+          >
         <GlassCard style={{ gridArea: 'a' }}>
           <CardHead title="AI 使用情况" en="AI Usage" right={<HeadNote>能力分布 · 真实计数</HeadNote>} />
           <div className="flex flex-1 items-center gap-[26px]">
@@ -311,6 +336,8 @@ function CockpitInner({
           </div>
         </GlassCard>
       </div>
+        </>
+      )}
     </div>
   )
 }

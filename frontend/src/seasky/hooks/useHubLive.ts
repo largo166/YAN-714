@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { Agent, Broadcast, TeamMember } from '@/types/schemas'
 
@@ -6,7 +6,8 @@ import { hubService as hs } from '../services'
 
 /* b3 协作平台真源聚合:成员/甲方画像/智能体/通知,独立失败不互拖。
    封板可信度包(2026-07-08):errs 聚合为 err 供板内渲染(错误不再静默成空列表);
-   监听 romai:broadcast-updated(驾驶舱发通知→横幅即时更新,事件命名约定)。 */
+   监听 romai:broadcast-updated(驾驶舱发通知→横幅即时更新,事件命名约定)。
+   B④(2026-07-09):ver 驱动重试(reload),取代一次性 loaded 闸——失败可重拉。 */
 
 export interface HubLive {
   loading: boolean
@@ -18,6 +19,8 @@ export interface HubLive {
   /** 四源任一失败的聚合提示(null=全部成功)。板内渲染用,错误≠空库。 */
   err: string | null
   reloadMembers: () => void
+  /** 全量重拉(B④ 重试态用):bump ver 强制重新聚合四源。 */
+  reload: () => void
 }
 
 export function useHubLive(active: boolean): HubLive {
@@ -27,12 +30,15 @@ export function useHubLive(active: boolean): HubLive {
   const [agents, setAgents] = useState<Agent[]>([])
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [errs, setErrs] = useState<string[]>([])
-  const [loaded, setLoaded] = useState(false)
+  const [ver, setVer] = useState(0)
+  const fetchedVer = useRef(-1)
   const [memberVer, setMemberVer] = useState(0)
 
   useEffect(() => {
-    if (!active || loaded) return
+    if (!active || fetchedVer.current === ver) return
+    fetchedVer.current = ver
     let alive = true
+    setLoading(true)
     ;(async () => {
       const [m, c, a, b] = await Promise.allSettled([
         hs.listTeamMembers(),
@@ -52,12 +58,12 @@ export function useHubLive(active: boolean): HubLive {
       else es.push(`通知:${b.reason}`)
       setErrs(es)
       setLoading(false)
-      setLoaded(true)
+      if (es.length === 4) fetchedVer.current = -1 /* 全败不锁定:可重试 */
     })()
     return () => {
       alive = false
     }
-  }, [active, loaded])
+  }, [active, ver])
 
   /* 成员增删后局部重拉 */
   useEffect(() => {
@@ -82,5 +88,6 @@ export function useHubLive(active: boolean): HubLive {
     loading, members, clients, agents, broadcasts, errs,
     err: errs.length ? `部分数据加载失败——${errs.join(' / ')}` : null,
     reloadMembers: () => setMemberVer((v) => v + 1),
+    reload: () => setVer((v) => v + 1),
   }
 }

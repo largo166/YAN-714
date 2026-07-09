@@ -17,12 +17,15 @@ export interface ProjectLive {
   milestones: ProjectMilestone[]
   risks: ProjectRisk[]
   analysisLead: string | null /* 最新研判一句话(总览优先) */
+  /** 手动重试(B④):bump ver 强制重拉当前项目五源。 */
+  reload: () => void
 }
 
 export function useProjectLive(active: boolean, projectId: number | null): ProjectLive {
-  const [state, setState] = useState<ProjectLive>({
+  const [state, setState] = useState<Omit<ProjectLive, 'reload'>>({
     loading: true, err: null, overview: null, progress: null, milestones: [], risks: [], analysisLead: null,
   })
+  const [ver, setVer] = useState(0)
 
   useEffect(() => {
     if (!active) return
@@ -74,7 +77,7 @@ export function useProjectLive(active: boolean, projectId: number | null): Proje
     return () => {
       alive = false
     }
-  }, [active, projectId])
+  }, [active, projectId, ver])
 
-  return state
+  return { ...state, reload: () => setVer((v) => v + 1) }
 }

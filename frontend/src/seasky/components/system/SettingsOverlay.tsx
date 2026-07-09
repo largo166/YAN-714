@@ -140,6 +140,10 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
   const [projList, setProjList] = useState<{ id: number; name: string; city: string; client: string }[]>([])
   const [stats, setStats] = useState<{ documents: number; indexed: number; engine: string } | null>(null)
   const [typeStats, setTypeStats] = useState<[string, number][]>([])
+  /* B④ 读取态三态:批量拉取失败不再静默吞(此前 allSettled 丢 reject → 永久"…")。
+     readErr=失败源如实点名;readVer bump=一键重试。 */
+  const [readErr, setReadErr] = useState<string | null>(null)
+  const [readVer, setReadVer] = useState(0)
 
   /* 打开即拉全量(设置/工作目录/收件箱/健康/项目/统计) */
   useEffect(() => {
@@ -156,6 +160,13 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
         api.listKnowledgeDocs(),
       ])
       if (!alive) return
+      /* 逐源记错:失败源如实点名(错误≠空值),不再吞 reject 留永久"…" */
+      const failed: string[] = []
+      const names = ['设置', '工作目录', '收件箱', '库体检', '项目列表', '索引统计', '文档列表'] as const
+      ;[s, w, i, h, p, st, docs].forEach((r, idx) => {
+        if (r.status === 'rejected') failed.push(names[idx])
+      })
+      setReadErr(failed.length ? `部分设置数据加载失败——${failed.join('/')}` : null)
       if (s.status === 'fulfilled') {
         setKeySet(s.value.deepseek_api_key_set)
         setSaved((v) => ({ ...v, repo: s.value.repository_root_path ?? '' }))
@@ -185,7 +196,7 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
     return () => {
       alive = false
     }
-  }, [open])
+  }, [open, readVer])
 
   const save = async () => {
     setBusy(true)
@@ -585,7 +596,18 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
               </div>
             ))}
           </nav>
-          <main className="sk-scroll min-w-0 flex-1 overflow-y-auto py-1 pl-6">{pages[page]}</main>
+          <main className="sk-scroll min-w-0 flex-1 overflow-y-auto py-1 pl-6">
+            {/* B④ 读取失败横幅(错误≠空值,失败源如实点名 + 一键重试;不再让"…"永挂) */}
+            {readErr && (
+              <div className="mb-3 flex items-center gap-3 rounded-[10px] border-[0.5px] border-[rgba(207,127,127,.32)] bg-[rgba(207,127,127,.06)] px-3.5 py-2.5">
+                <span className="font-skcjk text-[11.5px] font-light text-sk-risk">{readErr}</span>
+                <GhostButton className="ml-auto px-3 py-1 text-[10.5px]" onClick={() => setReadVer((v) => v + 1)}>
+                  重试 ↻
+                </GhostButton>
+              </div>
+            )}
+            {pages[page]}
+          </main>
         </div>
       </div>
 

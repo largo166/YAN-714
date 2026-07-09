@@ -135,6 +135,28 @@ def get_document(document_id: int, db: Session = Depends(get_db)):
     return doc
 
 
+@router.patch("/documents/{document_id}/doc-type", response_model=schemas.KnowledgeDocOut)
+def update_doc_type(
+    document_id: int,
+    payload: schemas.KnowledgeDocTypeUpdate,
+    db: Session = Depends(get_db),
+):
+    """P1-1:人工改文档建筑语义类型(design_doc_type)。
+    纯元数据写——只改分类标签,不碰物理文件、不动检索索引。
+    校验入参 ∈ 16 类枚举(不猜、不接受任意值);人工改即置 design_type_confirmed=True。"""
+    doc = db.get(models.KnowledgeDocument, document_id)
+    if doc is None:
+        raise HTTPException(404, "文档不存在")
+    new_type = payload.design_doc_type.strip()
+    if new_type not in doc_type_rules.DESIGN_DOC_TYPES:
+        raise HTTPException(422, f"不是合法的资料类型:{new_type}（须为 16 类之一）")
+    doc.design_doc_type = new_type
+    doc.design_type_confirmed = True  # 人工覆盖=已确认(不再被规则重推翻)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
 @router.post("/documents/{document_id}/generate-metadata", response_model=schemas.GenerateMetadataOut)
 def generate_metadata(document_id: int, db: Session = Depends(get_db)) -> schemas.GenerateMetadataOut:
     """AI 按需生成 description + refine type（围绕文档正文，不伪造）。
