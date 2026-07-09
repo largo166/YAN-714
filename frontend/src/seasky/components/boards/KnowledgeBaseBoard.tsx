@@ -4,8 +4,10 @@ import { api } from '@/lib/api'
 
 import { boardImages } from '../../data/boardImages'
 import type { KnowledgeLive } from '../../hooks/useKnowledgeLive'
+import { useProjectBridge } from '../../services/projectBridge'
 import { DataSourceStrip } from '../data/DataSourceStrip'
 import { CleanupWizard } from '../data/CleanupWizard'
+import { ImageAssetPool } from '../data/ImageAssetPool'
 import { KnowledgeSearch } from '../data/KnowledgeSearch'
 import { Popover } from '../common/Modal'
 import { GhostButton, Label, Pill } from '../common/PillButton'
@@ -18,6 +20,8 @@ import { MRow } from '../common/StatBlock'
 export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean; live: KnowledgeLive }) {
   const [recentOpen, setRecentOpen] = useState(false)
   const [cleanupOpen, setCleanupOpen] = useState(false)
+  const [assetPoolOpen, setAssetPoolOpen] = useState(false) /* 图片资产池(读当前项目) */
+  const proj = useProjectBridge()
   const img = boardImages.data
 
   /* 营地清理卡跳板信号:切到 b1 后自动打开清理浮层(破坏动作在此权威面执行,ADR-001) */
@@ -124,6 +128,12 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
             </Popover>
           </span>
           <GhostButton onClick={() => setCleanupOpen(true)}>一键清理 ›</GhostButton>
+          <GhostButton
+            onClick={() => setAssetPoolOpen(true)}
+            title="查看当前项目从 PPT/PDF/Word 抽出的所有图(效果图/总图/参考),可筛选、改分类、打开原文件"
+          >
+            图片资产 ›
+          </GhostButton>
           {live.inbox && (
             <Pill tone={live.inbox.configured && live.inbox.accessible ? 'ok' : 'default'}>
               {live.inbox.configured
@@ -137,6 +147,12 @@ export function KnowledgeBaseBoard({ active: _active, live }: { active: boolean;
       </div>
       {img && <DataSourceStrip />}
       <CleanupWizard open={cleanupOpen} onClose={() => setCleanupOpen(false)} />
+      <ImageAssetPool
+        open={assetPoolOpen}
+        onClose={() => setAssetPoolOpen(false)}
+        projectId={proj.cur?.id ?? null}
+        projectName={proj.cur?.name}
+      />
     </>
   )
 }

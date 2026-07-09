@@ -61,21 +61,46 @@ def availability() -> Availability:
 
 
 def ensure_model(progress: Optional[Callable[[str], None]] = None) -> None:
-    """确保模型在本机;缺则经 HF(默认镜像)下载。失败抛异常(不伪造成功)。"""
+    """确保模型在本机;缺则按 model_source 下载(ModelScope 主路 / HF 备选)。失败抛异常(不伪造成功)。
+
+    离线兜底:手动把模型放进 config.MODELS_ROOT/whisper-large-v3-turbo/(含 model.bin 等),
+    model_present() 即真,直接跳过下载——不把命交给在线下载。
+    """
     if not deps_installed():
         raise RuntimeError("转写依赖未安装(faster-whisper);请重新安装或联系维护者")
     if model_present():
         return
-    # HF_ENDPOINT 必须在 import huggingface_hub 之前设入 os.environ
-    os.environ.setdefault("HF_ENDPOINT", config.settings.hf_endpoint)
-    if progress:
-        progress("下载转写模型…(首次,约 1.6GB)")
-    from huggingface_hub import snapshot_download
+    dst = _model_dir()
+    dst.mkdir(parents=True, exist_ok=True)
+    source = (config.settings.model_source or "modelscope").lower()
 
-    _model_dir().mkdir(parents=True, exist_ok=True)
-    snapshot_download(config.settings.whisper_repo, local_dir=str(_model_dir()))
+    if source == "modelscope":
+        if progress:
+            progress("下载转写模型…(ModelScope 国内源,首次约 1.6GB)")
+        try:
+            from modelscope.hub.snapshot_download import snapshot_download as ms_download
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"ModelScope 库未安装({e});或改 model_source=hf") from e
+        # ModelScope 下到缓存后,把 CT2 文件复制到我们的标准目录
+        local = ms_download(config.settings.whisper_repo_ms)
+        import shutil
+        from pathlib import Path as _P
+        for f in _P(local).iterdir():
+            if f.is_file():
+                shutil.copy2(f, dst / f.name)
+    else:  # hf
+        os.environ.setdefault("HF_ENDPOINT", config.settings.hf_endpoint)
+        if progress:
+            progress("下载转写模型…(HuggingFace,首次约 1.6GB)")
+        from huggingface_hub import snapshot_download
+        snapshot_download(config.settings.whisper_repo, local_dir=str(dst))
+
     if not model_present():
-        raise RuntimeError("模型下载后仍未就绪(可能网络中断或镜像不可用)")
+        raise RuntimeError(
+            "模型下载后仍未就绪(网络中断/源不可达)。"
+            "可改 .env 的 model_source,或手动放模型到 "
+            + str(dst)
+        )
 
 
 def _get_model():

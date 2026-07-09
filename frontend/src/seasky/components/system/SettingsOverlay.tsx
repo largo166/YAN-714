@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import FolderPicker from '@/components/FolderPicker'
 
+import { LS_KEYS } from '../../lib/constants'
+import { lsGet, lsSet } from '../../lib/storage'
 import { GhostButton } from '../common/PillButton'
 
 /* ═══ 设置 · 两栏化(P0+ 已批,小样v4确认) ═══
@@ -75,6 +77,36 @@ function Dot({ text, tone }: { text: string; tone: 'ok' | 'warn' | 'risk' | 'mut
 function Sect({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-1 mt-4 font-sans text-[8.5px] font-medium uppercase tracking-[0.26em] text-sk-muted2">{children}</div>
+  )
+}
+
+/* 背景偏好三选(极慢粒子/静态/fbm 海);切后广播 romai:bg-updated 即时换,晕动症红线可关 */
+function BgToggle() {
+  const [v, setV] = useState<string>(() => lsGet(LS_KEYS.bg) || 'sea')
+  const pick = (val: string) => {
+    setV(val)
+    lsSet(LS_KEYS.bg, val)
+    window.dispatchEvent(new CustomEvent('romai:bg-updated'))
+  }
+  const opts: { k: string; label: string }[] = [
+    { k: 'sea', label: '海面' },
+    { k: 'particle', label: '粒子' },
+    { k: 'static', label: '静态' },
+  ]
+  return (
+    <div className="flex items-center gap-1 rounded-full border-[0.5px] border-sk-hairsoft p-0.5">
+      {opts.map((o) => (
+        <button
+          key={o.k}
+          onClick={() => pick(o.k)}
+          className={`cursor-pointer rounded-full px-3 py-1 font-skcjk text-[10.5px] font-light tracking-[0.06em] transition-colors ${
+            v === o.k ? 'bg-[rgba(127,179,207,.14)] text-sk-fg' : 'text-sk-muted2 hover:text-sk-muted'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -224,6 +256,9 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
         <PageHead cn="通用" en="General" note="应用偏好" />
         <Row title="视觉主题" desc="海天 OS(深色)。锁版视觉面,主题切换未开放。">
           <Dot text="海天" tone="mut" />
+        </Row>
+        <Row title="板块背景" desc="海面=流动光带;粒子=极慢星尘;静态=不动(久看不累/减动效)。即时生效。">
+          <BgToggle />
         </Row>
         <Row title="开机动画" desc="启动时的海平线开场。已看过则自动跳过,可在开场时按 Esc 直达。">
           <Dot text="智能跳过" tone="ok" />

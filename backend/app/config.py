@@ -128,10 +128,13 @@ class Settings(BaseSettings):
     asr_language: str = "zh"
 
     # ── 本地会议转写（faster-whisper + sherpa-onnx，录音不出本机）──
-    # HF 模型下载端点：默认国内镜像;开发机可直连 huggingface.co 时按 .env 覆盖。
+    # 模型下载源:modelscope(国内直连,CN 正解,主路) | hf(huggingface,可直连 HF 的机器用)。
+    model_source: str = "modelscope"
+    # HF 端点(model_source=hf 时用);ModelScope 走 modelscope 库自带国内 CDN。
     hf_endpoint: str = "https://hf-mirror.com"
-    # 转写模型仓库(CT2 格式,首次下载不进包);计算精度(int8=CPU 友好体积小)。
-    whisper_repo: str = "deepdml/faster-whisper-large-v3-turbo-ct2"
+    # 转写模型仓库(首次下载不进包):按源分别配 repo id(CT2 格式)。
+    whisper_repo: str = "deepdml/faster-whisper-large-v3-turbo-ct2"          # HF repo
+    whisper_repo_ms: str = "pengzhendong/faster-whisper-large-v3-turbo"      # ModelScope repo
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
 
