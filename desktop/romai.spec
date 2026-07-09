@@ -14,7 +14,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 ROOT = Path(SPECPATH).resolve().parent          # 仓库根（spec 在 desktop/ 下）
 BACKEND = ROOT / "backend"
@@ -72,6 +72,20 @@ for pkg in ("rapidocr_onnxruntime", "onnxruntime"):
     except Exception:
         pass
 
+# ── 会议转写进包(2026-07-09 已批):faster-whisper + ctranslate2 + PyAV + sherpa-onnx ──
+# 只进【代码+原生 DLL】,不进模型(whisper turbo/sherpa 分离模型首次使用时下载到 DATA_DIR/models)。
+# ctranslate2/av/sherpa_onnx/onnxruntime 带原生库,须 collect_dynamic_libs 进 binaries(非 data_files)。
+binaries_asr = []
+for pkg in ("faster_whisper", "ctranslate2", "av", "sherpa_onnx"):
+    try:
+        datas += collect_data_files(pkg)
+    except Exception:
+        pass
+    try:
+        binaries_asr += collect_dynamic_libs(pkg)
+    except Exception:
+        pass
+
 # ── 隐藏导入：uvicorn 动态加载的 loop/protocol/lifespan + 后端全部子模块 ──
 hiddenimports = []
 hiddenimports += collect_submodules("uvicorn")
@@ -88,6 +102,7 @@ hiddenimports += [
     "webview", "clr",
     "fitz", "docx", "pptx",
     "rapidocr_onnxruntime", "onnxruntime",  # OCR 进包(2026-07-08 已批)
+    "faster_whisper", "ctranslate2", "av", "sherpa_onnx",  # 会议转写进包(2026-07-09 已批)
     "app.main", "app.config", "app.database", "app.models",
 ]
 
@@ -95,7 +110,7 @@ hiddenimports += [
 a = Analysis(
     [str(ROOT / "desktop" / "launcher.py")],
     pathex=[str(BACKEND)],
-    binaries=[],
+    binaries=binaries_asr,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

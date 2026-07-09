@@ -5,8 +5,9 @@ import type { Meeting } from '@/types/schemas'
 import { projectService as ps } from '../../services'
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
 import { Popover } from '../common/Modal'
-import { ChipButton, Dot } from '../common/PillButton'
+import { ChipButton, Dot, GhostButton } from '../common/PillButton'
 import { MRow } from '../common/StatBlock'
+import { MeetingTranscribeDrawer } from './MeetingTranscribeDrawer'
 
 /* ═══ b0 · 会议链路卡(接真):tile 数字=真 overview;
    一键建会=真 POST /tencent/quick(TOKEN 未配→如实 400 中性文案,不伪造链接);
@@ -63,6 +64,7 @@ export function MeetingChainCard({ projectId, meetings, minutes, todos }: Meetin
   const [listOpen, setListOpen] = useState(false)
   const [list, setList] = useState<Meeting[] | null>(null)
   const [listErr, setListErr] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false) /* 录音转写抽屉 */
 
   /* 一键建会:真实外呼腾讯——400=未配置(中性),502=失败(红),都如实 */
   const createMeeting = useCallback(async () => {
@@ -100,11 +102,33 @@ export function MeetingChainCard({ projectId, meetings, minutes, todos }: Meetin
     setMade(null); setMakeErr(''); setList(null); setListErr(''); setListOpen(false); setCopied(false)
   }, [projectId])
 
+  /* 转写/纪要落库后刷新会议列表(下次打开浮层重取) */
+  useEffect(() => {
+    const onUpdated = () => { setList(null); setListErr('') }
+    window.addEventListener('romai:meetings-updated', onUpdated)
+    return () => window.removeEventListener('romai:meetings-updated', onUpdated)
+  }, [])
+
   const notConfigured = makeErr.includes('未配置') || makeErr.includes('not configured') || makeErr.includes('TOKEN')
 
   return (
     <GlassCard slim overflowVisible data-in>
-      <CardHead slim title="会议链路" en="Meeting Chain" right={<HeadNote>创建 → 纪要 → 看板</HeadNote>} />
+      <CardHead
+        slim
+        title="会议链路"
+        en="Meeting Chain"
+        right={
+          <span className="flex items-center gap-2.5">
+            <GhostButton
+              onClick={() => setDrawerOpen(true)}
+              title="上传录音本地转写 + 说话人分离 + 生成五段式纪要(录音不出本机)"
+            >
+              录音转写 ›
+            </GhostButton>
+            <HeadNote>创建 → 纪要 → 看板</HeadNote>
+          </span>
+        }
+      />
       <div className="flex flex-1 items-center gap-2">
         <MeetingTile
           n={String(meetings)}
@@ -166,6 +190,12 @@ export function MeetingChainCard({ projectId, meetings, minutes, todos }: Meetin
           />
         ))}
       </Popover>
+
+      <MeetingTranscribeDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projectId={projectId}
+      />
     </GlassCard>
   )
 }

@@ -1100,6 +1100,32 @@ class MeetingListOut(BaseModel):
     total: int
 
 
+# ── 本地会议录音转写(2026-07-09)──
+class TranscribeCapabilityOut(BaseModel):
+    """转写能力三态:依赖装没装 / 模型下没下 / 分离可用性。"""
+    ready: bool           # 转写整体就绪(依赖+模型都有)
+    deps: bool            # faster-whisper 依赖已装
+    model: bool           # 转写模型已下载
+    reason: str           # 面向用户一句话
+    diarize_ready: bool   # 说话人分离就绪
+    diarize_reason: str
+
+
+class TranscribeJobOut(BaseModel):
+    """转写异步任务状态(十态)。phase: running|done|failed。"""
+    job_id: str
+    phase: str
+    stage: str = ""       # 当前阶段中文名(检查文件/转写中/说话人分离中/写入项目库/完成/失败)
+    note: str = ""        # 附注(如"已分离 2 位说话人")
+    meeting_id: int = 0   # done 后指向落库的 Meeting.id
+    error: str = ""       # failed 时真实错误
+
+
+class SpeakerMapIn(BaseModel):
+    """人工把 speaker-1/2/3 映射为真实角色(→甲方王总/我方)。不承诺自动认人。"""
+    mapping: dict[str, str]  # {"speaker-1": "甲方王总", "speaker-2": "我方严总"}
+
+
 class DemandItem(BaseModel):
     """一条诉求转译，锚定原话+时间点（红线）。"""
 

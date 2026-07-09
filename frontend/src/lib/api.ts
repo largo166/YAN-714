@@ -18,6 +18,8 @@ import {
   MeetingDetailSchema,
   MeetingListSchema,
   MeetingMinuteSchema,
+  TranscribeCapabilitySchema,
+  TranscribeJobSchema,
   ProjectAnalysisListSchema,
   ProjectAnalysisSchema,
   ProjectFileDetailSchema,
@@ -67,6 +69,7 @@ import {
   type KnowledgeSearchOut,
   type MeetingDetail,
   type MeetingMinute,
+  type TranscribeJob,
   type Project,
   type ProjectAnalysis,
   type ProjectMilestone,
@@ -770,6 +773,69 @@ export const api = {
       xhr.onerror = () => reject(new Error('上传网络错误'))
       xhr.send(form)
     })
+  },
+  /** 转写能力三态(依赖/模型/分离是否就绪)。 */
+  async transcribeCapability(projectId: number) {
+    return TranscribeCapabilitySchema.parse(
+      await request(`/api/projects/${projectId}/transcribe/status`),
+    )
+  },
+  /** 上传录音起异步转写 job(带上传进度)。返回 {job_id}。 */
+  createMeetingFromAudio(
+    projectId: number,
+    file: File,
+    meta: { title: string },
+    onProgress?: (pct: number) => void,
+  ): Promise<TranscribeJob> {
+    return new Promise((resolve, reject) => {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('title', meta.title)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${BASE_URL}/api/projects/${projectId}/meetings/from-audio`)
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(TranscribeJobSchema.parse(JSON.parse(xhr.responseText)))
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error('解析失败'))
+          }
+        } else {
+          let detail = xhr.statusText
+          try {
+            const b = JSON.parse(xhr.responseText) as { detail?: string }
+            if (b?.detail) detail = b.detail
+          } catch {
+            /* ignore */
+          }
+          reject(new Error(`上传失败 ${xhr.status}: ${detail}`))
+        }
+      }
+      xhr.onerror = () => reject(new Error('上传网络错误'))
+      xhr.send(form)
+    })
+  },
+  /** 轮询转写 job 状态(十态)。 */
+  async transcribeJobStatus(projectId: number, jobId: string): Promise<TranscribeJob> {
+    return TranscribeJobSchema.parse(
+      await request(`/api/projects/${projectId}/transcribe/jobs/${jobId}`),
+    )
+  },
+  /** 人工映射 speaker-1/2/3 → 真实角色(生成纪要前)。 */
+  async updateSpeakerMap(
+    projectId: number,
+    meetingId: number,
+    mapping: Record<string, string>,
+  ): Promise<MeetingDetail> {
+    return MeetingDetailSchema.parse(
+      await request(`/api/projects/${projectId}/meetings/${meetingId}/speaker-map`, {
+        method: 'POST',
+        body: JSON.stringify({ mapping }),
+      }),
+    )
   },
   async listMeetings(projectId: number) {
     return MeetingListSchema.parse(await request(`/api/projects/${projectId}/meetings`))

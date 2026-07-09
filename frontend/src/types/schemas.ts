@@ -653,6 +653,27 @@ export const MeetingListSchema = z.object({
   total: z.number(),
 })
 
+// ── 本地会议录音转写(2026-07-09)──
+export const TranscribeCapabilitySchema = z.object({
+  ready: z.boolean(),
+  deps: z.boolean(),
+  model: z.boolean(),
+  reason: z.string().default(''),
+  diarize_ready: z.boolean(),
+  diarize_reason: z.string().default(''),
+})
+export type TranscribeCapability = z.infer<typeof TranscribeCapabilitySchema>
+
+export const TranscribeJobSchema = z.object({
+  job_id: z.string(),
+  phase: z.string(), // running | done | failed
+  stage: z.string().default(''),
+  note: z.string().default(''),
+  meeting_id: z.number().default(0),
+  error: z.string().default(''),
+})
+export type TranscribeJob = z.infer<typeof TranscribeJobSchema>
+
 export const DemandItemSchema = z.object({
   statement: z.string(),
   quote: z.string(),

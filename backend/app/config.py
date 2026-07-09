@@ -45,6 +45,10 @@ ENV_FILE = DATA_DIR / ".env" if _is_frozen() else (BASE_DIR / ".env")
 # 建仓（检查点①）在此目录下按项目名 mkdir 子目录。与 uploads(程序内部副本) 平级、互不嵌套。
 REPOS_ROOT = DATA_DIR / "repos"
 
+# 本地 AI 模型根（会议转写 whisper turbo + sherpa-onnx 分离模型）：DATA_DIR/'models'。
+# 绝不进 exe bundle（_MEIPASS 只读且每次重启清空）——首次使用时下载到此可写持久目录。
+MODELS_ROOT = DATA_DIR / "models"
+
 
 def _ensure_repos_root() -> None:
     """确保 REPOS_ROOT 存在且可写；不可建/不可写 → fail closed 抛错（不静默降级到别处）。
@@ -122,6 +126,14 @@ class Settings(BaseSettings):
     asr_api_url: str = ""
     asr_model: str = ""
     asr_language: str = "zh"
+
+    # ── 本地会议转写（faster-whisper + sherpa-onnx，录音不出本机）──
+    # HF 模型下载端点：默认国内镜像;开发机可直连 huggingface.co 时按 .env 覆盖。
+    hf_endpoint: str = "https://hf-mirror.com"
+    # 转写模型仓库(CT2 格式,首次下载不进包);计算精度(int8=CPU 友好体积小)。
+    whisper_repo: str = "deepdml/faster-whisper-large-v3-turbo-ct2"
+    whisper_compute_type: str = "int8"
+    whisper_device: str = "cpu"
 
     # ── AI 生图（key 只进本机 .env，绝不入库/同步;未配→not_configured 不伪造）──
     # APImart OpenAI 兼容异步制:提交 /v1/images/generations → 轮询 /v1/tasks/{id}

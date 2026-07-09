@@ -32,11 +32,19 @@ export const projectService = {
   listFiles: api.listProjectFiles,
   quickTencentMeeting: api.quickTencentMeeting,
   listMeetings: api.listMeetings,
+  getMeeting: api.getMeeting,
   getLatestMinute: api.getLatestMinute,
   generateMinute: api.generateMinute,
   syncTencentMinutes: api.syncTencentMinutes,
   minuteDocxUrl: api.minuteDocxUrl,
   minutePrintUrl: api.minutePrintUrl,
+  // 会议录音转写(2026-07-09)
+  transcribeCapability: api.transcribeCapability,
+  createMeetingFromAudio: api.createMeetingFromAudio,
+  createMeetingFromMaterial: api.createMeetingFromMaterial,
+  transcribeJobStatus: api.transcribeJobStatus,
+  updateSpeakerMap: api.updateSpeakerMap,
+  confirmMinute: api.confirmMinute,
 }
 
 /** b2 共创营地:技能域+特殊三件套+归档 */

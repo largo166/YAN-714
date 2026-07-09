@@ -113,6 +113,104 @@ async def create_meeting_from_material(
     return _meeting_detail(m)
 
 
+# ══ 本地会议录音转写(2026-07-09,faster-whisper + sherpa-onnx,录音不出本机)══
+
+@router.get("/{project_id}/transcribe/status", response_model=schemas.TranscribeCapabilityOut)
+def transcribe_capability(project_id: int, db: Session = Depends(get_db)):
+    """转写能力三态(依赖装没装/模型下没下)——前端据此显示"就绪/首次下载/未安装"。"""
+    from .. import transcribe_local, diarize
+
+    _project_or_404(db, project_id)
+    av = transcribe_local.availability()
+    dia_ok, dia_reason = diarize.available()
+    return schemas.TranscribeCapabilityOut(
+        ready=av.ready, deps=av.deps, model=av.model, reason=av.reason,
+        diarize_ready=dia_ok, diarize_reason=dia_reason,
+    )
+
+
+@router.post("/{project_id}/meetings/from-audio", response_model=schemas.TranscribeJobOut, status_code=202)
+async def create_meeting_from_audio(
+    project_id: int,
+    title: str = Form("未命名会议"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """上传录音 → 起异步转写 job(转写+分离+落 Meeting)。返回 job_id,前端轮询状态。
+
+    项目隔离:project_id 必须存在(404);录音存本机 uploads/{pid}/_audio,不出机。
+    热词:经认知脊椎构造 initial_prompt(项目名/甲方/城市/已确认认知 + 默认建筑术语)。
+    """
+    from .. import transcribe_jobs, transcribe_local, meeting_hotwords, analysis
+    import tempfile
+
+    proj = _project_or_404(db, project_id)
+    av = transcribe_local.availability()
+    if not av.deps:
+        raise HTTPException(503, f"转写不可用:{av.reason}")
+    fname = file.filename or "recording"
+    ext = ("." + fname.rsplit(".", 1)[-1].lower()) if "." in fname else ""
+    if ext not in transcribe_jobs.AUDIO_EXTS:
+        raise HTTPException(400, f"不支持的音频格式:{ext or '(无扩展名)'}")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "录音文件为空")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+    tmp.write(data)
+    tmp.close()
+
+    # 热词:认知脊椎 confirmed 词条 + 项目基本信息(单一注入点 gather_cognition)
+    cog_lines, _ = analysis.gather_cognition(db, project_id)
+    hotwords = meeting_hotwords.build_hotwords(
+        project_name=proj.name, city=proj.city or "", client=proj.client or "",
+        cognition_terms=cog_lines,
+    )
+    initial_prompt = meeting_hotwords.to_initial_prompt(hotwords)
+
+    job_id = transcribe_jobs.start_job(project_id, tmp.name, fname, initial_prompt, title)
+    return schemas.TranscribeJobOut(job_id=job_id, phase="running", stage="检查文件", meeting_id=0)
+
+
+@router.get("/{project_id}/transcribe/jobs/{job_id}", response_model=schemas.TranscribeJobOut)
+def transcribe_job_status(project_id: int, job_id: str, db: Session = Depends(get_db)):
+    """轮询转写 job 状态(十态)。失败态带真实 error。"""
+    from .. import transcribe_jobs
+
+    job = transcribe_jobs.get_job(job_id)
+    if job is None or job.get("project_id") != project_id:
+        raise HTTPException(404, "转写任务不存在")
+    return schemas.TranscribeJobOut(
+        job_id=job["job_id"], phase=job["phase"], stage=job.get("stage", ""),
+        note=job.get("note", ""), meeting_id=job.get("meeting_id", 0), error=job.get("error", ""),
+    )
+
+
+@router.post("/{project_id}/meetings/{meeting_id}/speaker-map", response_model=schemas.MeetingDetailOut)
+def update_speaker_map(
+    project_id: int, meeting_id: int,
+    payload: schemas.SpeakerMapIn, db: Session = Depends(get_db),
+):
+    """人工把 speaker-1/2/3 映射为真实角色(→甲方王总/我方…)。生成纪要前调用;写回 segments_json。
+
+    不承诺自动认人——纯人工映射。映射后 speaker_key 变成用户给的名字,直通五段式纪要 prompt。
+    """
+    m = _meeting_or_404(db, project_id, meeting_id)
+    segs = safe_json.loads_or(m.segments_json, [])
+    if not isinstance(segs, list):
+        raise HTTPException(400, "该会议无可映射的转写分段")
+    mapping = payload.mapping or {}
+    for s in segs:
+        if isinstance(s, dict):
+            k = s.get("speaker_key", "")
+            if k in mapping and mapping[k].strip():
+                s["speaker_key"] = mapping[k].strip()
+    m.segments_json = safe_json.dumps_safe(segs)
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return _meeting_detail(m)
+
+
 @router.get("/{project_id}/meetings", response_model=schemas.MeetingListOut)
 def list_meetings(project_id: int, db: Session = Depends(get_db)):
     _project_or_404(db, project_id)
