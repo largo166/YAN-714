@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { boardImages } from '../../data/boardImages'
 import { useProjectLive } from '../../hooks/useProjectLive'
 import { STAGE_LABELS, STAGE_ORDER, type ProjectBridge } from '../../services/projectBridge'
@@ -5,8 +7,9 @@ import { cn } from '../../lib/cn'
 import { AnalysisSummaryCard } from '../project/AnalysisSummaryCard'
 import { MeetingChainCard } from '../project/MeetingTile'
 import { ProjectSwitcher } from '../project/ProjectSwitcher'
+import { ImageAssetPool } from '../data/ImageAssetPool'
 import { CardHead, GlassCard, HeadNote } from '../common/GlassCard'
-import { Dot, Label, Pill } from '../common/PillButton'
+import { Dot, GhostButton, Label, Pill } from '../common/PillButton'
 import { MRow, StatBlock } from '../common/StatBlock'
 
 /* ═══ b0 项目中心:左图右文(构图冻结)——全卡接真:
@@ -14,6 +17,7 @@ import { MRow, StatBlock } from '../common/StatBlock'
 
 export function ProjectCenterBoard({ proj, active }: { proj: ProjectBridge; active: boolean }) {
   const img = boardImages.project
+  const [assetPoolOpen, setAssetPoolOpen] = useState(false) /* 图片资产池抽屉 */
   const live = useProjectLive(active, proj.cur?.id ?? null)
 
   const curStage = proj.cur?.current_stage || 'brief'
@@ -64,7 +68,22 @@ export function ProjectCenterBoard({ proj, active }: { proj: ProjectBridge; acti
 
         {/* 阶段拆解:16 节点,当前节点=项目 current_stage */}
         <GlassCard slim data-in>
-          <CardHead slim title="阶段拆解" en="16 Nodes" right={<HeadNote>当前 · {stageLabel}</HeadNote>} />
+          <CardHead
+            slim
+            title="阶段拆解"
+            en="16 Nodes"
+            right={
+              <span className="flex items-center gap-2.5">
+                <GhostButton
+                  onClick={() => setAssetPoolOpen(true)}
+                  title="查看本项目从 PPT/PDF/Word 抽出的所有图(效果图/总图/参考),可筛选、改分类、打开原文件"
+                >
+                  图片资产 ›
+                </GhostButton>
+                <HeadNote>当前 · {stageLabel}</HeadNote>
+              </span>
+            }
+          />
           <div className="sk-stagebar flex flex-nowrap items-center gap-[5px] pb-0.5">
             {STAGE_ORDER.map((key, i) => (
               <span
@@ -88,7 +107,6 @@ export function ProjectCenterBoard({ proj, active }: { proj: ProjectBridge; acti
           todos={live.overview?.todos ?? 0}
         />
         <AnalysisSummaryCard lead={live.analysisLead} risks={live.risks} />
-
         <GlassCard slim data-in>
           <CardHead slim title="下一步 · 里程碑" en="Milestones" />
           {live.loading && <div className="font-skcjk text-[11.5px] font-light text-sk-muted2">加载中…</div>}
@@ -102,6 +120,13 @@ export function ProjectCenterBoard({ proj, active }: { proj: ProjectBridge; acti
           ))}
         </GlassCard>
       </div>
+
+      <ImageAssetPool
+        open={assetPoolOpen}
+        onClose={() => setAssetPoolOpen(false)}
+        projectId={proj.cur?.id ?? null}
+        projectName={proj.cur?.name}
+      />
     </div>
   )
 }

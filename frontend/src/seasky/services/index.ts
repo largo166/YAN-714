@@ -14,6 +14,13 @@ export const knowledgeService = {
   upload: api.uploadProjectFile,
   index: api.indexProjectFile,
   extractAssets: api.extractFileAssets,
+  // 图片资产池(2026-07-09):读列表/改类型软删/缩略图·大图 URL/打开原文件
+  listAssets: api.listAssets,
+  updateAsset: api.updateAsset,
+  assetThumbUrl: api.assetThumbUrl,
+  assetImageUrl: api.assetImageUrl,
+  revealProjectFile: api.revealProjectFile,
+  listProjectFiles: api.listProjectFiles,
   inboxStatus: api.inboxStatus,
   workspaceStatus: api.workspaceStatus,
   workspaceScan: api.workspaceScan,
