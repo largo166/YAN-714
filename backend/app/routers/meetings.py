@@ -456,6 +456,31 @@ def export_minute_md(
     return PlainTextResponse(content=md, media_type="text/markdown; charset=utf-8")
 
 
+@router.get("/{project_id}/meetings/{meeting_id}/transcript.txt",
+            response_class=PlainTextResponse, include_in_schema=False)
+def export_transcript(project_id: int, meeting_id: int, db: Session = Depends(get_db)):
+    """转写稿纯文本导出(零 LLM,无需 key)。bug3 解耦:转写稿是资产,不该被纪要生成的 key 卡死。
+    格式:[mm:ss] 说话人: 文本,逐段。无分段则返回 raw_text。"""
+    m = _meeting_or_404(db, project_id, meeting_id)
+    segs = safe_json.loads_or(m.segments_json, [])
+    lines: list[str] = [f"# {m.title} · 转写稿", ""]
+    if isinstance(segs, list) and segs:
+        for s in segs:
+            if not isinstance(s, dict):
+                continue
+            ms = int(s.get("start_ms", 0))
+            ts = f"{ms // 60000}:{(ms // 1000) % 60:02d}"
+            spk = s.get("speaker_key", "") or ""
+            txt = (s.get("text", "") or "").strip()
+            if txt:
+                lines.append(f"[{ts}] {spk}: {txt}" if spk else f"[{ts}] {txt}")
+    elif (m.raw_text or "").strip():
+        lines.append(m.raw_text)
+    else:
+        lines.append("(无转写内容)")
+    return PlainTextResponse(content="\n".join(lines), media_type="text/plain; charset=utf-8")
+
+
 def _minute_dict(row: models.MeetingMinute) -> dict:
     return {
         "summary": safe_json.loads_or(row.summary_json, []),

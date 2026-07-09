@@ -155,3 +155,35 @@ def test_speaker_map_rewrites_keys(client):
     segs_out = r.json()["segments"]
     keys = {s["speaker_key"] for s in segs_out}
     assert keys == {"甲方王总", "我方严总"}
+
+
+def test_transcript_export_no_key_needed(client):
+    """bug3 解耦:转写稿导出零 LLM、无需 key——转写完直接拿得到文本。"""
+    from app.database import SessionLocal
+    from app import models, safe_json, transcription
+
+    p = client.post("/api/projects", json={"name": "转写稿导出测试"}).json()
+    db = SessionLocal()
+    try:
+        segs = [
+            transcription.Segment("展示区要做高台府门", speaker_key="甲方王总", start_ms=0, end_ms=3000),
+            transcription.Segment("总图建议北方庄院格局", speaker_key="我方严总", start_ms=3000, end_ms=6000),
+        ]
+        m = models.Meeting(
+            project_id=p["id"], title="市庄对接会",
+            segments_json=safe_json.dumps_safe(transcription.segments_to_dicts(segs)),
+            transcript_source="asr", status="created",
+        )
+        db.add(m)
+        db.commit()
+        db.refresh(m)
+        mid = m.id
+    finally:
+        db.close()
+    r = client.get(f"/api/projects/{p['id']}/meetings/{mid}/transcript.txt")
+    assert r.status_code == 200
+    body = r.text
+    assert "市庄对接会" in body
+    assert "高台府门" in body and "北方庄院" in body  # 两段转写文本都在
+    assert "甲方王总" in body and "[0:00]" in body  # 说话人 + 时间戳
+

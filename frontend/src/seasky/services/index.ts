@@ -46,6 +46,7 @@ export const projectService = {
   syncTencentMinutes: api.syncTencentMinutes,
   minuteDocxUrl: api.minuteDocxUrl,
   minutePrintUrl: api.minutePrintUrl,
+  transcriptTxtUrl: api.transcriptTxtUrl,
   // 会议录音转写(2026-07-09)
   transcribeCapability: api.transcribeCapability,
   createMeetingFromAudio: api.createMeetingFromAudio,

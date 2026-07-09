@@ -556,8 +556,42 @@ export function MeetingTranscribeDrawer({ open, onClose, projectId, projectName 
               {!minute ? (
                 <div className="py-6 text-center font-skcjk text-[12.5px] text-sk-muted2">加载中…</div>
               ) : minute.gen_status === 'not_configured' ? (
-                <div className="rounded-skcard border-[0.5px] border-sk-hairsoft bg-sk-card p-4 font-skcjk text-[12px] font-light leading-[1.7] text-sk-muted">
-                  AI 引擎未配置,请先在设置中配置 API Key。
+                /* 解耦(bug3):无 key 不生成五段式纪要,但转写稿是资产——直接给看+导出+复制,不卡死 */
+                <div className="flex flex-col gap-3">
+                  <div className="rounded-skcard border-[0.5px] border-[rgba(201,178,127,.3)] bg-[rgba(201,178,127,.05)] p-4 font-skcjk text-[12px] font-light leading-[1.7] text-sk-warn">
+                    未配置 AI 引擎,暂不能生成五段式纪要。<span className="text-sk-muted">但转写稿已保存,可直接查看、复制或导出为 txt。</span>到设置 · AI 引擎填 DeepSeek Key 后,回来点「生成纪要」即可。
+                  </div>
+                  {meeting && meeting.segments.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <Label>转写稿</Label>
+                        <GhostButton
+                          className="px-3 py-1 text-[10.5px]"
+                          onClick={() => { if (meeting) window.open(ps.transcriptTxtUrl(meeting.project_id, meeting.id), '_blank') }}
+                        >
+                          导出 txt
+                        </GhostButton>
+                        <GhostButton
+                          className="px-3 py-1 text-[10.5px]"
+                          onClick={() => {
+                            if (!meeting) return
+                            const txt = meeting.segments.map((s) => `[${fmtMs(s.start_ms)}] ${s.speaker_key ? s.speaker_key + ': ' : ''}${s.text}`).join('\n')
+                            void navigator.clipboard?.writeText(txt)
+                          }}
+                        >
+                          复制全文
+                        </GhostButton>
+                      </div>
+                      <div className="sk-scroll max-h-[320px] overflow-y-auto rounded-skcard border-[0.5px] border-sk-hairsoft bg-sk-card p-3">
+                        {meeting.segments.map((s, i) => (
+                          <div key={i} className="mb-1.5 font-skcjk text-[11.5px] font-light leading-[1.7] text-sk-muted">
+                            <span className="font-skmono text-[10px] text-sk-muted2">[{fmtMs(s.start_ms)}]</span>{' '}
+                            {s.speaker_key && <span className="text-sk-primary">{s.speaker_key}:</span>} {s.text}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : minute.gen_status === 'no_material' ? (
                 <div className="rounded-skcard border-[0.5px] border-sk-hairsoft bg-sk-card p-4 font-skcjk text-[12px] font-light leading-[1.7] text-sk-muted">

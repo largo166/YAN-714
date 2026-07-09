@@ -905,6 +905,10 @@ export const api = {
   minutePrintUrl(projectId: number, meetingId: number, minuteId: number, internal = false): string {
     return `${BASE_URL}/api/projects/${projectId}/meetings/${meetingId}/minute/${minuteId}/print${internal ? '?internal=true' : ''}`
   },
+  /** 转写稿纯文本导出 URL（零 LLM,无需 key;bug3 解耦——转写稿是资产)。 */
+  transcriptTxtUrl(projectId: number, meetingId: number): string {
+    return `${BASE_URL}/api/projects/${projectId}/meetings/${meetingId}/transcript.txt`
+  },
   /** 一键创建腾讯会议（零输入）。 */
   async quickTencentMeeting(projectId: number): Promise<MeetingDetail> {
     return MeetingDetailSchema.parse(

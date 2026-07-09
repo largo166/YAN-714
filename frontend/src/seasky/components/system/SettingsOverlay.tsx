@@ -496,6 +496,11 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
         </div>
         {msg && <div className="mt-1.5 font-skcjk text-[11px] font-light text-sk-ok">{msg}</div>}
         {err && <div className="mt-1.5 font-skcjk text-[11px] font-light text-sk-risk">{err}</div>}
+        <div className="mt-1.5 font-skcjk text-[10.5px] font-light leading-[1.6] text-sk-muted2">
+          {keySet
+            ? '已就绪:会议纪要五段式生成、PPT 大纲、AI 研判即可用。'
+            : '用于会议纪要五段式生成、PPT 大纲、AI 研判。未配置时转写稿仍可查看/导出,只是不生成纪要。填入并保存后立即可用,无需重启。'}
+        </div>
         <Row title="回复语言" desc="固定 AI 回复与纪要的语言;「跟随用户」时按你的消息判断。中英混合汇报场景用。" plan>
           <Dot text="跟随用户" tone="mut" />
         </Row>
