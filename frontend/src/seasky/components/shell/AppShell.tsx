@@ -18,7 +18,7 @@ import { BoardsSelect } from './BoardsSelect'
 import { GateScene } from './GateScene'
 import { IntroFilm } from './IntroFilm'
 import { SeaCanvas } from './SeaCanvas'
-import { ParticleField } from './ParticleField'
+import { FilmSea } from './FilmSea'
 import { CineLayer, SkipIntro, useFluidStage } from './SkipIntro'
 import { StatusBar, TopNavCapsules } from './TopNavCapsules'
 import { SettingsOverlay } from '../system/SettingsOverlay'
@@ -36,13 +36,13 @@ export function AppShell() {
   const [progress, setProgress] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false) /* P0:Ctrl+K 全局检索 */
-  const [bg, setBg] = useState<string>(() => lsGet(LS_KEYS.bg) || 'sea') /* 五板背景偏好:sea|particle|static */
+  const [bg, setBg] = useState<string>(() => lsGet(LS_KEYS.bg) || 'particle') /* 五板背景偏好:particle(默认,衔接影片)|static|sea(旧网点) */
   const appRef = useRef<HTMLDivElement>(null)
   const enteredRef = useRef(false)
 
   /* 背景切换:设置页改后广播 romai:bg-updated,即时换背景(无需重启) */
   useEffect(() => {
-    const onBg = () => setBg(lsGet(LS_KEYS.bg) || 'sea')
+    const onBg = () => setBg(lsGet(LS_KEYS.bg) || 'particle')
     window.addEventListener('romai:bg-updated', onBg)
     return () => window.removeEventListener('romai:bg-updated', onBg)
   }, [])
@@ -145,11 +145,11 @@ export function AppShell() {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black">
       <div ref={stageRef} className="relative h-[720px] w-[1280px] origin-center overflow-hidden bg-sk-bg">
-        {/* 影片期不挂常驻背景(v12 影片自带粒子海+不透明底,后方全遮挡仍满帧=纯浪费;
-            uniforms 是模块单例,gate 相重挂无损契约——对抗审查修)。
-            背景可切(已批):sea=fbm 海(默认) / particle=粒子(极慢极淡) / static=粒子静态不动。 */}
+        {/* 影片期不挂常驻背景(v12 影片自带粒子海+不透明底,后方全遮挡仍满帧=纯浪费)。
+            全线统一(2026-07-09 已批):gate/boards 用与开机影片同款粒子海(FilmSea),消除影片→口令闸断层。
+            背景档:particle=粒子海(默认,衔接影片) / static=粒子海静止(久看不累/减动效) / sea=旧 fbm 网点(保留可选)。 */}
         {phase !== 'film' &&
-          (bg === 'sea' ? <SeaCanvas /> : <ParticleField animated={bg !== 'static'} />)}
+          (bg === 'sea' ? <SeaCanvas /> : <FilmSea animated={bg !== 'static'} />)}
         {/* scrim */}
         <div
           className="pointer-events-none absolute inset-0 z-[1]"

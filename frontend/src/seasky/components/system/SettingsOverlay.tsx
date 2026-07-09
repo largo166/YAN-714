@@ -82,16 +82,16 @@ function Sect({ children }: { children: React.ReactNode }) {
 
 /* 背景偏好三选(极慢粒子/静态/fbm 海);切后广播 romai:bg-updated 即时换,晕动症红线可关 */
 function BgToggle() {
-  const [v, setV] = useState<string>(() => lsGet(LS_KEYS.bg) || 'sea')
+  const [v, setV] = useState<string>(() => lsGet(LS_KEYS.bg) || 'particle')
   const pick = (val: string) => {
     setV(val)
     lsSet(LS_KEYS.bg, val)
     window.dispatchEvent(new CustomEvent('romai:bg-updated'))
   }
   const opts: { k: string; label: string }[] = [
-    { k: 'sea', label: '海面' },
-    { k: 'particle', label: '粒子' },
-    { k: 'static', label: '静态' },
+    { k: 'particle', label: '粒子海' },
+    { k: 'static', label: '静止' },
+    { k: 'sea', label: '网点' },
   ]
   return (
     <div className="flex items-center gap-1 rounded-full border-[0.5px] border-sk-hairsoft p-0.5">
@@ -257,7 +257,7 @@ export function SettingsOverlay({ open, onClose }: { open: boolean; onClose: () 
         <Row title="视觉主题" desc="海天 OS(深色)。锁版视觉面,主题切换未开放。">
           <Dot text="海天" tone="mut" />
         </Row>
-        <Row title="板块背景" desc="海面=流动光带;粒子=极慢星尘;静态=不动(久看不累/减动效)。即时生效。">
+        <Row title="板块背景" desc="粒子海=与开机同款粒子海(默认,衔接开场);静止=粒子海不动(久看不累/减动效);网点=旧 fbm 底。即时生效。">
           <BgToggle />
         </Row>
         <Row title="开机动画" desc="启动时的海平线开场。已看过则自动跳过,可在开场时按 Esc 直达。">

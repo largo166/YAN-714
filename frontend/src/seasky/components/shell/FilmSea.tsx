@@ -109,14 +109,14 @@ function makeSimplex(): (xin: number, yin: number) => number {
   }
 }
 
-export function FilmSea() {
+export function FilmSea({ animated = true }: { animated?: boolean } = {}) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const cv = ref.current
     if (!cv) return
-    /* 减动效红线:该人群在导航层已直达口令闸不进影片;此处兜底静态 */
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    /* 减动效红线 或 静态档:粒子海不跑动画,渲染一帧静止画面(晕动症红线;全线统一背景兜底) */
+    const still = !animated || matchMedia('(prefers-reduced-motion: reduce)').matches
     filmSeaReset()
 
     const renderer = new WebGLRenderer({ canvas: cv, antialias: true, alpha: true })
@@ -212,12 +212,17 @@ export function FilmSea() {
     }
     addEventListener('pointermove', onPtr)
 
-    /* 流体舞台:画布逻辑尺寸随 stage 变(帧内轻量自检,同 SeaCanvas 惯例) */
+    /* 流体舞台:画布逻辑尺寸随 stage 变(帧内轻量自检,同 SeaCanvas 惯例)。
+       退化视口防呆:clientW/H 夹到 [1,4096],防某些环境(如 1px 宽 headless)算出天文尺寸把 GPU 打爆。 */
     let lastW = 0
     let lastH = 0
+    const clampDim = (n: number, fallback: number) => {
+      if (!Number.isFinite(n) || n <= 0) return fallback
+      return Math.min(n, 4096)
+    }
     const resize = () => {
-      const cw = cv.clientWidth || 1280
-      const ch = cv.clientHeight || 720
+      const cw = clampDim(cv.clientWidth, 1280)
+      const ch = clampDim(cv.clientHeight, 720)
       if (cw === lastW && ch === lastH) return
       lastW = cw
       lastH = ch
@@ -227,11 +232,13 @@ export function FilmSea() {
     }
 
     let raf = 0
-    const frame = (time: number) => {
+    const frame = (rawTime: number) => {
       resize()
       cur.x += (ptr.x - cur.x) * 0.03
       cur.y += (ptr.y - cur.y) * 0.03
       const now = performance.now() * 0.001
+      /* 静态档:锁定一帧时间(不推进海浪/月光带/镜头),渲染一次静止画面 */
+      const time = still ? 8000 : rawTime
 
       /* 恒定节奏:海面与叙事参数解耦,全程不变速不变幅(v12) */
       const flow = 0.62
@@ -302,7 +309,7 @@ export function FilmSea() {
       camera.position.y = 4.4 + Math.sin(time * 0.00007) * 0.15 - cur.y * 0.8
       camera.lookAt(0, -0.3, 0)
       renderer.render(scene, camera)
-      raf = requestAnimationFrame(frame)
+      if (!still) raf = requestAnimationFrame(frame) /* 静态档只画一帧,不占 rAF */
     }
     raf = requestAnimationFrame(frame)
 
@@ -315,7 +322,7 @@ export function FilmSea() {
       lineMat.dispose()
       renderer.dispose()
     }
-  }, [])
+  }, [animated])
 
   /* canvas 替换元素必须显式 h-full w-full(P0 尺寸失配教训);opacity-90=v12 #dither */
   return <canvas ref={ref} className="absolute inset-0 z-0 h-full w-full opacity-90" />
