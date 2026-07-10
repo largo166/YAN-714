@@ -23,4 +23,8 @@
 | WeasyPrint | Python 包 | 后端 HTML→PDF | Windows GTK/中文字体不稳，已用浏览器打印替代，**放弃** |
 | Tesseract OCR | CLI/引擎 | 扫描件转文字 | 装引擎+精度+性能不可控，无明确需求 |
 | faster-whisper | Python 包(本地模型) | 本地录音转写 | 模型大/CPU 慢；腾讯会议转写已覆盖该场景 |
-| DuckDuckGo 搜索 |
+| DuckDuckGo 搜索 | Python 包 | 无 key 资料调研 | 官方 WebSearch 已够用；非官方易限流，不进运行时 |
+| ArchViz-AI-Studio | 独立前端(Gemini) | 建筑生图 | 依赖 Gemini key+独立前端，生图已有替代，放弃 |
+
+## ASR 录音转写（已停用保留）
+`app/transcription.py` 的音频 ASR 入口 4E 起停用（标 DEPRECATED 保留不删；`text_to_segments` 等仍复用）。后续若确认 ASR 方案再启用。
