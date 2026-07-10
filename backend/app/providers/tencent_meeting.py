@@ -64,6 +64,18 @@ def is_configured() -> bool:
     return bool(_token()) and _skill_script() is not None
 
 
+def _decode(b: bytes) -> str:
+    """子进程输出解码防呆:Windows 下 skill 脚本 stdout 常为 GBK(如'会议'=b'\\xbb\\xe1\\xd2\\xe9'),
+    硬按 UTF-8 解会把中文全变 '�' 一路糊到前端红字(2026-07-10 实锤)。
+    策略:先严格 UTF-8;失败则 GBK;再失败才 UTF-8+replace 兜底。"""
+    for enc in ("utf-8", "gbk"):
+        try:
+            return b.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return b.decode("utf-8", errors="replace")
+
+
 def _run_tool(name: str, arguments: dict, *, timeout: float = 60.0) -> dict:
     """调 skill 脚本的 tools/call。返回解析后的 JSON dict。失败抛 RuntimeError。"""
     script = _skill_script()
@@ -78,13 +90,15 @@ def _run_tool(name: str, arguments: dict, *, timeout: float = 60.0) -> dict:
         [sys.executable, str(script), "tools/call", payload],
         cwd=str(script.parent), env=env, capture_output=True, timeout=timeout,
     )
-    out = proc.stdout.decode("utf-8", errors="replace").strip()
+    out = _decode(proc.stdout).strip()
     if proc.returncode != 0 or not out:
-        raise RuntimeError(f"skill 调用失败: {out[:200] or proc.stderr.decode('utf-8','replace')[:200]}")
+        raise RuntimeError(f"skill 调用失败: {out[:200] or _decode(proc.stderr)[:200]}")
     try:
         return json.loads(out)
-    except ValueError as e:
-        raise RuntimeError(f"skill 输出非 JSON: {e}")
+    except ValueError:
+        # 脚本以纯文本报错(returncode=0 但非 JSON,如"[错误] tool execution failed…"):
+        # 把可读原文透传,而非"输出非 JSON"这种无信息报错。
+        raise RuntimeError(out[:200])
 
 
 def _body(resp: dict) -> dict:
