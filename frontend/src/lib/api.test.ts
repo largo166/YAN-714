@@ -9,29 +9,29 @@ import { api, resolveApiBase } from './api'
 
 describe('resolveApiBase · 端口→后端映射(防呆)', () => {
   const origWin = globalThis.window
-  const setPort = (port: string) => {
+  const setLocation = (port: string, origin: string) => {
     // @ts-expect-error 测试注入 location
-    globalThis.window = { location: { port } }
+    globalThis.window = { location: { port, origin } }
   }
   afterEach(() => {
     globalThis.window = origWin
   })
 
   it('5173(dev) → 打 8000 后端', () => {
-    setPort('5173')
+    setLocation('5173', 'http://127.0.0.1:5173')
     expect(resolveApiBase()).toBe('http://127.0.0.1:8000')
   })
   it('4173(vite preview) → 打 8000 后端(此前落同源→满屏红字的根因)', () => {
-    setPort('4173')
+    setLocation('4173', 'http://127.0.0.1:4173')
     expect(resolveApiBase()).toBe('http://127.0.0.1:8000')
   })
-  it('8000(后端同源托管 dist) → 同源空串', () => {
-    setPort('8000')
-    expect(resolveApiBase()).toBe('')
+  it('8000(后端同源托管 dist) → 当前服务 Origin', () => {
+    setLocation('8000', 'http://127.0.0.1:8000')
+    expect(resolveApiBase()).toBe('http://127.0.0.1:8000')
   })
-  it('其他端口(exe/未知) → 同源空串', () => {
-    setPort('')
-    expect(resolveApiBase()).toBe('')
+  it('公网 HTTPS → 当前公网 Origin，不残留本地 API 地址', () => {
+    setLocation('', 'https://rom-ai.example.com')
+    expect(resolveApiBase()).toBe('https://rom-ai.example.com')
   })
 })
 
@@ -69,6 +69,8 @@ describe('request() · 连不到后端给人话(不抛 Unexpected token)', () =>
       json: async () => ({ status: 'ok', service: 'rom-ai-backend', database: 'sqlite' }),
     } as unknown as Response)
     await expect(api.health()).resolves.toMatchObject({ status: 'ok' })
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect((init as RequestInit).credentials).toBe('include')
   })
 
   it('非 2xx JSON → 保留 API 状态错误(不被防呆吞掉)', async () => {
@@ -120,7 +122,7 @@ describe('共创营地 API 契约', () => {
 
     await expect(api.exportSkillResultPptx(7, 9, { 1: 11 })).resolves.toBe(blob)
     const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(url).toBe('/api/projects/7/skill-results/9/export.pptx')
+    expect(url).toBe('http://localhost:3000/api/projects/7/skill-results/9/export.pptx')
     expect((init as RequestInit).method).toBe('POST')
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({ slide_asset_ids: { '1': 11 } })
   })

@@ -106,13 +106,13 @@ import {
 // - Vite 开发/预览端口(5173 dev / 4173 vite preview) → 打本地 FastAPI 8000。
 //   （2026-07-10 防呆:4173 也纳入——vite preview 只托管静态 dist、无 /api,
 //    此前落到同源'' → /api 打到自己返回 HTML → 满屏"Unexpected token '<'"红错。）
-// - 其余(exe / 8000 后端同源托管 dist，或未来端口) → 相对同源('')，请求走 /api。
+// - 其余(exe / 8000 / 公网 HTTPS) → 当前页面 Origin，API 地址自然随公网域名切换。
 const DEV_PREVIEW_PORTS = new Set(['5173', '4173'])
 export function resolveApiBase(): string {
   const explicit = import.meta.env.VITE_API_BASE_URL as string | undefined
   if (explicit) return explicit
   if (typeof window !== 'undefined' && DEV_PREVIEW_PORTS.has(window.location.port)) return 'http://127.0.0.1:8000'
-  return ''
+  return typeof window !== 'undefined' ? window.location.origin : ''
 }
 const BASE_URL: string = resolveApiBase()
 
@@ -127,6 +127,7 @@ async function request<T = unknown>(path: string, options: RequestInit = {}): Pr
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
+      credentials: 'include',
       ...options,
     })
   } catch {
@@ -162,6 +163,12 @@ export interface HealthStatus {
   database: string
 }
 
+export interface AccessStatus {
+  enabled: boolean
+  configured: boolean
+  authenticated: boolean
+}
+
 export interface SendMessageInput {
   message: string
   use_knowledge?: boolean
@@ -173,6 +180,19 @@ export interface SendMessageInput {
 
 export const api = {
   baseUrl: BASE_URL,
+
+  async accessStatus(): Promise<AccessStatus> {
+    return request<AccessStatus>('/api/access/status')
+  },
+  async accessLogin(password: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>('/api/access/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    })
+  },
+  async accessLogout(): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>('/api/access/logout', { method: 'POST' })
+  },
 
   async health(): Promise<HealthStatus> {
     return request<HealthStatus>('/health')

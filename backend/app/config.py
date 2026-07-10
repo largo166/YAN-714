@@ -113,6 +113,14 @@ class Settings(BaseSettings):
     database_url: str = ""
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
+    # ── 公网访问闸（默认关闭，桌面/本地开发行为不变）──
+    # 开启后，除 health 与登录端点外，所有 API/接口文档都需要签名 HttpOnly 会话。
+    access_control_enabled: bool = False
+    access_password: str = ""
+    access_session_secret: str = ""
+    access_session_hours: int = 12
+    access_cookie_secure: bool = False
+
     # DeepSeek key 权威存于 DB(AppSetting.deepseek_api_key);此处仅用于「预置 key 分发」:
     # bundle 的 .env 带 deepseek_api_key → 首启 seed 写进空库的 AppSetting。运行期消费仍读 DB。
     deepseek_api_key: str = ""

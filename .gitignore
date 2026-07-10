@@ -20,7 +20,13 @@ dist/
 .env.*
 !.env.example
 !desktop/.env.bundle.example
+!frontend/.env.production
 *.local
+/.claude/settings.local.json
+
+# 公网部署本机密钥与下载型隧道客户端
+/deploy/public.env
+/tools/cloudflared.exe
 
 # ── 日志 / 临时 ──
 logs/
