@@ -52,3 +52,7 @@ build/
 
 # 本地会议转写模型目录(1.6GB,首次下载,永不入库)
 .romai_data/
+
+# 待核来历的并行会话产物(2026-07-10,核过再定去留)
+prototypes/ai-workflow-survey/
+prototypes/ai-workflow-survey-package.tar.gz
