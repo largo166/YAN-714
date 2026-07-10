@@ -81,3 +81,47 @@ describe('request() · 连不到后端给人话(不抛 Unexpected token)', () =>
     await expect(api.health()).rejects.toThrow(/API 500: 服务器炸了/)
   })
 })
+
+describe('共创营地 API 契约', () => {
+  const realFetch = globalThis.fetch
+  beforeEach(() => vi.restoreAllMocks())
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('runSkill 可携带图生图参考资产 ref_asset_ids', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => ({
+        skill_id: 'img',
+        status: 'ok',
+        title: 'AI 生图',
+        content: '',
+        image_url: '1/AI.png',
+        result_id: 9,
+      }),
+    } as unknown as Response)
+
+    await api.runSkill(7, 'img', 'stepped facade', 'gemini-3-pro-image-preview', 0, '', '', '', [11, 12])
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({ ref_asset_ids: [11, 12] })
+  })
+
+  it('exportSkillResultPptx 用 POST 提交手动 slide_asset_ids 并返回 blob', async () => {
+    const blob = new Blob(['pptx'])
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
+      blob: async () => blob,
+    } as unknown as Response)
+
+    await expect(api.exportSkillResultPptx(7, 9, { 1: 11 })).resolves.toBe(blob)
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(url).toBe('/api/projects/7/skill-results/9/export.pptx')
+    expect((init as RequestInit).method).toBe('POST')
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({ slide_asset_ids: { '1': 11 } })
+  })
+})

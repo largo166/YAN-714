@@ -330,6 +330,12 @@ class SkillResultOut(BaseModel):
     created_at: datetime
 
 
+class PptExportIn(BaseModel):
+    """PPT 手动配图导出:slide_no -> file_assets.id。"""
+
+    slide_asset_ids: dict[str, int] = {}
+
+
 class SkillResultListOut(BaseModel):
     items: List[SkillResultOut]
     total: int

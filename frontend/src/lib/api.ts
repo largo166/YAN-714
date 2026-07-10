@@ -236,11 +236,11 @@ export const api = {
   async listSkills(): Promise<SkillList> {
     return SkillListSchema.parse(await request('/api/skills'))
   },
-  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', audience = '', mode = '', signal?: AbortSignal): Promise<SkillRun> {
+  async runSkill(projectId: number, skillId: string, input = '', model = '', sessionId = 0, imagePrompt = '', audience = '', mode = '', refAssetIds: number[] = [], signal?: AbortSignal): Promise<SkillRun> {
     return SkillRunSchema.parse(
       await request(`/api/projects/${projectId}/skills/${skillId}/run`, {
         method: 'POST',
-        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt, audience, mode }),
+        body: JSON.stringify({ input, model, session_id: sessionId, image_prompt: imagePrompt, audience, mode, ref_asset_ids: refAssetIds }),
         signal,
       }),
     )
@@ -278,6 +278,30 @@ export const api = {
   /** PPT 大纲成果导出为 .pptx 的下载 URL(后端据已落库结构化 output_json 渲染)。 */
   skillResultPptxUrl(projectId: number, resultId: number): string {
     return `${BASE_URL}/api/projects/${projectId}/skill-results/${resultId}/export.pptx`
+  },
+  /** 成果导出 PPTX(POST):slide_asset_ids={页号:资产id} 手动指定每页图槽用图;返回 Blob 供前端触发下载。 */
+  async exportSkillResultPptx(projectId: number, resultId: number, slideAssetIds: Record<number, number> = {}): Promise<Blob> {
+    let res: Response
+    try {
+      res = await fetch(`${BASE_URL}/api/projects/${projectId}/skill-results/${resultId}/export.pptx`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slide_asset_ids: slideAssetIds }),
+      })
+    } catch {
+      throw new Error(backendUnreachableMessage())
+    }
+    if (!res.ok) {
+      let detail = res.statusText
+      try {
+        const body = (await res.json()) as { detail?: string }
+        if (body?.detail) detail = body.detail
+      } catch {
+        // 忽略非 JSON 错误体
+      }
+      throw new Error(`API ${res.status}: ${detail}`)
+    }
+    return res.blob()
   },
 
   // ── 协作平台（C4）──

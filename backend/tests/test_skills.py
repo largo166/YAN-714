@@ -203,6 +203,89 @@ def test_command_img_needs_confirm(client, monkeypatch):
     assert "terrace" in r["prompt"]  # 确认弹窗给的是真要用的英文提示词,不是用户原中文
 
 
+def test_ppt_export_post_uses_manual_slide_assets(client):
+    """PPT 导出:POST 支持用户手动指定每页图片资产,返回真实 pptx。"""
+    import json as _json
+    from app import models, uploads
+    from app.database import SessionLocal
+
+    pid = _new_project(client, name="PPT手动配图测试")
+    stored = uploads.save_upload(pid, "manual-slide.png",
+                                 b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                                 b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+                                 b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05"
+                                 b"\xfe\x02\xfeA\xe2!\xbc\x00\x00\x00\x00IEND\xaeB`\x82")
+    db = SessionLocal()
+    try:
+        asset = models.FileAsset(
+            project_id=pid, source_file_id=0, asset_type="render",
+            stored_path=stored.stored_path, ext=".png", caption="退台立面意向图",
+            width=1, height=1,
+        )
+        result = models.SkillResult(
+            project_id=pid, skill_id="ppt", title="PPT 大纲", status="ok",
+            content="# x",
+            output_json=_json.dumps({
+                "title": "手动配图汇报",
+                "slides": [{"no": 1, "title": "立面策略", "keyMessage": "退台立面",
+                            "bullets": ["形成城市界面"], "visualSuggestion": "效果图"}],
+            }, ensure_ascii=False),
+        )
+        db.add_all([asset, result])
+        db.commit()
+        aid, rid = asset.id, result.id
+    finally:
+        db.close()
+
+    r = client.post(f"/api/projects/{pid}/skill-results/{rid}/export.pptx",
+                    json={"slide_asset_ids": {"1": aid}})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    )
+    assert r.content[:2] == b"PK"
+
+
+def test_ppt_export_post_rejects_other_project_asset(client):
+    """PPT 手动配图:asset 必须属于当前项目,防止跨项目串图。"""
+    import json as _json
+    from app import models, uploads
+    from app.database import SessionLocal
+
+    pid = _new_project(client, name="PPT配图主项目")
+    other_pid = _new_project(client, name="PPT配图其他项目")
+    stored = uploads.save_upload(other_pid, "other.png",
+                                 b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                                 b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+                                 b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05"
+                                 b"\xfe\x02\xfeA\xe2!\xbc\x00\x00\x00\x00IEND\xaeB`\x82")
+    db = SessionLocal()
+    try:
+        asset = models.FileAsset(
+            project_id=other_pid, source_file_id=0, asset_type="render",
+            stored_path=stored.stored_path, ext=".png", caption="其他项目图",
+            width=1, height=1,
+        )
+        result = models.SkillResult(
+            project_id=pid, skill_id="ppt", title="PPT 大纲", status="ok",
+            output_json=_json.dumps({
+                "title": "越权配图汇报",
+                "slides": [{"no": 1, "title": "封面", "keyMessage": "x",
+                            "bullets": [], "visualSuggestion": "图"}],
+            }, ensure_ascii=False),
+        )
+        db.add_all([asset, result])
+        db.commit()
+        aid, rid = asset.id, result.id
+    finally:
+        db.close()
+
+    r = client.post(f"/api/projects/{pid}/skill-results/{rid}/export.pptx",
+                    json={"slide_asset_ids": {"1": aid}})
+    assert r.status_code == 400
+    assert "图片资产" in r.text
+
+
 def test_command_not_a_command(client):
     """非斜杠/未知命令 → not_command,前端走普通对话。"""
     pid = _new_project(client, name="非命令测试")

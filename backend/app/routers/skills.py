@@ -729,8 +729,26 @@ def _slide_image_map(db: Session, project_id: int, slides: list) -> dict:
     return out
 
 
-@router.get("/api/projects/{project_id}/skill-results/{result_id}/export.pptx", include_in_schema=False)
-def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depends(get_db)):
+def _manual_slide_image_map(db: Session, project_id: int, slide_asset_ids: dict) -> dict:
+    """用户手动指定 slide_no -> asset_id。资产必须属于当前项目,宁可报错不串图。"""
+    out: dict = {}
+    for raw_slide_no, raw_asset_id in (slide_asset_ids or {}).items():
+        try:
+            slide_no = int(raw_slide_no)
+            asset_id = int(raw_asset_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "图片资产映射格式错误")
+        asset = db.get(models.FileAsset, asset_id)
+        if asset is None or asset.project_id != project_id or asset.status != "active":
+            raise HTTPException(400, "图片资产不存在或不属于当前项目")
+        try:
+            out[slide_no] = str(uploads.abs_of(asset.stored_path))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(400, f"图片资产不可读取：{type(e).__name__}: {e}")
+    return out
+
+
+def _export_pptx_response(project_id: int, result_id: int, db: Session, slide_images: Optional[dict] = None):
     """把 PPT 大纲成果渲染成真 .pptx 下载(复用已落库的结构化 output_json)。"""
     from urllib.parse import quote
 
@@ -744,7 +762,7 @@ def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depe
     data = safe_json.loads_or(row.output_json, {})
     if not isinstance(data, dict) or not data.get("slides"):
         raise HTTPException(400, "该成果没有可导出的结构化内容")
-    slide_images = _slide_image_map(db, project_id, data.get("slides") or [])
+    slide_images = slide_images if slide_images is not None else _slide_image_map(db, project_id, data.get("slides") or [])
     try:
         pptx_bytes = exporters.build_pptx(data, slide_images)
     except Exception as e:  # noqa: BLE001
@@ -755,6 +773,21 @@ def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depe
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
     )
+
+
+@router.get("/api/projects/{project_id}/skill-results/{result_id}/export.pptx", include_in_schema=False)
+def export_skill_result_pptx(project_id: int, result_id: int, db: Session = Depends(get_db)):
+    """自动匹配项目图片资产后导出 PPTX(旧入口保留)。"""
+    return _export_pptx_response(project_id, result_id, db)
+
+
+@router.post("/api/projects/{project_id}/skill-results/{result_id}/export.pptx", include_in_schema=False)
+def export_skill_result_pptx_with_assets(
+    project_id: int, result_id: int, payload: schemas.PptExportIn, db: Session = Depends(get_db)
+):
+    """按用户手动选定的图片资产导出 PPTX。"""
+    slide_images = _manual_slide_image_map(db, project_id, payload.slide_asset_ids)
+    return _export_pptx_response(project_id, result_id, db, slide_images=slide_images)
 
 
 # ── 斜杠命令:对话框打 /xxx 直接触发技能 ──
