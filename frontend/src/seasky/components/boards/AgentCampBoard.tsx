@@ -12,6 +12,7 @@ import { AgentComposer } from '../agent/AgentComposer'
 import { CleanupFlowCard } from '../agent/CleanupFlowCard'
 import { CommandPalette, type PaletteItem } from '../agent/CommandPalette'
 import { FlowBtn, FlowCard, FlowTonePill, type CardTone } from '../agent/flowKit'
+import { ImageGenDrawer } from '../agent/ImageGenDrawer'
 import { MinuteFlowCard } from '../agent/MinuteFlowCard'
 import { MoaView, SpecialResultView, type Special } from '../agent/MoaView'
 import { OrganizeFlowCard, type OrganizePayload } from '../agent/OrganizeFlowCard'
@@ -70,6 +71,7 @@ export function AgentCampBoard({
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [picker, setPicker] = useState(false) /* 方案评审:快速/设计委员会 模式选择(紫黑同款能力) */
   const [paletteOpen, setPaletteOpen] = useState(false) /* 命令面板(/ 触发,能力总线确认基座) */
+  const [imgGenOpen, setImgGenOpen] = useState(false) /* 生图工作台抽屉(2026-07-10 拍板 1A) */
   const [pending, setPending] = useState<PaletteItem | null>(null) /* 已预填技能:发送键=确认执行,永不静默 */
   const [msgs, setMsgs] = useState<FlowMsg[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -160,6 +162,11 @@ export function AgentCampBoard({
   const composerText = useRef('')
   const preSelect = useCallback(
     (skillId: string, title?: string, category = '', slash?: string, confirm?: boolean) => {
+      if (skillId === '__imggen__') {
+        /* 生图卡(1A):直接开生图工作台抽屉,不进 runSkill/预填链 */
+        setImgGenOpen(true)
+        return
+      }
       if (skillId === 'review') {
         setPicker(true)
         return
@@ -497,6 +504,9 @@ export function AgentCampBoard({
 
       {/* 命令面板(/ 触发,能力总线确认基座:type-to-filter → 预填 → 发送确认) */}
       <CommandPalette open={paletteOpen} cats={live.cats} onPick={pickFromPalette} onClose={() => setPaletteOpen(false)} />
+
+      {/* 生图工作台抽屉(2026-07-10 拍板 1A/2A/3B):快捷卡「AI 生图」主入口 */}
+      <ImageGenDrawer open={imgGenOpen} onClose={() => setImgGenOpen(false)} projectId={projectId} projectName={projectName} />
 
       {/* 方案评审 · 模式选择(快速/设计委员会 MoA,紫黑同款能力海天化) */}
       {picker && (

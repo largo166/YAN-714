@@ -65,6 +65,10 @@ export const campService = {
   querySlang: api.querySlang,
   listSkillResults: api.listSkillResults,
   projectImageUrl: api.projectImageUrl,
+  // 生图抽屉(2026-07-10 1A/2A/3B):/出图 轻确认扩写 + 参考图选择器数据
+  runCommand: api.runCommand,
+  listAssets: api.listAssets,
+  assetThumbUrl: api.assetThumbUrl,
 }
 
 /** b3 协作平台:成员/甲方画像/智能体/通知 */

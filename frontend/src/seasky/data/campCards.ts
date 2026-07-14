@@ -9,9 +9,10 @@ export interface QuickCardDef {
   skillId: string
 }
 
-/* 对话共创四卡:紫黑版口径(复盘进度/概念激发/定义工作流/起草汇报),不擅改 */
+/* 对话共创四卡:2026-07-10 拍板(1A)——「复盘进度」让位「AI 生图」主入口(review 走 / 命令与评审按钮仍可达);
+   其余三卡紫黑口径不动。skillId='__imggen__' 是抽屉哨兵,不进 runSkill。 */
 export const CAMP_QC_ASK: readonly QuickCardDef[] = [
-  { i: '◐', t: '复盘进度', s: '总结近期投标推进与卡点', skillId: 'review' },
+  { i: '◫', t: 'AI 生图', s: '项目意向图 · 参考图驱动生成', skillId: '__imggen__' },
   { i: '✦', t: '概念激发', s: '头脑风暴方案概念方向', skillId: 'concept' },
   { i: '⌗', t: '定义工作流', s: '搭建设计—出图—评审流程', skillId: 'flow' },
   { i: '✎', t: '起草汇报', s: '生成甲方汇报提纲与说辞', skillId: 'brief' },

@@ -108,12 +108,17 @@ export function ImageAssetPool({ open, onClose, projectId, projectName, allProje
     }
   }, [open, projectId, allProjects, load])
 
-  /* 资产池是资产数据的消费者:入库抽图完成(knowledge-updated)时,若抽屉开着则重拉 */
+  /* 资产池是资产数据的消费者:入库抽图完成(knowledge-updated)或 AI 生图入池(assets-updated,
+     2026-07-10 事件命名约定)时,若抽屉开着则重拉 */
   useEffect(() => {
     if (!open || (!allProjects && projectId == null)) return
     const onUpd = () => { void load() }
     window.addEventListener('romai:knowledge-updated', onUpd)
-    return () => window.removeEventListener('romai:knowledge-updated', onUpd)
+    window.addEventListener('romai:assets-updated', onUpd)
+    return () => {
+      window.removeEventListener('romai:knowledge-updated', onUpd)
+      window.removeEventListener('romai:assets-updated', onUpd)
+    }
   }, [open, projectId, allProjects, load])
 
   /* 每类真实数量(来自已拉取资产) */

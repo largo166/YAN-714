@@ -289,6 +289,7 @@ class SkillRunIn(BaseModel):
     image_prompt: str = ""  # 生图:用户已确认的最终英文提示词。非空则直接用,不再二次扩写(/出图 轻确认对齐)
     audience: str = ""  # PPT 分口径档位:client|exec|review(空=不分口径);其它技能忽略(P1-F)
     ref_asset_ids: List[int] = []  # 图生图参考资产 id(生图技能用其字节作参考图;空=文生图)
+    image_purpose: str = ""  # 生图用途标签(概念/氛围/立面意向/材料板/场景/示范区…):写进资产 caption 作血缘 v1;其它技能忽略
 
 
 class SkillTasksToBoardOut(BaseModel):

@@ -565,14 +565,17 @@ def _run_skill_inner(
             return schemas.SkillRunOut(skill_id=skill_id, status="error", title="AI 生图",
                                        content="图片存盘失败。", error_message=str(exc))
         # AI 效果图同步登记为图片资产(asset_type=render)——出图那刻分类 100% 确定,不猜。
+        # caption 血缘 v1: [AI生成·用途] 前缀(2A 用途闸落点;used_in 结构化字段等 PPT 底稿实体一起做)
         try:
             w, h = image_assets._dims(res.image_bytes)
             thumb = image_assets.make_thumb(res.image_bytes)
             thumb_rel = uploads.save_upload(project_id, f"thumb-AI生图-{res.model}.jpg", thumb).stored_path if thumb else ""
+            purpose = (payload.image_purpose or "").strip()[:20]
+            cap_prefix = f"[AI生成·{purpose}] " if purpose else ("[图生图] " if ref_urls else "[AI生成] ")
             db.add(models.FileAsset(
                 project_id=project_id, source_file_id=0, asset_type="render",
                 stored_path=stored.stored_path, thumb_path=thumb_rel, ext=ext,
-                caption=((("[图生图] " if ref_urls else "") + (prompt or "AI 效果图")))[:200],
+                caption=(cap_prefix + (prompt or "AI 效果图"))[:200],
                 width=w, height=h, status="active",
             ))
             db.commit()
