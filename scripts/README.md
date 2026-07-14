@@ -33,8 +33,9 @@ powershell -ExecutionPolicy Bypass -File scripts\start-romai.ps1
 ## 公网验收（HTTPS · 匿名访问）
 
 1. 运行 `scripts/build-public.ps1`，生成同源生产 `dist`。
-2. 运行 `scripts/start-public-backend.ps1`，只监听本机 `127.0.0.1:8010`（与本地生产入口 8000 隔离）。
-3. 运行 `scripts/start-public-tunnel.ps1`，取得临时 `https://*.trycloudflare.com` 地址。
+2. 运行 `scripts/redeploy-public.ps1`，后台启动 `127.0.0.1:8010` 后端和 Quick Tunnel，并输出临时 `https://*.trycloudflare.com` 地址。
+
+`redeploy-public.ps1` 启动的进程不依赖当前终端会话；PID、当前公网地址和运行日志写入忽略提交的 `logs/public/`。需要前台观察日志时，仍可分别运行 `start-public-backend.ps1` 与 `start-public-tunnel.ps1`。
 
 按 2026-07-14 用户裁决，公网入口、开机流程和管理驾驶舱均不再要求输入密码。公网访问者可直接读取系统中的内部资料，部署前应确认链接接收范围。
 
