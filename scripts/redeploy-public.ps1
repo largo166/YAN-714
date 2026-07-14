@@ -7,8 +7,8 @@ $distIndex = Join-Path $repo "frontend\dist\seasky.html"
 $runtime = Join-Path $repo "logs\public"
 $origin = "http://127.0.0.1:8010"
 
-if (-not (Test-Path -LiteralPath $python)) { throw "缺少 backend/.venv，请先安装后端依赖。" }
-if (-not (Test-Path -LiteralPath $distIndex)) { throw "缺少 frontend/dist，请先运行 scripts/build-public.ps1。" }
+if (-not (Test-Path -LiteralPath $python)) { throw "Missing backend/.venv. Install backend dependencies first." }
+if (-not (Test-Path -LiteralPath $distIndex)) { throw "Missing frontend/dist. Run scripts/build-public.ps1 first." }
 
 New-Item -ItemType Directory -Force -Path $runtime | Out-Null
 
@@ -60,7 +60,7 @@ for ($i = 0; $i -lt 30; $i++) {
 }
 if (-not $localReady) {
     Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
-    throw "公网后端 30 秒内未就绪，请检查 $backendErr"
+    throw "Public backend did not become ready within 30 seconds. Check $backendErr"
 }
 
 $cloudflaredBefore = @(Get-Process cloudflared -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
@@ -87,7 +87,7 @@ for ($i = 0; $i -lt 45; $i++) {
 if (-not $publicUrl) {
     Stop-Process -Id $tunnelLauncher.Id -Force -ErrorAction SilentlyContinue
     Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
-    throw "45 秒内未取得 Quick Tunnel 地址，请检查 $tunnelErr"
+    throw "Quick Tunnel URL was not available within 45 seconds. Check $tunnelErr"
 }
 
 $newCloudflared = Get-Process cloudflared -ErrorAction SilentlyContinue |
@@ -105,6 +105,6 @@ for ($i = 0; $i -lt 30; $i++) {
         if ($response.StatusCode -eq 200) { $publicReady = $true; break }
     } catch { }
 }
-if (-not $publicReady) { throw "已取得隧道地址，但公网健康检查未通过：$publicUrl" }
+if (-not $publicReady) { throw "Tunnel URL was created but public health check failed: $publicUrl" }
 
 Write-Output $publicUrl
