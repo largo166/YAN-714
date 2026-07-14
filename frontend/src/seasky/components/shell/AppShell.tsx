@@ -16,7 +16,6 @@ import { KnowledgeBaseBoard } from '../boards/KnowledgeBaseBoard'
 import { ProjectCenterBoard } from '../boards/ProjectCenterBoard'
 import { BoardFrame } from './BoardFrame'
 import { BoardsSelect } from './BoardsSelect'
-import { GateScene } from './GateScene'
 import { IntroFilm } from './IntroFilm'
 import { SeaCanvas } from './SeaCanvas'
 import { FilmSea } from './FilmSea'
@@ -97,7 +96,7 @@ export function AppShell() {
           setFilmPaused((p) => !p)
         }
         if (e.code === 'Escape') {
-          nav.toGate() /* 每次开机都播(2026-07-09):Esc 只跳本次,不记「已看过」 */
+          nav.toBoards() /* 口令闸已取消：Esc 直接到五板选择 */
         }
         return
       }
@@ -149,7 +148,7 @@ export function AppShell() {
     <div className="fixed inset-0 flex items-center justify-center bg-black">
       <div ref={stageRef} className="relative h-[720px] w-[1280px] origin-center overflow-hidden bg-sk-bg">
         {/* 影片期不挂常驻背景(v12 影片自带粒子海+不透明底,后方全遮挡仍满帧=纯浪费)。
-            全线统一(2026-07-09 已批):gate/boards 用与开机影片同款粒子海(FilmSea),消除影片→口令闸断层。
+            boards 用与开机影片同款粒子海(FilmSea),保持影片→五板选择连续。
             背景档:particle=粒子海(默认,衔接影片) / static=粒子海静止(久看不累/减动效) / sea=旧 fbm 网点(保留可选)。 */}
         {phase !== 'film' &&
           (bg === 'sea' ? <SeaCanvas /> : <FilmSea animated={bg !== 'static'} />)}
@@ -164,7 +163,7 @@ export function AppShell() {
 
         {phase === 'film' && (
           <>
-            <IntroFilm paused={filmPaused} onComplete={nav.toGate} onProgress={setProgress} />
+            <IntroFilm paused={filmPaused} onComplete={nav.toBoards} onProgress={setProgress} />
             {/* 进度条 + hint + Skip(首帧即出) */}
             <div className="absolute bottom-0 left-0 z-[70] h-0.5 w-full bg-[rgba(242,241,238,.05)]">
               <i className="block h-full bg-sk-primary" style={{ width: `${progress * 100}%` }} />
@@ -174,13 +173,12 @@ export function AppShell() {
             </div>
             <SkipIntro
               onSkip={() => {
-                nav.toGate()
+                nav.toBoards()
               }}
             />
           </>
         )}
 
-        {phase === 'gate' && <GateScene onUnlock={nav.toBoards} />}
         {phase === 'boards' && <BoardsSelect onEnter={enterFromBoards} />}
 
         {/* app 壳:五板块恒挂载 display 切换。
@@ -226,7 +224,7 @@ export function AppShell() {
         <div id="sk-overlay" className="pointer-events-none absolute inset-0 z-[45]" />
 
         {/* 全局后端连接闸(根治红字反复出现):仅 app 相且未连接 → 整屏单一提示,盖住各板,杜绝满屏红字。
-            版本不一致 → 非阻断顶部横幅(已批:只提示不拦)。film/gate/boards 相不拦(那几相不依赖后端数据)。 */}
+            版本不一致 → 非阻断顶部横幅(已批:只提示不拦)。film/boards 相不拦(那两相不依赖后端数据)。 */}
         {phase === 'app' && backend.status === 'disconnected' && (
           <BackendDisconnected message={backend.message} onRetry={backend.retry} />
         )}

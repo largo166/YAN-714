@@ -82,9 +82,6 @@ export const hubService = {
 
 /** b4 驾驶舱:门禁/用量/工作量/广播/大盘 */
 export const cockpitService = {
-  adminStatus: api.adminStatus,
-  adminSetup: api.adminSetup,
-  adminLogin: api.adminLogin,
   getAiUsage: api.getAiUsage,
   getWorkload: api.getWorkload,
   getBossDashboard: api.getBossDashboard,

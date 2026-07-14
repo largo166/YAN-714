@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .access_control import AccessControlMiddleware, router as access_router
 from .config import settings, frontend_dist_dir
 from .database import init_db
 from .routers import agents, boss, broadcast, chat, health, knowledge, projects
@@ -38,7 +37,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ROM-AI Backend", version="0.2.0", lifespan=lifespan)
 
-app.add_middleware(AccessControlMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -48,7 +46,6 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
-app.include_router(access_router)
 app.include_router(projects.router)
 app.include_router(settings_router.router)
 app.include_router(chat.router)

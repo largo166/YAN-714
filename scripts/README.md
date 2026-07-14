@@ -30,12 +30,13 @@ powershell -ExecutionPolicy Bypass -File scripts\start-romai.ps1
 - 后端：<http://127.0.0.1:8000>（健康检查 `/health`，版本自检 `/api/app/version`，OpenAPI 文档 `/docs`）
 - 前端 dev：<http://127.0.0.1:5173>（仅热更新，不作证据）
 
-## 公网验收（HTTPS + 服务端访问口令）
+## 公网验收（HTTPS · 匿名访问）
 
-1. 从 `deploy/public.env.example` 复制 `deploy/public.env` 并填写强口令与会话密钥（本机文件，不进 git）。
-2. 运行 `scripts/build-public.ps1`，生成同源生产 `dist`。
-3. 运行 `scripts/start-public-backend.ps1`，只监听本机 `127.0.0.1:8010`（与本地生产入口 8000 隔离）。
-4. 运行 `scripts/start-public-tunnel.ps1`，取得临时 `https://*.trycloudflare.com` 地址。
+1. 运行 `scripts/build-public.ps1`，生成同源生产 `dist`。
+2. 运行 `scripts/start-public-backend.ps1`，只监听本机 `127.0.0.1:8010`（与本地生产入口 8000 隔离）。
+3. 运行 `scripts/start-public-tunnel.ps1`，取得临时 `https://*.trycloudflare.com` 地址。
+
+按 2026-07-14 用户裁决，公网入口、开机流程和管理驾驶舱均不再要求输入密码。公网访问者可直接读取系统中的内部资料，部署前应确认链接接收范围。
 
 Quick Tunnel 只用于公网验收，URL 会随进程重启变化且不支持 SSE。固定域名生产部署需配置 Cloudflare named tunnel token 并注册为 Windows 服务；不要把 Quick Tunnel 当长期入口。
 

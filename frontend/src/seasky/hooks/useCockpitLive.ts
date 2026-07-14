@@ -4,7 +4,7 @@ import type { AiUsageItem, BossDashboard, Broadcast, WorkloadItem } from '@/type
 
 import { cockpitService as cks } from '../services'
 
-/* b4 驾驶舱真源:门禁(sessionStorage 记住本次解锁)+ 用量/工作量/大盘/广播;
+/* b4 驾驶舱真源:用户已取消门禁，进入即拉用量/工作量/大盘/广播;
    日历=前端聚合(里程碑单源起步,会议聚合后补——降级预案已批)。
    封板可信度包(2026-07-08):数据层加 err(四源/日历失败不再静默丢弃,错误≠空库);
    sendBroadcast 成功后派发 romai:broadcast-updated(协作板横幅即时更新)。 */
@@ -16,10 +16,7 @@ export interface CalendarEvent {
 }
 
 export interface CockpitLive {
-  gate: 'checking' | 'locked' | 'setup' | 'open'
-  gateErr: string
-  unlock: (pw: string) => Promise<void>
-  setup: (pw: string) => Promise<void>
+  gate: 'open'
   loading: boolean
   usage: AiUsageItem[]
   workload: WorkloadItem[]
@@ -33,11 +30,7 @@ export interface CockpitLive {
   reload: () => void
 }
 
-const SS_KEY = 'romai_seasky_cockpit_open'
-
 export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLive {
-  const [gate, setGate] = useState<CockpitLive['gate']>('checking')
-  const [gateErr, setGateErr] = useState('')
   const [loading, setLoading] = useState(true)
   const [usage, setUsage] = useState<AiUsageItem[]>([])
   const [workload, setWorkload] = useState<WorkloadItem[]>([])
@@ -48,54 +41,9 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
   const [calErr, setCalErr] = useState('')
   const [dataVer, setDataVer] = useState(0)
 
-  /* 门禁状态:configured=有口令→locked;未配置→setup;本会话已解锁→open */
+  /* 进入后直接拉数据 */
   useEffect(() => {
-    if (!active || gate !== 'checking') return
-    if (sessionStorage.getItem(SS_KEY) === '1') {
-      setGate('open')
-      return
-    }
-    cks.adminStatus()
-      .then((s) => setGate(s.configured ? 'locked' : 'setup'))
-      .catch((e) => {
-        setGate('locked')
-        setGateErr((e as Error).message)
-      })
-  }, [active, gate])
-
-  const unlock = useCallback(async (pw: string) => {
-    setGateErr('')
-    try {
-      const r = await cks.adminLogin(pw)
-      if (r.ok) {
-        sessionStorage.setItem(SS_KEY, '1')
-        setGate('open')
-      } else {
-        setGateErr('口令不正确')
-      }
-    } catch (e) {
-      setGateErr((e as Error).message)
-    }
-  }, [])
-
-  const setup = useCallback(async (pw: string) => {
-    setGateErr('')
-    try {
-      const r = await cks.adminSetup(pw)
-      if (r.ok) {
-        sessionStorage.setItem(SS_KEY, '1')
-        setGate('open')
-      } else {
-        setGateErr('设置失败')
-      }
-    } catch (e) {
-      setGateErr((e as Error).message)
-    }
-  }, [])
-
-  /* 解锁后拉数据 */
-  useEffect(() => {
-    if (!active || gate !== 'open') return
+    if (!active) return
     let alive = true
     ;(async () => {
       setLoading(true)
@@ -121,11 +69,11 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
     return () => {
       alive = false
     }
-  }, [active, gate, dataVer])
+  }, [active, dataVer])
 
   /* 日历:里程碑单源前端聚合(每项目一请求;项目多/慢时已批降级路径就是本形态) */
   useEffect(() => {
-    if (!active || gate !== 'open' || projectIds.length === 0) return
+    if (!active || projectIds.length === 0) return
     let alive = true
     ;(async () => {
       const settled = await Promise.allSettled(
@@ -148,7 +96,7 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
     return () => {
       alive = false
     }
-  }, [active, gate, projectIds, dataVer])
+  }, [active, projectIds, dataVer])
 
   const sendBroadcast = useCallback(async (text: string) => {
     await cks.createBroadcast(text)
@@ -159,7 +107,7 @@ export function useCockpitLive(active: boolean, projectIds: number[]): CockpitLi
 
   const allErrs = [...errs, ...(calErr ? [calErr] : [])]
   return {
-    gate, gateErr, unlock, setup, loading, usage, workload, dash, broadcasts, calEvents,
+    gate: 'open', loading, usage, workload, dash, broadcasts, calEvents,
     err: allErrs.length ? `部分数据加载失败——${allErrs.join(' / ')}` : null,
     sendBroadcast,
     reload: () => setDataVer((v) => v + 1),

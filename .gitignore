@@ -24,8 +24,7 @@ dist/
 *.local
 /.claude/settings.local.json
 
-# 公网部署本机密钥与下载型隧道客户端
-/deploy/public.env
+# 公网部署下载型隧道客户端
 /tools/cloudflared.exe
 
 # ── 日志 / 临时 ──

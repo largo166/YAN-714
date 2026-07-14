@@ -10,7 +10,7 @@ export interface GoAPI {
   app(i: number): void
   /** app 相内切板块 */
   board(i: number): void
-  /** 跳到口令闸 */
+  /** 旧兼容入口：口令闸已取消，调用时跳到五板选择 */
   gate(): void
   /** 跳到五板块展开页 */
   boards(): void

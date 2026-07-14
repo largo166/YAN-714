@@ -1,6 +1,6 @@
 /* 海天 OS 常量(与视觉母版 prototypes/romai-seasky-os-v2.html 同源) */
 
-export type Phase = 'film' | 'gate' | 'boards' | 'app'
+export type Phase = 'film' | 'boards' | 'app'
 export type BoardIndex = 0 | 1 | 2 | 3 | 4
 
 export const BOARD_NAMES = ['项目中心', '数据基地', '共创营地', '协作平台', '管理驾驶舱'] as const

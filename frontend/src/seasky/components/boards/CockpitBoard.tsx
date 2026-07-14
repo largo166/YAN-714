@@ -8,8 +8,8 @@ import { Dot, GhostButton, Label } from '../common/PillButton'
 import { RetryState } from '../common/Skeleton'
 import { MRow } from '../common/StatBlock'
 
-/* ═══ b4 管理驾驶舱:数据网格(构图冻结)——真门禁+真数据 ═══
-   门禁只落 b4(boot 闸保持仪式性,决策A);甜甜圈/工作量/广播/大盘全真源;
+/* ═══ b4 管理驾驶舱:数据网格(构图冻结)——直接进入真数据 ═══
+   用户已取消全部口令输入;甜甜圈/工作量/广播/大盘全真源;
    日历=里程碑单源前端聚合(降级预案已批:含日期的里程碑上墙,自然语言 due 不伪造日期) */
 
 const USAGE_COLORS = ['#7fb3cf', '#4f7f9e', '#a8cfe0', '#5f93ad', '#d7e5ec', '#c9b27f']
@@ -26,59 +26,7 @@ export function CockpitBoard({
   projectNames: string[]
 }) {
   const live = useCockpitLive(active, projectIds)
-
-  if (live.gate !== 'open') {
-    return <GateView gate={live.gate} err={live.gateErr} onUnlock={live.unlock} onSetup={live.setup} />
-  }
   return <CockpitInner live={live} curIdx={curIdx} projectNames={projectNames} />
-}
-
-/* ── 门禁视图(海天口令语言:点点+进度线,与 boot 闸同家族) ── */
-function GateView({
-  gate,
-  err,
-  onUnlock,
-  onSetup,
-}: {
-  gate: 'checking' | 'locked' | 'setup'
-  err: string
-  onUnlock: (pw: string) => Promise<void>
-  onSetup: (pw: string) => Promise<void>
-}) {
-  const [pw, setPw] = useState('')
-  const [busy, setBusy] = useState(false)
-  const submit = async () => {
-    if (pw.length < 4 || busy) return
-    setBusy(true)
-    await (gate === 'setup' ? onSetup(pw) : onUnlock(pw))
-    setBusy(false)
-  }
-  return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-[22px]">
-      <Label>Cockpit Access{'　'}{gate === 'setup' ? '首次设置管理口令' : '管理驾驶舱已锁定'}</Label>
-      <div className="font-skcjk text-[13px] font-light tracking-[0.1em] text-sk-muted">
-        {gate === 'checking' ? '正在核对门禁状态…' : gate === 'setup' ? '设置一个本机口令(仅加盐哈希存本机,不上传)' : '输入管理口令进入 · 只读大盘'}
-      </div>
-      {gate !== 'checking' && (
-        <>
-          <input
-            type="password"
-            className="w-[300px] border-0 border-b-2 border-sk-hairsoft bg-transparent pb-2 text-center font-sans text-[22px] tracking-[0.4em] text-sk-fg outline-none transition-colors focus:border-sk-primary"
-            value={pw}
-            autoFocus
-            onChange={(e) => setPw(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void submit()
-            }}
-          />
-          <GhostButton pri onClick={() => void submit()}>
-            {busy ? '验证中…' : gate === 'setup' ? '设置并进入' : '解锁'}
-          </GhostButton>
-        </>
-      )}
-      {err && <div className="font-skcjk text-[12px] font-light text-sk-risk">{err}</div>}
-    </div>
-  )
 }
 
 /* ── 解锁后主体(构图=数据网格,冻结) ── */

@@ -163,12 +163,6 @@ export interface HealthStatus {
   database: string
 }
 
-export interface AccessStatus {
-  enabled: boolean
-  configured: boolean
-  authenticated: boolean
-}
-
 export interface SendMessageInput {
   message: string
   use_knowledge?: boolean
@@ -180,19 +174,6 @@ export interface SendMessageInput {
 
 export const api = {
   baseUrl: BASE_URL,
-
-  async accessStatus(): Promise<AccessStatus> {
-    return request<AccessStatus>('/api/access/status')
-  },
-  async accessLogin(password: string): Promise<{ ok: boolean }> {
-    return request<{ ok: boolean }>('/api/access/login', {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    })
-  },
-  async accessLogout(): Promise<{ ok: boolean }> {
-    return request<{ ok: boolean }>('/api/access/logout', { method: 'POST' })
-  },
 
   async health(): Promise<HealthStatus> {
     return request<HealthStatus>('/health')
