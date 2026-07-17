@@ -1,4 +1,4 @@
-name: Deploy ROM-AI preview to GitHub Pages
+name: Deploy ROM-AI and Prompt Daily to GitHub Pages
 
 on:
   push:
@@ -18,9 +18,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,11 +29,32 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install ROM-AI dependencies
+        working-directory: frontend
         run: npm ci
 
-      - name: Build site
+      - name: Build ROM-AI
+        working-directory: frontend
         run: npm run build
+
+      - name: Unpack Prompt Daily source
+        run: |
+          rm -rf .prompt-lab-src
+          mkdir -p .prompt-lab-src
+          cat prompt-lab/source.part*.b64 | base64 --decode | tar -xz -C .prompt-lab-src
+
+      - name: Install Prompt Daily dependencies
+        working-directory: .prompt-lab-src
+        run: npm install --no-audit --no-fund
+
+      - name: Build Prompt Daily
+        working-directory: .prompt-lab-src
+        run: npm run build
+
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p frontend/dist/prompt-lab
+          cp -R .prompt-lab-src/dist/. frontend/dist/prompt-lab/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
