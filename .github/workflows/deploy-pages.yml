@@ -42,6 +42,7 @@ jobs:
           rm -rf .prompt-lab-src
           mkdir -p .prompt-lab-src
           cat prompt-lab/source.part*.b64 | base64 --decode | tar -xz -C .prompt-lab-src
+          grep -RIl 'white/8' .prompt-lab-src/src | xargs -r sed -i 's#white/8#white/[0.08]#g'
 
       - name: Install Prompt Daily dependencies
         working-directory: .prompt-lab-src
